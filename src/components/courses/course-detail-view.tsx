@@ -59,6 +59,9 @@ export function CourseDetailView({
 }) {
   const category = courseCategory(course);
   const CategoryIcon = categoryIcon(category.icon);
+  // NB: rendered via createElement below — assigning the icon to a capitalised
+  // local and rendering it as JSX makes the compiler treat it as a
+  // "component created during render".
   const isNew = course.ratingsCount === 0;
   const { recordCourseView } = useApp();
   const { hiddenReviewIds, hydrated: adminHydrated } = useAdmin();
@@ -86,7 +89,7 @@ export function CourseDetailView({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="violet" className="gap-1">
-              <CategoryIcon aria-hidden />
+              {React.createElement(CategoryIcon, { "aria-hidden": true })}
               {category.name}
             </Badge>
             {course.badge === "bestseller" && <Badge variant="amber">Bestseller</Badge>}

@@ -37,24 +37,27 @@ export default function OnboardingPage() {
   const { hydrated, profile, saveProfile, payoutSettings, savePayoutSettings } = useCreator();
 
   const [step, setStep] = useState(0);
-  const [displayName, setDisplayName] = useState(profile.displayName);
-  const [headline, setHeadline] = useState(profile.headline);
-  const [country, setCountry] = useState(profile.country);
+  /* Draft identity fields follow the stored profile until the creator types. */
+  const [identity, setIdentity] = useState<{
+    displayName: string;
+    headline: string;
+    country: string;
+  } | null>(null);
+  const displayName = identity?.displayName ?? profile.displayName;
+  const headline = identity?.headline ?? profile.headline;
+  const country = identity?.country ?? profile.country;
+  const setField = <K extends "displayName" | "headline" | "country">(key: K, value: string) =>
+    setIdentity((prev) => ({
+      displayName: prev?.displayName ?? profile.displayName,
+      headline: prev?.headline ?? profile.headline,
+      country: prev?.country ?? profile.country,
+      [key]: value,
+    }));
   const [topics, setTopics] = useState<string[]>(profile.topics.slice(0, 3));
   const [firstCategory, setFirstCategory] = useState(profile.topics[0] ? "generative-ai" : "");
   const [method, setMethod] = useState<"bank" | "paypal">("bank");
   const [details, setDetails] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  /* once hydrated, refresh defaults if user visits with a fresh profile */
-  React.useEffect(() => {
-    if (hydrated && !displayName) {
-      setDisplayName(profile.displayName);
-      setHeadline(profile.headline);
-      setCountry(profile.country);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
 
   if (!hydrated) {
     return (
@@ -128,6 +131,7 @@ export default function OnboardingPage() {
         {steps.map((s, i) => (
           <React.Fragment key={s.id}>
             <div
+              aria-label={`Step ${i + 1} of ${steps.length}: ${s.title}`}
               className={cn(
                 "flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full text-[12px] font-medium transition-colors",
                 i === step
@@ -138,7 +142,7 @@ export default function OnboardingPage() {
               )}
             >
               {i < step ? <Check className="size-3.5" strokeWidth={3} aria-hidden /> : <s.icon className="size-3.5" aria-hidden />}
-              <span className="hidden sm:inline">{s.title}</span>
+              <span className="hidden sm:inline" aria-hidden>{s.title}</span>
             </div>
           </React.Fragment>
         ))}
@@ -164,17 +168,17 @@ export default function OnboardingPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ob-name">Display name *</Label>
-              <Input id="ob-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} aria-invalid={!!errors.displayName} />
+              <Input id="ob-name" value={displayName} onChange={(e) => setField("displayName", e.target.value)} aria-invalid={!!errors.displayName} />
               {errors.displayName && <p className="text-[12px] font-medium text-destructive">{errors.displayName}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ob-headline">Headline *</Label>
-              <Input id="ob-headline" value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. Data scientist · ex-Spotify" aria-invalid={!!errors.headline} />
+              <Input id="ob-headline" value={headline} onChange={(e) => setField("headline", e.target.value)} placeholder="e.g. Data scientist · ex-Spotify" aria-invalid={!!errors.headline} />
               {errors.headline && <p className="text-[12px] font-medium text-destructive">{errors.headline}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ob-country">Country</Label>
-              <Input id="ob-country" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. Portugal" />
+              <Input id="ob-country" value={country} onChange={(e) => setField("country", e.target.value)} placeholder="e.g. Portugal" />
             </div>
           </div>
         )}

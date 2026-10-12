@@ -5,7 +5,7 @@ import { Logo } from "@/components/layout/logo";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-dvh flex-col bg-white">
       <header className="border-b border-border px-6 py-4">
         <Logo />
       </header>

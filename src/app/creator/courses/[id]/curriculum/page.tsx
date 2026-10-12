@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
@@ -18,17 +18,13 @@ export default function CurriculumPage({ params }: { params: Promise<{ id: strin
   const { hydrated, getCourse, updateCourse } = useCreator();
   const course = hydrated ? getCourse(id) : undefined;
 
-  const [sections, setSections] = useState<CurriculumSection[] | null>(null);
-  const [savedSnapshot, setSavedSnapshot] = useState("");
+  /* Derived draft: the stored curriculum until the creator edits, then the draft. */
+  const [draftSections, setDraftSections] = useState<CurriculumSection[] | null>(null);
+  const sections = draftSections ?? course?.curriculum ?? null;
+  const setSections = setDraftSections;
+  const [savedOverride, setSavedOverride] = useState<string | null>(null);
+  const savedSnapshot = savedOverride ?? (course ? JSON.stringify(course.curriculum) : "");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (course && sections === null) {
-      setSections(course.curriculum);
-      setSavedSnapshot(JSON.stringify(course.curriculum));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [course?.id, hydrated]);
 
   if (!hydrated || sections === null) {
     return (
@@ -55,7 +51,7 @@ export default function CurriculumPage({ params }: { params: Promise<{ id: strin
         0
       );
       updateCourse(id, { curriculum: sections, lessonsCount, durationMinutes, downloadableResources });
-      setSavedSnapshot(JSON.stringify(sections));
+      setSavedOverride(JSON.stringify(sections));
       setSaving(false);
       toast.success("Curriculum saved");
     }, 500);

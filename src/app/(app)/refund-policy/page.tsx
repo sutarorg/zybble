@@ -22,7 +22,7 @@ export default function RefundPolicyPage() {
             The short version
           </p>
           <p className="mt-1 max-w-2xl text-[14px] leading-relaxed text-emerald-900/80">
-            Request a refund within 30 days of purchase, and you'll get your money back — full
+            Request a refund within 30 days of purchase, and you&apos;ll get your money back — full
             amount, original payment method, usually within 5–10 business days. In this demo,
             purchases are simulated and no money ever moves.
           </p>
@@ -48,7 +48,7 @@ export default function RefundPolicyPage() {
 
         <LegalSection index={2} title="How to request a refund">
           <p>
-            Open the course in My Learning, choose "Request refund" from the course menu, and tell
+            Open the course in My Learning, choose &quot;Request refund&quot; from the course menu, and tell
             us briefly what went wrong (optional — it helps us improve). Approved refunds are
             issued to the original payment method. In this demo, the flow is simulated from the
             Help Center.
@@ -70,7 +70,7 @@ export default function RefundPolicyPage() {
           <p>
             Our guarantee exists so you can try courses without risk. To protect instructors, we
             may decline refunds in cases of clear abuse — for example, repeatedly completing entire
-            courses before refunding, or a pattern of refunding every purchase. We'll always
+            courses before refunding, or a pattern of refunding every purchase. We&apos;ll always
             explain our decision and you can appeal it.
           </p>
         </LegalSection>
@@ -78,7 +78,7 @@ export default function RefundPolicyPage() {
         <LegalSection index={5} title="After a refund">
           <p>
             Refunded courses are removed from your library and certificates are revoked. Your
-            account and other courses are unaffected, and you're welcome back to the course any
+            account and other courses are unaffected, and you&apos;re welcome back to the course any
             time at its current price.
           </p>
         </LegalSection>

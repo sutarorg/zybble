@@ -20,7 +20,7 @@ export function AuthShell({
   footer: React.ReactNode;
 }) {
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="grid min-h-dvh lg:grid-cols-2">
       {/* Form column */}
       <div className="flex flex-col px-5 py-6 sm:px-10">
         <div className="flex items-center justify-between">

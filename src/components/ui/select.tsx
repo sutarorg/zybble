@@ -42,7 +42,7 @@ function SelectContent({
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         className={cn(
-          "z-50 max-h-72 min-w-32 overflow-hidden rounded-xl border border-border bg-white p-1 shadow-pop",
+          "z-50 max-h-[min(18rem,60dvh)] min-w-32 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border bg-white p-1 shadow-pop",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
           position === "popper" && "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
           className
@@ -71,7 +71,7 @@ function SelectItem({
   return (
     <SelectPrimitive.Item
       className={cn(
-        "relative flex w-full cursor-pointer items-center rounded-lg py-2 pr-8 pl-3 text-[13px] outline-none select-none focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex w-full min-h-9 cursor-pointer items-center rounded-lg py-2 pr-8 pl-3 text-[13px] outline-none select-none focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50 sm:min-h-0",
         className
       )}
       {...props}

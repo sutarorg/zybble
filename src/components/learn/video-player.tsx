@@ -45,7 +45,11 @@ export function SimulatedPlayer({
   onEnded: () => void;
 }) {
   const total = Math.max(60, durationMinutes * 60);
-  const [time, setTime] = useState(0);
+  /* Timeline state carries the lesson it belongs to, so a new lesson starts at 0:00. */
+  const [timeline, setTimeline] = useState<{ title: string; time: number }>({ title, time: 0 });
+  const time = timeline.title === title ? timeline.time : 0;
+  const setTime = (next: number) =>
+    setTimeline((prev) => ({ title, time: typeof next === "number" ? next : prev.time }));
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [showCaptions, setShowCaptions] = useState(true);
@@ -56,9 +60,8 @@ export function SimulatedPlayer({
   const lastRef = useRef<number>(0);
   const timeRef = useRef(0);
 
-  // Reset timeline when the lesson changes
+  // The lesson changed: start the clock again from the top.
   useEffect(() => {
-    setTime(0);
     timeRef.current = 0;
   }, [title]);
 

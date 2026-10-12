@@ -30,16 +30,28 @@ export function formatCompact(n: number): string {
   return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
-export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+/** `2026-01-12` style strings carry no timezone — format them in UTC so the
+ *  server-rendered and client-rendered markup always agree. */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function dateOptions(iso: string): Intl.DateTimeFormatOptions {
+  const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "long",
     day: "numeric",
-  });
+  };
+  if (DATE_ONLY.test(iso.trim())) options.timeZone = "UTC";
+  return options;
+}
+
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", dateOptions(iso));
 }
 
 export function formatMonthYear(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long" });
+  const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long" };
+  if (DATE_ONLY.test(iso.trim())) options.timeZone = "UTC";
+  return new Date(iso).toLocaleDateString("en-US", options);
 }
 
 export function timeAgo(iso: string): string {

@@ -16,7 +16,7 @@ export function CategoryChips({
 }) {
   const chip = (active: boolean) =>
     cn(
-      "flex h-9 shrink-0 cursor-pointer snap-start items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring/25",
+      "flex h-10 shrink-0 cursor-pointer snap-start items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring/25 sm:h-9",
       active
         ? "border-primary bg-primary text-white shadow-sm"
         : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:bg-muted hover:text-foreground"
@@ -27,7 +27,7 @@ export function CategoryChips({
       <div
         role="tablist"
         aria-label="Course categories"
-        className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide mask-fade-r"
+        className="flex snap-x gap-2 overflow-x-auto overscroll-contain-x pb-1 scrollbar-hide"
       >
         <button
           type="button"

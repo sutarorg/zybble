@@ -1,30 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { Menu } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { SearchBox } from "@/components/layout/search-box";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { LearnerSidebarContent } from "@/components/learner/learner-sidebar";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { IconButton } from "@/components/ui/icon-button";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
 export function LearnerHeader() {
   const [navOpen, setNavOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-white/85 backdrop-blur-md">
-      <div className="flex h-16 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
+    <header className="pt-safe sticky top-0 z-30 border-b border-border bg-white/85 backdrop-blur-md">
+      <div className="flex h-16 items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
-          <button
-            type="button"
-            aria-label="Open navigation"
+          <IconButton
+            label="Open navigation"
             onClick={() => setNavOpen(true)}
-            className="flex size-9.5 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none lg:hidden"
+            className="lg:hidden"
           >
             <Menu className="size-5" aria-hidden />
-          </button>
+          </IconButton>
           <SheetContent side="left" className="w-72 p-0">
             <VisuallyHidden.Root>
               <SheetTitle>Navigation</SheetTitle>
@@ -35,9 +36,31 @@ export function LearnerHeader() {
 
         <Logo className="lg:hidden" showWordmark={false} href="/dashboard" />
 
-        <SearchBox className="mx-auto w-full max-w-xl flex-1" />
+        <SearchBox className="mx-auto hidden w-full max-w-xl flex-1 sm:block" />
 
-        <div className="flex items-center gap-0.5 sm:gap-1">
+        {/* Mobile: search collapses to an icon that opens a sheet */}
+        <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
+          <IconButton
+            label="Search courses"
+            onClick={() => setSearchOpen(true)}
+            className="ml-auto sm:hidden"
+          >
+            <Search className="size-5" aria-hidden />
+          </IconButton>
+          <SheetContent side="top" className="p-0">
+            <SheetTitle className="sr-only">Search courses</SheetTitle>
+            <div className="px-4 py-4 pt-5">
+              <SearchBox
+                mode="panel"
+                autoFocus
+                onSubmit={() => setSearchOpen(false)}
+                className="w-full"
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <div className="ml-auto flex items-center gap-0.5 sm:ml-0 sm:gap-1">
           <NotificationsMenu />
           <div className="mx-1.5 hidden h-5 w-px bg-border sm:block" aria-hidden />
           <UserMenu />

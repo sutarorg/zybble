@@ -23,8 +23,10 @@
     }
   }
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Brand type pair (loaded via <link> in app/layout.tsx, with system fallbacks) */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display:
+    "Space Grotesk", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* Zybble brand tokens */
   --color-background: #ffffff;
@@ -65,7 +67,25 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  /* Anchor links + carousel scrolling animate, unless the user asked for less motion. */
+  -webkit-text-size-adjust: 100%;
+}
+
+/*
+ * Keyboard focus fallback for plain links and custom interactive elements
+ * (buttons/inputs carry their own ring styles via the design system).
+ */
+a:focus-visible,
+[role="button"]:focus-visible,
+li[tabindex]:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {
@@ -74,6 +94,45 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Anchored sections (e.g. #reviews) clear the 64px sticky header. */
+  scroll-padding-top: 5rem;
+}
+
+/* Long unbroken strings (emails, ids, URLs, currency) must wrap, not overflow. */
+@utility break-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Device safe areas (notches, rounded corners, home indicator) */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility px-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* iOS-style momentum scrolling inside overflow panels */
+@utility overscroll-contain-x {
+  overscroll-behavior-x: contain;
+}
+
+/* Motion preferences: neutralise decorative animation, keep state changes visible. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 ::selection {

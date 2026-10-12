@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
@@ -20,19 +20,16 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
   const { hydrated, getCourse, applyDraft } = useCreator();
 
   const course = hydrated ? getCourse(id) : undefined;
-  const [draft, setDraft] = useState<CourseDraft | null>(null);
-  const [savedSnapshot, setSavedSnapshot] = useState<string>("");
+
+  /* Derived draft: built once from the stored course, then owned by the form. */
+  const initialDraft = React.useMemo(() => (course ? draftFromCourse(course) : null), [course]);
+  const [draftOverride, setDraftOverride] = useState<CourseDraft | null>(null);
+  const draft = draftOverride ?? initialDraft;
+  const setDraft = (next: CourseDraft) => setDraftOverride(next);
+  const [savedOverride, setSavedOverride] = useState<string | null>(null);
+  const savedSnapshot = savedOverride ?? (initialDraft ? JSON.stringify(initialDraft) : "");
   const [tab, setTab] = useState("basics");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (course && !draft) {
-      const d = draftFromCourse(course);
-      setDraft(d);
-      setSavedSnapshot(JSON.stringify(d));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [course?.id, hydrated]);
 
   if (!hydrated) {
     return (
@@ -51,7 +48,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     setSaving(true);
     window.setTimeout(() => {
       applyDraft(id, draft);
-      setSavedSnapshot(JSON.stringify(draft));
+      setSavedOverride(JSON.stringify(draft));
       setSaving(false);
       toast.success("Course details saved");
     }, 500);

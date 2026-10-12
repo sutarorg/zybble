@@ -93,7 +93,7 @@ export default function OrdersPage() {
                         ) : null}
                         <div className="min-w-0">
                           <p className="truncate text-[13.5px] font-semibold">{course?.title ?? "Course unavailable"}</p>
-                          <p className="mt-0.5 font-mono text-[11px] text-zinc-400">{order.id}</p>
+                          <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-400">{order.id}</p>
                         </div>
                       </div>
                       <span className="hidden text-[12.5px] text-muted-foreground md:block">

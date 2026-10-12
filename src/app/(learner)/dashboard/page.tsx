@@ -328,12 +328,12 @@ export default function DashboardPage() {
               <h2 className="font-display text-[15.5px] font-semibold">Milestones</h2>
               <Badge variant="secondary">Simulated</Badge>
             </div>
-            <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6">
+            <ul className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-6 sm:gap-3">
               {achievements.map((a) => (
                 <li
                   key={a.id}
                   className={cn(
-                    "flex flex-col items-center gap-2 rounded-xl border p-3.5 text-center transition-colors",
+                    "flex flex-col items-center gap-2 rounded-xl border p-2.5 text-center transition-colors sm:p-3.5",
                     a.earned ? "border-violet-200 bg-accent" : "border-border bg-muted/40 opacity-60"
                   )}
                 >

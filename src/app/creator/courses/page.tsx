@@ -15,6 +15,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useKeyedState } from "@/lib/hooks";
 
 const PAGE_SIZE = 5;
 const STATUS_ORDER: (CourseStatus | "all")[] = [
@@ -36,11 +37,14 @@ export default function CreatorCoursesPage({
   const { q } = use(searchParams);
   const { courses, hydrated } = useCreator();
 
-  const [query, setQuery] = useState(typeof q === "string" ? q : "");
+  /* Query follows the URL (?q= from the studio search) without a stale-state effect. */
+  const urlKey = typeof q === "string" ? q : "";
+  const [query, setQuery] = useKeyedState(urlKey, urlKey);
   const [status, setStatus] = useState<CourseStatus | "all">("all");
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState<SortKey>("updated");
-  const [page, setPage] = useState(1);
+  /* Page number resets when the filter set changes. */
+  const [page, setPage] = useKeyedState(`${query}|${status}|${category}|${sort}`, 1);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: courses.length };
@@ -74,10 +78,6 @@ export default function CreatorCoursesPage({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, totalPages);
   const pageItems = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [query, status, category, sort]);
 
   return (
     <div className="space-y-6">

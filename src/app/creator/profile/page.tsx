@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useState } from "react";
+import type { CreatorProfile } from "@/types";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Eye, Globe2, MapPin, Plus, Save, X } from "lucide-react";
@@ -26,14 +27,16 @@ const AVATAR_COLORS = [
 
 export default function CreatorProfilePage() {
   const { hydrated, profile, saveProfile } = useCreator();
-  const [form, setForm] = useState(profile);
+  /* Derived draft: follows the stored creator profile until the creator edits it. */
+  const [formDraft, setFormDraft] = useState<CreatorProfile | null>(null);
+  const form = formDraft ?? profile;
+  const setForm = (next: CreatorProfile | ((prev: CreatorProfile) => CreatorProfile)) =>
+    setFormDraft((prev) => {
+      const current = prev ?? profile;
+      return typeof next === "function" ? next(current) : next;
+    });
   const [topicInput, setTopicInput] = useState("");
   const [saving, setSaving] = useState(false);
-
-  React.useEffect(() => {
-    if (hydrated) setForm(profile);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
 
   if (!hydrated) {
     return (

@@ -48,7 +48,7 @@ export default function TermsPage() {
             perform or create derivative works from course content without written permission.
           </p>
           <p>
-            "Lifetime access" means for the lifetime of the course on the platform. If a course is
+            &quot;Lifetime access&quot; means for the lifetime of the course on the platform. If a course is
             retired, enrolled students keep access for at least 12 additional months wherever
             technically possible.
           </p>
@@ -89,9 +89,9 @@ export default function TermsPage() {
 
         <LegalSection index={7} title="Disclaimer and liability">
           <p>
-            The platform is provided "as is" without warranties of any kind. Educational outcomes
+            The platform is provided &quot;as is&quot; without warranties of any kind. Educational outcomes
             depend on your effort; we do not guarantee employment, income or certification outside
-            of Zybble-issued certificates. To the maximum extent permitted by law, Zybble's
+            of Zybble-issued certificates. To the maximum extent permitted by law, Zybble&apos;s
             aggregate liability is limited to the amount you paid in the 12 months preceding the
             claim.
           </p>

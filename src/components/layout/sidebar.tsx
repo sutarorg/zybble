@@ -41,7 +41,7 @@ function NavItem({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex h-9 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/25",
+        "group flex h-10 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/25 lg:h-9",
         active
           ? "bg-accent text-primary"
           : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -151,7 +151,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               type="button"
               onClick={signOut}
               title="Sign out"
-              className="cursor-pointer rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-muted hover:text-foreground"
+              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
             >
               <LogOut className="size-4" />
               <span className="sr-only">Sign out</span>

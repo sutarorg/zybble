@@ -53,24 +53,31 @@ export default function NewCoursePage() {
   const router = useRouter();
   const { hydrated, draft: savedDraft, saveDraft, addCourse, submitForReview } = useCreator();
 
-  const [draft, setDraft] = useState<CourseDraft>(emptyCourseDraft());
-  const [resumed, setResumed] = useState(false);
+  /* Derived draft: the autosaved draft from storage (once hydrated), else a fresh one. */
+  const freshDraft = React.useMemo(() => emptyCourseDraft(), []);
+  const restoredDraft = hydrated ? savedDraft : null;
+  const [draftOverride, setDraftOverride] = useState<CourseDraft | null>(null);
+  const draft = draftOverride ?? restoredDraft ?? freshDraft;
+  const setDraft = (next: CourseDraft | ((prev: CourseDraft) => CourseDraft)) =>
+    setDraftOverride((prev) => {
+      const current = prev ?? restoredDraft ?? freshDraft;
+      return typeof next === "function" ? next(current) : next;
+    });
   const [step, setStep] = useState(0);
   const [maxReached, setMaxReached] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [dirty, setDirty] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const restoredNotice = React.useRef(false);
 
-  /* Restore wizard draft from storage */
+  /* Tell the creator once that the stored draft was restored (no state change). */
   useEffect(() => {
-    if (hydrated && savedDraft && !resumed) {
-      setDraft(savedDraft);
-      setResumed(true);
+    if (hydrated && savedDraft && !restoredNotice.current) {
+      restoredNotice.current = true;
       toast.info("Resumed your saved draft — autosave is on.");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
+  }, [hydrated, savedDraft]);
 
   /* Autosave (debounced) */
   useEffect(() => {

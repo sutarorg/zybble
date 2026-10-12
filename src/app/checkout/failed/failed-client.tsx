@@ -20,7 +20,7 @@ export function CheckoutFailedClient({ courseSlug }: { courseSlug: string }) {
   if (!course) return null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/40">
+    <div className="flex min-h-dvh flex-col bg-muted/40">
       <header className="border-b border-border bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Logo />

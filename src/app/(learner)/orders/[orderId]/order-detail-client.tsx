@@ -99,8 +99,8 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         <div
           className={
             paid
-              ? "flex items-center gap-3 border-b border-emerald-100 bg-emerald-50 px-6 py-4"
-              : "flex items-center gap-3 border-b border-red-100 bg-red-50 px-6 py-4"
+              ? "flex flex-wrap items-center gap-3 border-b border-emerald-100 bg-emerald-50 px-4 py-4 sm:px-6"
+              : "flex flex-wrap items-center gap-3 border-b border-red-100 bg-red-50 px-4 py-4 sm:px-6"
           }
         >
           {paid ? (
@@ -108,11 +108,11 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           ) : (
             <CircleX className="size-5 text-red-500" aria-hidden />
           )}
-          <div>
+          <div className="min-w-0">
             <p className="font-display text-[15px] font-semibold">
               {paid ? "Payment successful (simulated)" : "Payment declined (simulated)"}
             </p>
-            <p className="text-[12px] text-muted-foreground">
+            <p className="text-[12px] break-anywhere text-muted-foreground">
               Order <span className="font-mono">{order.id}</span> · {formatDate(order.createdAt)}
             </p>
           </div>
@@ -121,7 +121,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           </div>
         </div>
 
-        <div className="grid gap-6 p-6 md:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid min-w-0 gap-6 p-4 sm:p-6 md:grid-cols-[minmax(0,1fr)_280px]">
           {/* Course block */}
           <div>
             {course ? (
@@ -167,28 +167,28 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
             {/* Breakdown */}
             <dl className="mt-6 max-w-sm space-y-2 text-[13.5px]">
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Amount</dt>
                 <dd className="tabular-nums">{order.total === 0 ? "Free" : formatPrice(order.total)}</dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Platform commission (10%, illustrative)</dt>
-                <dd className="tabular-nums text-zinc-500">
+                <dd className="shrink-0 tabular-nums text-zinc-500">
                   −{order.total === 0 ? formatPrice(0) : formatPrice(order.total * PLATFORM_COMMISSION)}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Payment method</dt>
                 <dd className="tabular-nums">
                   {order.cardLast4 === "FREE" ? "Free enrollment" : `Demo card •••• ${order.cardLast4}`}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Billed to</dt>
-                <dd className="truncate pl-4">{order.email}</dd>
+                <dd className="min-w-0 truncate pl-4">{order.email}</dd>
               </div>
               <Separator className="!my-3" />
-              <div className="flex justify-between font-semibold">
+              <div className="flex justify-between gap-4 font-semibold">
                 <dt>Total</dt>
                 <dd className="font-display tabular-nums">
                   {order.total === 0 ? "Free" : formatPrice(order.total)}
