@@ -68,11 +68,11 @@ export default function AboutPage() {
           <p>
             Zybble connects those practitioners directly with learners. Courses are short on
             theory and long on practice, updated continuously, and priced accessibly for a global
-            audience. Whether you have a weekend or a year, there's a path here for you.
+            audience. Whether you have a weekend or a year, there&apos;s a path here for you.
           </p>
           <p>
-            We're a small, distributed team across six time zones, and every statistic on this
-            page is sample data for this frontend demo.
+            We&apos;re a small, distributed team across six time zones, and every statistic on
+            this page is sample data for this frontend demo.
           </p>
         </div>
       </section>

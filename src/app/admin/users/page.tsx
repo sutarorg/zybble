@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { useKeyedState } from "@/lib/hooks";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 8;
@@ -59,14 +60,17 @@ export default function AdminUsersPage({
   const { courses } = useCreator();
   const { orders: learnerOrders, enrollments } = useApp();
 
-  const [query, setQuery] = useState("");
-  const [role, setRole] = useState<AdminRole | "all">(
+  const initialRole: AdminRole | "all" =
     typeof sp.role === "string" && sp.role !== "all" && ["admin", "moderator", "creator", "learner"].includes(sp.role)
       ? (sp.role as AdminRole)
-      : "all"
-  );
+      : "all";
+  const urlKey = String(sp.role ?? "");
+  const [query, setQuery] = useState("");
+  /* Role follows the URL (?role=creator deep links) without a stale-state effect. */
+  const [role, setRole] = useKeyedState<AdminRole | "all">(urlKey, initialRole);
   const [sort, setSort] = useState<Sort>("registered");
-  const [page, setPage] = useState(1);
+  /* Page number resets when the filter set changes. */
+  const [page, setPage] = useKeyedState(`${query}|${role}|${sort}`, 1);
   const [selectedId, setSelectedId] = useState<string | null>(typeof sp.selected === "string" ? sp.selected : null);
 
   const filtered = useMemo(() => {
@@ -93,8 +97,6 @@ export default function AdminUsersPage({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, totalPages);
   const pageItems = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-
-  React.useEffect(() => setPage(1), [query, role, sort]);
 
   const selected = selectedId ? users.find((u) => u.id === selectedId) : null;
   const syncUrl = (id: string | null) => {
@@ -441,7 +443,7 @@ function UserDrawerBody({
             </ul>
           )
         ) : (
-          <p className="text-[12.5px] text-zinc-400">Staff accounts don't own or enroll in courses.</p>
+          <p className="text-[12.5px] text-zinc-400">Staff accounts don&apos;t own or enroll in courses.</p>
         )}
       </section>
 

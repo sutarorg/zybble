@@ -96,7 +96,7 @@ function LearningCard({
             href={`/courses/${course.slug}`}
             aria-label={`Open curriculum for ${course.title}`}
             title="Course details & curriculum"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground"
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground sm:size-8"
           >
             <ChevronRight className="size-4.5" aria-hidden />
           </Link>
@@ -122,17 +122,20 @@ function LearningCard({
               style={{ width: `${p.percent}%` }}
             />
           </div>
-          <p className="mt-1.5 text-[11.5px] text-zinc-400">
+          <p className="mt-1.5 text-[11.5px] break-anywhere text-zinc-400">
             Last visited {timeAgoShort(enrollment.lastVisitedAt ?? enrollment.enrolledAt)}
             {p.resumeLesson && !p.isCompleted && (
               <>
-                {" "}· up next: <span className="font-medium text-foreground">{p.resumeLesson.number} {p.resumeLesson.lesson.title}</span>
+                {" "}· up next:{" "}
+                <span className="font-medium text-foreground">
+                  {p.resumeLesson.number} {p.resumeLesson.lesson.title}
+                </span>
               </>
             )}
           </p>
         </div>
 
-        <div className="mt-auto flex items-center gap-2 pt-3">
+        <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
           {p.isCompleted ? (
             <>
               <Badge variant="emerald" className="gap-1">
@@ -241,7 +244,11 @@ export function MyLearningClient() {
 
       {/* Tabs */}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg bg-muted p-1" role="tablist" aria-label="Filter courses">
+        <div
+          className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1 scrollbar-hide"
+          role="tablist"
+          aria-label="Filter courses"
+        >
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -250,7 +257,7 @@ export function MyLearningClient() {
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-all",
+                "flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-3 text-[13px] font-medium whitespace-nowrap transition-all sm:h-8",
                 tab === t.id ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -261,8 +268,8 @@ export function MyLearningClient() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-zinc-400" aria-hidden />
             <input
               type="search"
@@ -270,11 +277,11 @@ export function MyLearningClient() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search enrolled…"
               aria-label="Search enrolled courses"
-              className="h-9 w-44 rounded-lg border border-input bg-white pr-3 pl-8.5 text-[13px] shadow-xs outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 sm:w-52 [&::-webkit-search-cancel-button]:hidden"
+              className="h-10 w-full rounded-lg border border-input bg-white pr-3 pl-8.5 text-[13px] shadow-xs outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 sm:h-9 sm:w-52 [&::-webkit-search-cancel-button]:hidden"
             />
           </div>
           <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
-            <SelectTrigger className="h-9 w-40 text-[13px]" aria-label="Sort courses">
+            <SelectTrigger className="h-10 w-36 shrink-0 text-[13px] sm:h-9 sm:w-40" aria-label="Sort courses">
               <ArrowUpDown className="size-3.5 text-zinc-400" aria-hidden />
               <SelectValue />
             </SelectTrigger>

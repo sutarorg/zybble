@@ -35,21 +35,20 @@ export function CheckoutClient({ course }: { course: Course }) {
   const instructor = getCourseInstructor(course);
   const free = course.price === 0;
 
-  const [email, setEmail] = useState(user?.email ?? "");
-  const [cardName, setCardName] = useState(user?.name ?? "");
+  /* `null` = untouched, so the signed-in user's details prefill the form
+     without an effect once the session hydrates. */
+  const [emailDraft, setEmailDraft] = useState<string | null>(null);
+  const [cardNameDraft, setCardNameDraft] = useState<string | null>(null);
+  const email = emailDraft ?? user?.email ?? "";
+  const cardName = cardNameDraft ?? user?.name ?? "";
+  const setEmail = setEmailDraft;
+  const setCardName = setCardNameDraft;
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvc, setCvc] = useState("");
   const [country, setCountry] = useState("United States");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState(false);
-
-  React.useEffect(() => {
-    if (user) {
-      setEmail((prev) => prev || user.email);
-      setCardName((prev) => prev || user.name);
-    }
-  }, [user]);
 
   const enrolled = hydrated && isEnrolled(course.id);
 
@@ -93,7 +92,7 @@ export function CheckoutClient({ course }: { course: Course }) {
   };
 
   return (
-    <div className="min-h-screen bg-muted/40">
+    <div className="min-h-dvh bg-muted/40">
       {/* Minimal checkout chrome */}
       <header className="sticky top-0 z-20 border-b border-border bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">

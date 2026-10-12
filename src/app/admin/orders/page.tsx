@@ -50,12 +50,22 @@ export default function AdminOrdersPage() {
   const [sort, setSort] = useState<Sort>("date");
   const [selected, setSelected] = useState<AdminOrder | null>(null);
 
+  /**
+   * Demo data is historical, so "last N days" is measured from the newest order
+   * in the dataset rather than from the wall clock — otherwise the filter would
+   * always return an empty table.
+   */
+  const newestOrderAt = useMemo(
+    () => orders.reduce((latest, o) => Math.max(latest, +new Date(o.date)), 0),
+    [orders]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const cutoff = DAYS.find((d) => d.id === days)?.days;
     let list = orders.filter((o) => {
       if (status !== "all" && o.status !== status) return false;
-      if (cutoff && Date.now() - +new Date(o.date) > cutoff * 86400_000) return false;
+      if (cutoff && newestOrderAt - +new Date(o.date) > cutoff * 86400_000) return false;
       if (q && !`${o.orderRef} ${o.learnerName} ${o.courseTitle} ${o.creatorName}`.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -64,7 +74,7 @@ export default function AdminOrdersPage() {
       if (sort === "course") return a.courseTitle.localeCompare(b.courseTitle);
       return +new Date(b.date) - +new Date(a.date);
     });
-  }, [orders, query, status, days, sort]);
+  }, [orders, newestOrderAt, query, status, days, sort]);
 
   const totals = useMemo(() => {
     const paid = filtered.filter((o) => o.status === "paid" || o.status === "pending");

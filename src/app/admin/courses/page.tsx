@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { useKeyedState } from "@/lib/hooks";
 
 const PAGE_SIZE = 6;
 type Tab = CourseStatus | "all";
@@ -47,11 +48,15 @@ export default function AdminCoursesPage({
 
   const { hydrated, approveCourse, rejectCourse, returnToQueue } = useAdmin();
   const { courses } = useCreator();
-  const [tab, setTab] = useState<Tab>(initialTab);
-  const [query, setQuery] = useState(initialQ);
+  /* Tab + query follow the URL: a new `?tab=`/`?q=` (e.g. the header search)
+     resets them without a stale-state effect. */
+  const urlKey = `${initialTab}|${initialQ}`;
+  const [tab, setTab] = useKeyedState<Tab>(urlKey, initialTab);
+  const [query, setQuery] = useKeyedState(urlKey, initialQ);
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState<Sort>("updated");
-  const [page, setPage] = useState(1);
+  /* Page number resets whenever the filter set changes (derived, not an effect). */
+  const [page, setPage] = useKeyedState(`${tab}|${query}|${category}|${sort}`, 1);
 
   /* Local-only courses (creator workspace) + aliases of static catalog copies.
      Statik catalog originals are managed under "published". */
@@ -91,10 +96,6 @@ export default function AdminCoursesPage({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, totalPages);
   const pageItems = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [tab, query, category, sort]);
 
   return (
     <div className="space-y-6">

@@ -34,6 +34,8 @@ export default async function CategoryPage({
   const category = getCategoryBySlug(slug);
   if (!category) notFound();
 
+  // Rendered with createElement below so the icon lookup is not treated as a
+  // component created during render.
   const Icon = categoryIcon(category.icon);
   const pool = coursesByCategory(slug);
   const students = pool.reduce((a, c) => a + c.studentsCount, 0);
@@ -48,7 +50,7 @@ export default async function CategoryPage({
         </p>
         <div className="mt-2 flex items-center gap-3">
           <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-primary">
-            <Icon className="size-5.5" aria-hidden />
+            {React.createElement(Icon, { className: "size-5.5", "aria-hidden": true })}
           </span>
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">

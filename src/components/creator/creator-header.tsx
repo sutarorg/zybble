@@ -14,6 +14,7 @@ import {
   Sparkles,
   ClipboardCheck,
 } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
 import { toast } from "sonner";
 import { Logo } from "@/components/layout/logo";
 import { CreatorSidebarContent } from "@/components/creator/creator-sidebar";
@@ -174,20 +175,20 @@ function CreatorAvatarMenu() {
 export function CreatorHeader({ title }: { title?: string }) {
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [q, setQ] = useState("");
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-white/85 backdrop-blur-md">
-      <div className="flex h-16 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
+    <header className="pt-safe sticky top-0 z-30 border-b border-border bg-white/85 backdrop-blur-md">
+      <div className="flex h-16 items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
-          <button
-            type="button"
-            aria-label="Open creator navigation"
+          <IconButton
+            label="Open creator navigation"
             onClick={() => setNavOpen(true)}
-            className="flex size-9.5 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none lg:hidden"
+            className="lg:hidden"
           >
             <Menu className="size-5" aria-hidden />
-          </button>
+          </IconButton>
           <SheetContent side="left" className="w-72 p-0">
             <VisuallyHidden.Root>
               <SheetTitle>Creator navigation</SheetTitle>
@@ -201,7 +202,7 @@ export function CreatorHeader({ title }: { title?: string }) {
         {/* Contextual search: searches your courses */}
         <form
           role="search"
-          className="mx-auto w-full max-w-md flex-1"
+          className="mx-auto hidden w-full max-w-md flex-1 sm:block"
           onSubmit={(e) => {
             e.preventDefault();
             router.push(q.trim() ? `/creator/courses?q=${encodeURIComponent(q.trim())}` : "/creator/courses");
@@ -220,7 +221,48 @@ export function CreatorHeader({ title }: { title?: string }) {
           </div>
         </form>
 
-        <div className="flex items-center gap-1.5">
+        {/* Mobile: search collapses to an icon that opens a sheet */}
+        <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
+          <IconButton
+            label="Search your courses"
+            onClick={() => setSearchOpen(true)}
+            className="ml-auto sm:hidden"
+          >
+            <Search className="size-5" aria-hidden />
+          </IconButton>
+          <SheetContent side="top" className="p-0">
+            <SheetTitle className="sr-only">Search your courses</SheetTitle>
+            <form
+              role="search"
+              className="px-4 py-4 pt-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearchOpen(false);
+                router.push(
+                  q.trim() ? `/creator/courses?q=${encodeURIComponent(q.trim())}` : "/creator/courses"
+                );
+              }}
+            >
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-zinc-400"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder={title ?? "Search your courses…"}
+                  aria-label="Search your courses"
+                  autoFocus
+                  className="h-11 w-full rounded-full border border-transparent bg-muted pr-4 pl-10 text-sm outline-none placeholder:text-zinc-400 focus:border-primary/40 focus:bg-white focus:ring-2 focus:ring-ring/15 [&::-webkit-search-cancel-button]:hidden"
+                />
+              </div>
+            </form>
+          </SheetContent>
+        </Sheet>
+
+        <div className="ml-auto flex items-center gap-1.5 sm:ml-0">
           <Button asChild size="sm" className="hidden sm:inline-flex">
             <Link href="/creator/courses/new">
               <Plus aria-hidden />

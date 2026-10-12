@@ -53,14 +53,12 @@ export default function LearnerSettingsPage() {
     resetLearnerData,
   } = useApp();
 
-  const [name, setName] = useState("");
+  /* `null` = untouched, so the field follows the stored profile without an
+     effect once hydration completes. */
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-
-  React.useEffect(() => {
-    if (hydrated) setName(user?.name ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
+  const name = nameDraft ?? user?.name ?? "";
 
   if (!hydrated) {
     return (
@@ -126,7 +124,13 @@ export default function LearnerSettingsPage() {
         <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="space-y-1.5">
             <Label htmlFor="ls-name">Display name</Label>
-            <Input id="ls-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+            <Input
+              id="ls-name"
+              value={name}
+              onChange={(e) => setNameDraft(e.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+            />
           </div>
           <div className="flex items-end">
             <Button onClick={saveProfile} loading={savingProfile} disabled={!nameDirty}>
@@ -154,7 +158,7 @@ export default function LearnerSettingsPage() {
                 toast.success(`Daily goal set to ${g} minutes`);
               }}
               className={cn(
-                "flex h-10 cursor-pointer items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium transition-all",
+                "flex h-11 cursor-pointer items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium transition-all sm:h-10",
                 learnerPrefs.goalMinutesPerDay === g
                   ? "border-primary bg-primary text-white shadow-sm"
                   : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:text-foreground"

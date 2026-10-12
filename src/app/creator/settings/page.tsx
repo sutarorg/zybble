@@ -42,13 +42,10 @@ const PREF_ITEMS: { key: keyof typeof PREF_DEFAULTS; title: string; text: string
 export default function CreatorSettingsPage() {
   const { hydrated, payoutSettings, savePayoutSettings, resetCreatorData, profile } = useCreator();
   const prefs = useLocalStorage<typeof PREF_DEFAULTS>("zybble.creator.prefs.v1", PREF_DEFAULTS);
-  const [threshold, setThreshold] = useState(PAYOUT_THRESHOLD_USD);
+  const [thresholdDraft, setThresholdDraft] = useState<number | null>(null);
+  const threshold = thresholdDraft ?? payoutSettings?.threshold ?? PAYOUT_THRESHOLD_USD;
+  const setThreshold = setThresholdDraft;
   const [resetOpen, setResetOpen] = useState(false);
-
-  React.useEffect(() => {
-    if (hydrated && payoutSettings) setThreshold(payoutSettings.threshold);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
 
   if (!hydrated) {
     return (

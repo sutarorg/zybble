@@ -35,6 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Curriculum } from "@/components/courses/curriculum";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { useKeyedState } from "@/lib/hooks";
 
 const LESSON_TYPES: { value: Lesson["type"]; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: "video", label: "Video", icon: CirclePlay },
@@ -54,6 +55,15 @@ interface LessonFormState {
   downloadable: boolean;
 }
 
+const EMPTY_LESSON_FORM: LessonFormState = {
+  title: "",
+  type: "video",
+  durationMinutes: 10,
+  description: "",
+  freePreview: false,
+  downloadable: false,
+};
+
 function LessonDialog({
   open,
   onOpenChange,
@@ -65,19 +75,20 @@ function LessonDialog({
   initial: LessonFormState | null;
   onSave: (lesson: LessonFormState & { title: string }) => void;
 }) {
-  const [form, setForm] = useState<LessonFormState>(
-    initial ?? { title: "", type: "video", durationMinutes: 10, description: "", freePreview: false, downloadable: false }
-  );
-  const [error, setError] = useState("");
-
-  React.useEffect(() => {
-    if (open) {
-      setForm(
-        initial ?? { title: "", type: "video", durationMinutes: 10, description: "", freePreview: false, downloadable: false }
-      );
-      setError("");
-    }
-  }, [open, initial]);
+  /**
+   * The form resets whenever the dialog is (re)opened for a different lesson —
+   * derived from the open state and lesson identity instead of an effect, so no
+   * stale values flash and no cascading render happens.
+   */
+  const dialogKey = open ? `open:${initial ? "edit" : "add"}:${initial?.title ?? ""}` : "closed";
+  const [state, setState] = useKeyedState(dialogKey, {
+    form: initial ?? EMPTY_LESSON_FORM,
+    error: "",
+  });
+  const form = state.form;
+  const error = state.error;
+  const setForm = (next: LessonFormState) => setState((prev) => ({ ...prev, form: next }));
+  const setError = (next: string) => setState((prev) => ({ ...prev, error: next }));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

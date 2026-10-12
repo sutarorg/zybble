@@ -46,7 +46,7 @@ function NavItem({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex h-9 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/25",
+        "group flex h-10 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/25 lg:h-9",
         active
           ? "bg-accent text-primary"
           : accent
@@ -180,7 +180,7 @@ export function CreatorSidebarContent({ onNavigate }: { onNavigate?: () => void 
         <Separator className="my-2" />
         <Link
           href="/explore"
-          className="flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
         >
           <Compass className="size-4 text-zinc-400" aria-hidden />
           Back to Explore

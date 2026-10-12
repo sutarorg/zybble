@@ -402,7 +402,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       resetAdminData,
     }),
     [
-      hydrated, users.value, payouts.value, categories.value, reports.value, hiddenReviews,
+      hydrated, users.value, payouts.value, categories.value, hiddenReviews,
       notes.value, reports, orders, notifications, readNotifs, activity.value, settings,
       setUserStatus, setUserRole, setPayoutStatus, addCategory, updateCategory, reorderCategories,
       toggleCategoryVisible, approveCourse, rejectCourse, requestChanges, returnToQueue,

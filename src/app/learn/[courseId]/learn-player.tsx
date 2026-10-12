@@ -74,21 +74,30 @@ export function LearnPlayer({
   const enrollment = enrollments.find((e) => e.courseId === course?.id);
   const flat = useMemo(() => (course ? flattenLessons(course) : []), [course]);
 
-  /* current lesson */
-  const progress = course ? progressOf(course, enrollment) : null;
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  useEffect(() => {
-    if (!course || currentId) return;
+  /**
+   * Current lesson: explicitly chosen lesson, else the `?lesson=` deep link,
+   * else where the learner left off, else the first lesson. Derived during
+   * render so the player is correct on the very first hydrated paint.
+   */
+  const [lessonOverride, setLessonOverride] = useState<string | null>(null);
+  const initialLesson = useMemo(() => {
+    if (!course || flat.length === 0) return null;
     const fromParam = initialLessonId ? flat.find((f) => f.lesson.id === initialLessonId) : undefined;
     const fromEnrollment = enrollment?.lastLessonId
       ? flat.find((f) => f.lesson.id === enrollment.lastLessonId)
       : undefined;
-    const target = fromParam ?? fromEnrollment ?? progressOf(course, enrollment).resumeLesson ?? flat[0];
-    if (target) setCurrentId(target.lesson.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [course?.id, hydrated]);
-
-  const current: FlatLesson | null = flat.find((f) => f.lesson.id === currentId) ?? flat[0] ?? null;
+    return (
+      fromParam ??
+      fromEnrollment ??
+      progressOf(course, enrollment).resumeLesson ??
+      flat[0] ??
+      null
+    );
+  }, [course, flat, initialLessonId, enrollment]);
+  const currentLessonId = lessonOverride ?? initialLesson?.lesson.id ?? null;
+  const setCurrentId = setLessonOverride;
+  const current: FlatLesson | null =
+    flat.find((f) => f.lesson.id === currentLessonId) ?? flat[0] ?? null;
 
   /* ui state */
   const [playing, setPlaying] = useState(false);
@@ -96,7 +105,8 @@ export function LearnPlayer({
   const [tutorOpen, setTutorOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
-  const [noteDraft, setNoteDraft] = useState("");
+  /* Note draft: trusted only while it belongs to the lesson being viewed. */
+  const [noteState, setNoteState] = useState<{ lessonId: string; text: string } | null>(null);
   const [noteSaved, setNoteSaved] = useState(false);
   const noteTimer = useRef<number | null>(null);
 
@@ -112,18 +122,19 @@ export function LearnPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.lesson.id]);
 
-  /* notes sync */
-  useEffect(() => {
-    if (!course || !current) return;
-    const existing = notes.find((n) => n.courseId === course.id && n.lessonId === current.lesson.id);
-    setNoteDraft(existing?.text ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [course?.id, current?.lesson.id]);
+  const existingNote =
+    course && current
+      ? notes.find((n) => n.courseId === course.id && n.lessonId === current.lesson.id)
+      : undefined;
+  const noteDraft =
+    noteState && current && noteState.lessonId === current.lesson.id
+      ? noteState.text
+      : (existingNote?.text ?? "");
 
   const persistNote = useCallback(
     (text: string) => {
       if (!course || !current) return;
-      setNoteDraft(text);
+      setNoteState({ lessonId: current.lesson.id, text });
       setNoteSaved(false);
       if (noteTimer.current) window.clearTimeout(noteTimer.current);
       noteTimer.current = window.setTimeout(() => {
@@ -169,7 +180,7 @@ export function LearnPlayer({
         toast("Lesson marked incomplete");
       }
     },
-    [course, current, enrollment, toggleLessonComplete]
+    [course, current, enrollment, toggleLessonComplete, setCurrentId]
   );
 
   /* free-course instant enroll */
@@ -192,7 +203,7 @@ export function LearnPlayer({
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-screen flex-col bg-white" aria-busy>
+      <div className="flex min-h-dvh flex-col bg-white" aria-busy>
         <div className="flex h-14 items-center gap-3 border-b border-border px-4">
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-5 w-64" />
@@ -209,7 +220,7 @@ export function LearnPlayer({
 
   if (flat.length === 0 || !current) {
     return (
-      <div className="flex min-h-screen flex-col bg-white">
+      <div className="flex min-h-dvh flex-col bg-white">
         <header className="flex h-14 items-center gap-3 border-b border-border px-4">
           <Logo href="/explore" />
         </header>
@@ -238,7 +249,7 @@ export function LearnPlayer({
       // fallthrough to enroll prompt below (still offers instant enroll)
     }
     return (
-      <div className="flex min-h-screen flex-col bg-white">
+      <div className="flex min-h-dvh flex-col bg-white">
         <header className="flex h-14 items-center gap-3 border-b border-border px-4">
           <Logo href="/explore" />
         </header>
@@ -324,9 +335,9 @@ export function LearnPlayer({
       {/* Header */}
       <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-white/90 px-3 backdrop-blur sm:gap-3 sm:px-4">
         <Button asChild variant="ghost" size="sm" className="-ml-1 shrink-0">
-          <Link href="/my-learning">
+          <Link href="/my-learning" aria-label="Back to My Learning">
             <ArrowLeft aria-hidden />
-            <span className="hidden sm:inline">My Learning</span>
+            <span className="hidden sm:inline" aria-hidden>My Learning</span>
           </Link>
         </Button>
         <div className="min-w-0 flex-1">
@@ -347,13 +358,20 @@ export function LearnPlayer({
           size="sm"
           onClick={() => setTutorOpen((v) => !v)}
           aria-pressed={tutorOpen}
+          aria-label="AI Tutor"
         >
           <Bot aria-hidden />
-          <span className="hidden sm:inline">AI Tutor</span>
+          <span className="hidden sm:inline" aria-hidden>AI Tutor</span>
         </Button>
-        <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setPanelOpen(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="lg:hidden"
+          onClick={() => setPanelOpen(true)}
+          aria-label="Open course curriculum"
+        >
           <PanelRight aria-hidden />
-          <span className="hidden sm:inline">Curriculum</span>
+          <span className="hidden sm:inline" aria-hidden>Curriculum</span>
         </Button>
       </header>
 

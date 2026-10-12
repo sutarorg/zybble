@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useState } from "react";
+import type { AdminSettings } from "@/types";
 import { toast } from "sonner";
 import {
   BadgePercent,
@@ -36,14 +37,12 @@ import { cn } from "@/lib/utils";
 
 export default function AdminSettingsPage() {
   const { hydrated, settings, saveSettings, categories, resetAdminData } = useAdmin();
-  const [form, setForm] = useState(settings);
+  /* Derived draft: follows the persisted settings until the operator edits a field. */
+  const [formDraft, setFormDraft] = useState<AdminSettings | null>(null);
+  const form = formDraft ?? settings;
+  const setForm = (next: AdminSettings) => setFormDraft(next);
   const [saving, setSaving] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-
-  React.useEffect(() => {
-    if (hydrated) setForm(settings);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
 
   if (!hydrated) return <Skeleton className="h-96 rounded-xl" />;
 

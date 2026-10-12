@@ -245,7 +245,7 @@ export default function AdminReportsPage() {
               <Badge variant="secondary">{TYPE_META[selected.type].label}</Badge>
             </div>
             <section>
-              <h3 className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">Reporter's claim</h3>
+              <h3 className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">Reporter&apos;s claim</h3>
               <p className="mt-1.5 text-[13.5px] leading-relaxed">{selected.reason}</p>
               <p className="mt-1 text-[12px] text-muted-foreground">— {selected.reporterName}</p>
             </section>

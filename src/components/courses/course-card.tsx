@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Bot, CirclePlay, Clock3, Signal, Star } from "lucide-react";
@@ -54,7 +55,7 @@ export function CourseCard({
           />
           <div className="absolute top-2.5 left-2.5 flex max-w-[75%] flex-wrap gap-1.5">
             <Badge variant="solid_white" className="gap-1 shadow-xs">
-              <CategoryIcon className="text-primary" aria-hidden />
+              {React.createElement(CategoryIcon, { className: "text-primary", "aria-hidden": true })}
               {category.shortName}
             </Badge>
             {status && <Badge variant={status.variant}>{status.label}</Badge>}
@@ -62,7 +63,7 @@ export function CourseCard({
         </div>
 
         {/* Body */}
-        <div className="flex flex-1 flex-col gap-2 p-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 p-3.5 sm:p-4">
           <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight transition-colors group-hover:text-primary">
             {course.title}
           </h3>
@@ -79,31 +80,31 @@ export function CourseCard({
             <span className="truncate text-[12px] text-muted-foreground">{instructor.name}</span>
           </div>
 
-          <div className="flex items-center gap-1 text-[12.5px]">
-            <Star className="size-3.5 fill-star text-star" aria-hidden />
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[12.5px]">
+            <Star className="size-3.5 shrink-0 fill-star text-star" aria-hidden />
             <span className="font-semibold text-foreground">{course.rating.toFixed(1)}</span>
             <span className="text-zinc-400">({formatCount(course.ratingsCount)})</span>
             <span className="px-0.5 text-zinc-300" aria-hidden>·</span>
             <span className="text-muted-foreground">{formatCompact(course.studentsCount)} students</span>
           </div>
 
-          <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
-            <span className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
+            <span className="flex items-center gap-1 whitespace-nowrap">
               <CirclePlay className="size-3.5 text-zinc-400" aria-hidden />
               {course.lessonsCount} lessons
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 whitespace-nowrap">
               <Clock3 className="size-3.5 text-zinc-400" aria-hidden />
               {formatDuration(course.durationMinutes)}
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 whitespace-nowrap">
               <Signal className="size-3.5 text-zinc-400" aria-hidden />
               {LEVEL_LABELS[course.level]}
             </span>
           </div>
 
           {/* Price row pinned to bottom for grid alignment */}
-          <div className="mt-auto flex items-center justify-between pt-2">
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
             {course.price === 0 ? (
               <span className="font-display text-[15px] font-bold text-success">Free</span>
             ) : (
@@ -134,7 +135,7 @@ export function CourseCard({
       <BookmarkButton
         courseId={course.id}
         courseTitle={course.title}
-        className="absolute top-2.5 right-2.5 z-10"
+        className="absolute top-2 right-2 z-10 size-10 sm:top-2.5 sm:right-2.5 sm:size-8"
       />
     </article>
   );

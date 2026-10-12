@@ -9,9 +9,9 @@ import { Footer } from "@/components/layout/footer";
  */
 export function LearnerShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-dvh bg-white">
       <LearnerSidebar />
-      <div className="flex min-h-screen flex-col lg:pl-64">
+      <div className="flex min-h-dvh flex-col lg:pl-64">
         <LearnerHeader />
         <main className="min-w-0 flex-1">{children}</main>
         <Footer />
