@@ -158,12 +158,6 @@ export default function DashboardPage() {
                 Enroll in a free course in seconds — no card needed. Your dashboard fills with
                 progress, milestones and recommendations as you learn.
               </p>
-              <Button asChild size="lg" className="mt-6 shadow-md shadow-violet-600/20">
-                <Link href="/explore">
-                  <BookOpen aria-hidden />
-                  Explore Courses
-                </Link>
-              </Button>
             </div>
           </div>
           <h2 className="font-display mt-10 mb-4 text-lg font-semibold">Recommended to start with</h2>
@@ -357,10 +351,6 @@ export default function DashboardPage() {
           <section className="mt-8">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-display text-lg font-semibold">Recommended AI courses</h2>
-              <Link href="/explore" className="group flex items-center gap-1 text-[13px] font-medium text-primary hover:text-primary-hover">
-                View all
-                <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </Link>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {recommended.map((c) => (

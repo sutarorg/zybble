@@ -9,7 +9,6 @@ import {
   GraduationCap,
   HelpCircle,
   LogOut,
-  MessageSquare,
   Presentation,
   ShieldCheck,
 } from "lucide-react";
@@ -23,19 +22,21 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/providers/app-providers";
+import { getDictionary } from "@/lib/i18n";
 
 export function UserMenu() {
   const router = useRouter();
-  const { user, signOut } = useApp();
+  const { user, signOut, language } = useApp();
+  const dict = getDictionary(language);
 
   if (!user) {
     return (
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-          <Link href="/login">Sign in</Link>
+          <Link href="/login">{dict.signIn}</Link>
         </Button>
         <Button asChild size="sm">
-          <Link href="/signup">Get started</Link>
+          <Link href="/signup">{dict.getStarted}</Link>
         </Button>
       </div>
     );
@@ -86,23 +87,18 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/my-learning">
-            <GraduationCap /> My Learning
+            <GraduationCap /> {dict.myLearning}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/wishlist">
-            <Bookmark /> Wishlist
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/messages">
-            <MessageSquare /> Messages
+            <Bookmark /> {dict.wishlist}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/help">
-            <HelpCircle /> Help Center
+            <HelpCircle /> {dict.footerHelp}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -110,10 +106,10 @@ export function UserMenu() {
           onSelect={() => {
             signOut();
             toast.success("Signed out. See you soon!");
-            router.push("/explore");
+            router.push("/");
           }}
         >
-          <LogOut /> Sign out
+          <LogOut /> {dict.signOut}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

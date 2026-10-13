@@ -62,7 +62,7 @@ export function CertificatesClient() {
 
   return (
     <div className="page-container py-6 sm:py-8">
-      <Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Certificates" }]} />
+      <Breadcrumb items={[{ label: "Overview", href: "/dashboard" }, { label: "Certificates" }]} />
 
       <header className="mt-6 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -98,7 +98,7 @@ export function CertificatesClient() {
             to download.
           </p>
           <Button asChild className="mt-2">
-            <Link href="/explore">
+            <Link href="/">
               <Compass aria-hidden />
               Find a course
             </Link>

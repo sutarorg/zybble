@@ -196,7 +196,7 @@ export default function CreatorDashboardPage() {
                 <Eye className="size-3" aria-hidden /> Public profile
               </Link>
               <span className="text-violet-300" aria-hidden>·</span>
-              <Link href="/explore" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <Link href="/" className="inline-flex items-center gap-1 text-primary hover:underline">
                 <Compass className="size-3" aria-hidden /> View catalog
               </Link>
             </div>

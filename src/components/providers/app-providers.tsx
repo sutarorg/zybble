@@ -104,6 +104,13 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const activity = useLocalStorage<ActivityItem[]>(KEYS.activity, []);
   const learnerPrefs = useLocalStorage<LearnerPrefs>(KEYS.learnerPrefs, DEFAULT_LEARNER_PREFS);
 
+  // Interface language actually drives the UI: mirror the stored code onto
+  // <html lang> (the root layout can only render the SSR default) so screen
+  // readers, hyphenation and the browser follow the learner's choice.
+  React.useEffect(() => {
+    if (language.hydrated) document.documentElement.lang = language.value;
+  }, [language.hydrated, language.value]);
+
   const hydrated =
     user.hydrated &&
     wishlist.hydrated &&

@@ -46,7 +46,7 @@ export function WishlistClient() {
             description="Found something interesting? Tap the bookmark on any course card and it'll be waiting for you here."
             action={
               <Button asChild>
-                <Link href="/explore">
+                <Link href="/">
                   <Compass aria-hidden />
                   Explore courses
                 </Link>

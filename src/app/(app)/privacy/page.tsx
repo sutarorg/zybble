@@ -35,7 +35,7 @@ export default function PrivacyPage() {
           <LegalList
             items={[
               "Provide and personalize your learning experience, including recommendations.",
-              "Process orders, issue receipts and handle refunds.",
+              "Process orders and issue receipts.",
               "Communicate product updates, price drops and learning reminders (opt-out any time).",
               "Detect abuse, secure the platform and comply with legal obligations.",
             ]}

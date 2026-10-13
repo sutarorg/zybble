@@ -14,7 +14,7 @@ export function CheckoutFailedClient({ courseSlug }: { courseSlug: string }) {
   const course = getCourseBySlug(courseSlug);
 
   useEffect(() => {
-    if (!course) router.replace("/explore");
+    if (!course) router.replace("/");
   }, [course, router]);
 
   if (!course) return null;

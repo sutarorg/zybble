@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AppProviders } from "@/components/providers/app-providers";
 import { CreatorProvider } from "@/components/providers/creator-provider";
 import { AdminProvider } from "@/components/providers/admin-provider";
+import { ScrollToTop } from "@/components/layout/scroll-to-top";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="bg-background font-sans text-foreground antialiased">
+        <ScrollToTop />
         <AppProviders>
           <CreatorProvider>
             <AdminProvider>{children}</AdminProvider>

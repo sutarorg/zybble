@@ -10,6 +10,8 @@ import { INSTRUCTORS } from "@/data/mock-data";
 import { searchCourses } from "@/lib/courses";
 import { useCommunityCourses } from "@/components/providers/creator-provider";
 import { useMounted } from "@/lib/hooks";
+import { useApp } from "@/components/providers/app-providers";
+import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type Suggestion =
@@ -135,6 +137,8 @@ export function SearchBox({
   onSubmit?: () => void;
 }) {
   const router = useRouter();
+  const { language } = useApp();
+  const dict = getDictionary(language);
   const mounted = useMounted();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -181,7 +185,7 @@ export function SearchBox({
     setOpen(false);
     onSubmit?.();
     if (active) router.push(active.href);
-    else router.push(`/explore?q=${encodeURIComponent(trimmed)}`);
+    else router.push(`/?q=${encodeURIComponent(trimmed)}`);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -220,7 +224,7 @@ export function SearchBox({
             if (!isPanel) setTimeout(() => setOpen(false), 150);
           }}
           onKeyDown={onKeyDown}
-          placeholder={isPanel ? "Search courses or instructors" : "Search courses, topics, or instructors…"}
+          placeholder={isPanel ? dict.searchPlaceholderShort : dict.searchPlaceholder}
           aria-label="Search courses"
           role="combobox"
           aria-expanded={showResults}

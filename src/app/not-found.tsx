@@ -20,7 +20,7 @@ export default function NotFound() {
         </p>
         <div className="mt-8 flex items-center gap-3">
           <Button asChild size="lg">
-            <Link href="/explore">
+            <Link href="/">
               <Compass aria-hidden />
               Back to Explore
             </Link>

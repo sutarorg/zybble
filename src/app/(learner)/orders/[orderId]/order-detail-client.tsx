@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -13,9 +12,6 @@ import {
   Download,
   Eye,
   GraduationCap,
-  Info,
-  RotateCcw,
-  ShieldCheck,
   CircleCheck,
 } from "lucide-react";
 import { useApp } from "@/components/providers/app-providers";
@@ -26,20 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { PLATFORM_COMMISSION } from "@/lib/creator";
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
   const { orders, hydrated, isEnrolled } = useApp();
   const community = useCommunityCourses();
-  const [refundOpen, setRefundOpen] = useState(false);
 
   const order = orders.find((o) => o.id === orderId);
   const course = order ? resolveCourse(order.courseId, community) : undefined;
@@ -203,16 +190,6 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               <Download aria-hidden />
               Download receipt
             </Button>
-            {paid && order.total > 0 && (
-              <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setRefundOpen(true)}>
-                <RotateCcw aria-hidden />
-                Request refund
-              </Button>
-            )}
-            <p className="flex items-start gap-1.5 pt-1 text-[11.5px] leading-relaxed text-zinc-400">
-              <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden />
-              Covered by the 30-day money-back guarantee.
-            </p>
             <p className="flex items-start gap-1.5 text-[11.5px] leading-relaxed text-zinc-400">
               <CreditCard className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               Demo order — no real payment or provider involved.
@@ -221,41 +198,6 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         </div>
       </div>
 
-      {/* Refund dialog */}
-      <Dialog open={refundOpen} onOpenChange={setRefundOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Request a refund?</DialogTitle>
-            <DialogDescription>
-              This simulates a refund request for “{course?.title ?? "this course"}”
-              {order.total > 0 ? ` (${formatPrice(order.total)})` : ""}. Nothing is really charged
-              or refunded — the course remains in your library.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3 text-[12.5px] leading-relaxed text-muted-foreground">
-            <Info className="mt-0.5 size-3.5 shrink-0 text-zinc-400" aria-hidden />
-            Requests within 30 days are auto-approved per the{" "}
-            <Link href="/refund-policy" className="font-medium text-primary hover:underline">
-              Refund Policy
-            </Link>
-            . Ordered {formatDate(order.createdAt)}.
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRefundOpen(false)}>
-              Keep my course
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setRefundOpen(false);
-                toast.success("Refund request submitted — simulated, no money moved");
-              }}
-            >
-              Submit request (demo)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

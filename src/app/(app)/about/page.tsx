@@ -124,7 +124,7 @@ export default function AboutPage() {
           Start with a free course today — no card, no commitment, just progress.
         </p>
         <Button asChild size="lg" className="mt-6">
-          <Link href="/explore">
+          <Link href="/">
             Start exploring
             <ArrowRight aria-hidden />
           </Link>

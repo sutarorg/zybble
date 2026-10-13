@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, Compass, Home, LogOut } from "lucide-react";
+import { Compass, GraduationCap, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORIES } from "@/data/mock-data";
 import { categoryIcon } from "@/lib/icons";
+import { getDictionary } from "@/lib/i18n";
 import { useApp } from "@/components/providers/app-providers";
 import { Logo } from "@/components/layout/logo";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -53,28 +54,34 @@ function NavItem({
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { user, signOut, certificates } = useApp();
+  const { user, signOut, language, enrollments } = useApp();
+  const dict = getDictionary(language);
 
+  // Explore is the site root. Signed-in learners also get My Learning
+  // directly below it; guests and signed-out visitors do not.
   const mainNav = [
-    { href: "/", icon: Home, label: "Home", active: pathname === "/" || pathname === "/home" },
     {
-      href: "/explore",
+      href: "/",
       icon: Compass,
-      label: "Explore",
-      active: pathname.startsWith("/explore"),
+      label: dict.explore,
+      active: pathname === "/",
     },
-    {
-      href: "/certificates",
-      icon: Award,
-      label: "Certificates",
-      active: pathname.startsWith("/certificates"),
-      trailing:
-        certificates.length > 0 ? (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-violet-100 px-1 text-[10.5px] font-semibold text-violet-700">
-            {certificates.length}
-          </span>
-        ) : undefined,
-    },
+    ...(user
+      ? [
+          {
+            href: "/my-learning",
+            icon: GraduationCap,
+            label: dict.myLearning,
+            active: pathname.startsWith("/my-learning") || pathname.startsWith("/learn"),
+            trailing:
+              enrollments.length > 0 ? (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-violet-100 px-1 text-[10.5px] font-semibold text-violet-700">
+                  {enrollments.length}
+                </span>
+              ) : undefined,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -93,9 +100,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <Separator className="my-4" />
 
         <p className="px-3 pb-2 text-[10.5px] font-semibold tracking-[0.08em] text-zinc-400 uppercase">
-          Categories
+          {dict.categories}
         </p>
-        <nav aria-label="Categories" className="flex flex-col gap-0.5 pb-4">
+        <nav aria-label={dict.categories} className="flex flex-col gap-0.5 pb-4">
           {CATEGORIES.map((category) => {
             const Icon = categoryIcon(category.icon);
             const href = `/categories/${category.slug}`;
@@ -128,20 +135,20 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <button
               type="button"
               onClick={signOut}
-              title="Sign out"
+              title={dict.signOut}
               className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
             >
               <LogOut className="size-4" />
-              <span className="sr-only">Sign out</span>
+              <span className="sr-only">{dict.signOut}</span>
             </button>
           </div>
         ) : (
           <div className="flex flex-col gap-2 p-1">
             <Button asChild size="sm" className="w-full">
-              <Link href="/signup">Create free account</Link>
+              <Link href="/signup">{dict.createFreeAccount}</Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="w-full">
-              <Link href="/login">Sign in</Link>
+              <Link href="/login">{dict.signIn}</Link>
             </Button>
           </div>
         )}

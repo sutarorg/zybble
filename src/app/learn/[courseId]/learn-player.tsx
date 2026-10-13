@@ -247,7 +247,7 @@ export function LearnPlayer({
     return (
       <div className="flex min-h-dvh flex-col bg-white">
         <header className="flex h-14 items-center gap-3 border-b border-border px-4">
-          <Logo href="/explore" />
+          <Logo href="/" />
         </header>
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-4 py-16 text-center">
           <GraduationCap className="size-9 text-zinc-300" aria-hidden />
@@ -261,7 +261,7 @@ export function LearnPlayer({
               <Link href="/my-learning">My Learning</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/explore">Explore courses</Link>
+              <Link href="/">Explore courses</Link>
             </Button>
           </div>
         </main>
@@ -276,7 +276,7 @@ export function LearnPlayer({
     return (
       <div className="flex min-h-dvh flex-col bg-white">
         <header className="flex h-14 items-center gap-3 border-b border-border px-4">
-          <Logo href="/explore" />
+          <Logo href="/" />
         </header>
         <main className="mx-auto flex w-full max-w-5xl flex-1 items-center px-4 py-12">
           <div className="grid w-full gap-8 md:grid-cols-[minmax(0,1fr)_340px]">

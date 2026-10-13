@@ -78,7 +78,7 @@ export function CourseDetailView({
     <div className="mx-auto max-w-330 px-4 py-6 pb-4 sm:px-6 lg:px-8">
       <Breadcrumb
         items={[
-          { label: "Explore", href: "/explore" },
+          { label: "Explore", href: "/" },
           { label: category.name, href: `/categories/${category.slug}` },
           { label: course.title },
         ]}

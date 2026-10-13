@@ -25,7 +25,7 @@ export function CheckoutSuccessClient({
   const order = orders.find((o) => o.id === orderId);
 
   useEffect(() => {
-    if (!course) router.replace("/explore");
+    if (!course) router.replace("/");
   }, [course, router]);
 
   if (!course) return null;
@@ -99,7 +99,7 @@ export function CheckoutSuccessClient({
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="flex-1">
-              <Link href="/explore">
+              <Link href="/">
                 <Compass aria-hidden />
                 Keep exploring
               </Link>

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/components/providers/app-providers";
 import { LANGUAGES } from "@/data/mock-data";
+import { getDictionary } from "@/lib/i18n";
 import { initialsOf } from "@/lib/format";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -176,17 +177,17 @@ export default function LearnerSettingsPage() {
       <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <Globe className="size-4.5 text-primary" aria-hidden />
-          Interface language
+          {getDictionary(language).interfaceLanguage}
         </h2>
         <div className="mt-4 max-w-xs">
           <Select
             value={language}
             onValueChange={(v) => {
               setLanguage(v);
-              toast.success(`Language preference saved: ${LANGUAGES.find((l) => l.code === v)?.label ?? v} (demo)`);
+              toast.success(getDictionary(v).languageChanged(LANGUAGES.find((l) => l.code === v)?.label ?? v));
             }}
           >
-            <SelectTrigger aria-label="Interface language">
+            <SelectTrigger aria-label={getDictionary(language).interfaceLanguage}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -232,7 +233,6 @@ export default function LearnerSettingsPage() {
       <section className="rounded-xl border border-border bg-white p-2 shadow-card">
         {[
           { href: "/orders", label: "Order history", text: "Receipts and simulated purchases" },
-          { href: "/refund-policy", label: "Refund policy", text: "30-day money-back guarantee" },
           { href: "/help", label: "Help Center", text: "FAQs and support" },
         ].map((link) => (
           <Link
@@ -262,7 +262,7 @@ export default function LearnerSettingsPage() {
               onClick={() => {
                 signOut();
                 toast.success("Signed out");
-                router.push("/explore");
+                router.push("/");
               }}
             >
               <LogOut aria-hidden />
@@ -304,7 +304,7 @@ export default function LearnerSettingsPage() {
               Object.keys(window.localStorage)
                 .filter((k) => k.startsWith("zybble."))
                 .forEach((k) => window.localStorage.removeItem(k));
-              window.location.href = "/explore";
+              window.location.href = "/";
             }}
           >
             <RotateCcw aria-hidden />
@@ -332,7 +332,7 @@ export default function LearnerSettingsPage() {
                 resetLearnerData();
                 setResetOpen(false);
                 toast.success("Learner data cleared");
-                router.push("/explore");
+                router.push("/");
               }}
             >
               Reset learner data

@@ -180,7 +180,7 @@ export default function CreatorSettingsPage() {
               Object.keys(window.localStorage)
                 .filter((k) => k.startsWith("zybble."))
                 .forEach((k) => window.localStorage.removeItem(k));
-              window.location.href = "/explore";
+              window.location.href = "/";
             }}
           >
             <Trash2 aria-hidden />

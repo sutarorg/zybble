@@ -19,7 +19,7 @@ export function ZybbleMark({ className }: { className?: string }) {
 
 export function Logo({
   className,
-  href = "/explore",
+  href = "/",
   showWordmark = true,
 }: {
   className?: string;

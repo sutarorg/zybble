@@ -237,7 +237,7 @@ export function MyLearningClient() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/explore">
+          <Link href="/">
             <Compass aria-hidden />
             Browse catalog
           </Link>
@@ -312,7 +312,7 @@ export function MyLearningClient() {
             description="When you enroll — free or paid — your learning dashboard starts here, with lesson-by-lesson progress."
             action={
               <Button asChild size="lg">
-                <Link href="/explore">
+                <Link href="/">
                   <BookOpen aria-hidden />
                   Explore Courses
                 </Link>
