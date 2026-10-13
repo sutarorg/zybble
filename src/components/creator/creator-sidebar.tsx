@@ -160,23 +160,13 @@ export function CreatorSidebarContent({ onNavigate }: { onNavigate?: () => void 
       </div>
 
       <div className="border-t border-border p-3">
-        <div className="flex items-center gap-2.5 rounded-lg p-1.5">
-          <Avatar className="size-8.5">
-            <AvatarFallback className={cn("text-[11px]", profile.avatarColor)}>
-              {profile.initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold">{profile.displayName}</p>
-            <Link
-              href="/instructors/maya-lindqvist"
-              className="flex items-center gap-0.5 text-[11.5px] font-medium text-primary hover:underline"
-            >
-              Public profile
-              <ArrowUpRight className="size-3" aria-hidden />
-            </Link>
-          </div>
-        </div>
+        <Link
+          href="/creator"
+          className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
+        >
+          <Compass className="size-4 text-zinc-400" aria-hidden />
+          Go to Studio
+        </Link>
         <Separator className="my-2" />
         <Link
           href="/"

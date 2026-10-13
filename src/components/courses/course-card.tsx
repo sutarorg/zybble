@@ -54,10 +54,6 @@ export function CourseCard({
             className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
           />
           <div className="absolute top-2.5 left-2.5 flex max-w-[75%] flex-wrap gap-1.5">
-            <Badge variant="solid_white" className="gap-1 shadow-xs">
-              {React.createElement(CategoryIcon, { className: "text-primary", "aria-hidden": true })}
-              {category.shortName}
-            </Badge>
             {status && <Badge variant={status.variant}>{status.label}</Badge>}
           </div>
         </div>

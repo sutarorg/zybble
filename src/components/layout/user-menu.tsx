@@ -11,6 +11,7 @@ import {
   LogOut,
   Presentation,
   ShieldCheck,
+  Compass,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -19,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/providers/app-providers";
 import { getDictionary } from "@/lib/i18n";
@@ -51,6 +52,7 @@ export function UserMenu() {
           className="flex cursor-pointer items-center gap-1.5 rounded-full p-0.5 pr-1.5 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
         >
           <Avatar className="size-8.5 ring-1 ring-border">
+            {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
             <AvatarFallback className="bg-primary text-[11px] text-white">
               {user.initials}
             </AvatarFallback>
@@ -61,6 +63,7 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-60">
         <div className="flex items-center gap-3 px-2.5 py-2.5">
           <Avatar className="size-10">
+            {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
             <AvatarFallback className="bg-primary text-xs text-white">{user.initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0">
@@ -70,13 +73,27 @@ export function UserMenu() {
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/creator">
-            <Presentation /> Creator studio
-            <span className="ml-auto rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">
-              Demo
-            </span>
+          <Link href="/">
+            <Compass /> Explore
           </Link>
         </DropdownMenuItem>
+        {user.role !== "creator" && (
+          <DropdownMenuItem asChild>
+            <Link href="/creator">
+              <Presentation /> Creator studio
+              <span className="ml-auto rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">
+                Demo
+              </span>
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {user.role === "creator" && (
+          <DropdownMenuItem asChild>
+            <Link href="/creator">
+              <Presentation /> Go to Studio
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <Link href="/admin">
             <ShieldCheck /> Admin portal

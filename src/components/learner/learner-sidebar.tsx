@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Award,
   Bookmark,
@@ -11,12 +11,14 @@ import {
   LogOut,
   Receipt,
   Settings,
+  Presentation,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDictionary } from "@/lib/i18n";
 import { Logo } from "@/components/layout/logo";
 import { useApp } from "@/components/providers/app-providers";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
 function NavItem({
@@ -144,36 +146,64 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
 
       <div className="border-t border-border p-3">
         {user ? (
-          <div className="flex items-center gap-2.5 rounded-lg p-1.5">
-            <Avatar className="size-8.5">
-              <AvatarFallback className="bg-primary text-[11px] text-white">
-                {user.initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold">{user.name}</p>
-              <Link href="/settings" className="text-[11.5px] font-medium text-primary hover:underline">
-                {dict.viewSettings}
+          <div className="flex flex-col gap-3">
+            {user.role !== "creator" && (
+              <Link
+                href="/creator/signup"
+                className="flex items-center gap-3 rounded-lg border border-border bg-white p-3 text-left transition-colors hover:border-violet-200 hover:shadow-card-hover"
+              >
+                <Presentation className="size-5 text-primary" aria-hidden />
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold text-foreground">Start teaching</p>
+                  <p className="truncate text-[11.5px] text-muted-foreground">
+                    Share your knowledge and earn money
+                  </p>
+                </div>
               </Link>
-            </div>
+            )}
+            <div className="flex items-center gap-2.5 rounded-lg p-1.5">
+              <Avatar className="size-8.5">
+                {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
+                <AvatarFallback className="bg-primary text-[11px] text-white">
+                  {user.initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold">{user.name}</p>
+                <Link href="/settings" className="text-[11.5px] font-medium text-primary hover:underline">
+                  {dict.viewSettings}
+                </Link>
+              </div>
             <button
               type="button"
-              onClick={signOut}
+              onClick={() => {
+                signOut();
+                router.push("/");
+              }}
               title={dict.signOut}
               className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
             >
               <LogOut className="size-4" />
               <span className="sr-only">{dict.signOut}</span>
             </button>
+            </div>
+            <Link
+              href="/"
+              className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
+            >
+              <Compass className="size-4 text-zinc-400" aria-hidden />
+              Back to Explore
+            </Link>
           </div>
         ) : (
           <div className="flex flex-col gap-2 p-1">
-            <Button asChild size="sm" className="w-full">
-              <Link href="/signup">{dict.createFreeAccount}</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="w-full">
-              <Link href="/login">{dict.signIn}</Link>
-            </Button>
+            <Link
+              href="/"
+              className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
+            >
+              <Compass className="size-4 text-zinc-400" aria-hidden />
+              Back to Explore
+            </Link>
           </div>
         )}
       </div>

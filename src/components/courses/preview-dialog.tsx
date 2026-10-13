@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, Expand } from "lucide-react";
 import type { Course } from "@/types";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -45,44 +45,67 @@ export function PreviewDialog({ course }: { course: Course }) {
 
   return (
     <>
-      {/* Trigger: 16:9 thumbnail with simulated play button */}
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          setPlaying(true);
-        }}
-        aria-label={`Play preview of ${course.title}`}
-        className="group relative block aspect-video w-full cursor-pointer overflow-hidden rounded-xl border border-border bg-zinc-950 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-      >
+      {/* Preview player directly in the page */}
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-zinc-950">
         <Image
           src={course.thumbnail}
           alt={`${course.title} preview`}
           fill
           sizes="(max-width: 1024px) 100vw, 768px"
-          className="object-cover opacity-95 transition-transform duration-300 group-hover:scale-[1.02]"
+          className={cn("object-cover opacity-95 transition-transform duration-300", playing ? "opacity-70" : "opacity-95")}
         />
         <span
           className="absolute inset-0 bg-gradient-to-t from-zinc-950/50 via-transparent to-transparent"
           aria-hidden
         />
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span
-            className="flex size-16 items-center justify-center rounded-full bg-white/95 text-foreground shadow-xl transition-transform duration-200 group-hover:scale-110"
-            style={{ animation: "pulse-ring 2.2s infinite" }}
-          >
-            <Play className="ml-1 size-6 fill-current" aria-hidden />
-          </span>
-        </span>
-        <span className="absolute bottom-3 left-3 flex items-center gap-2">
+        <span className="absolute top-3 left-3 flex items-center gap-2">
           <Badge variant="solid_white">Preview</Badge>
-          <span className="text-[12px] font-medium text-white/90 drop-shadow">
-            Watch course intro
+        </span>
+
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={playing ? "Pause preview" : "Play preview"}
+          className="absolute inset-0 flex cursor-pointer items-center justify-center outline-none"
+        >
+          <span className={cn(
+            "flex size-16 items-center justify-center rounded-full bg-white/95 text-foreground shadow-xl transition-all",
+            playing ? "scale-90 opacity-0 hover:scale-100 hover:opacity-100" : "scale-100 opacity-100"
+          )}>
+            {playing ? (
+              <Pause className="size-6 fill-current" aria-hidden />
+            ) : (
+              <Play className="ml-1 size-6 fill-current" aria-hidden />
+            )}
+          </span>
+        </button>
+
+        {/* Progress */}
+        <span className="absolute right-0 bottom-0 left-0 p-3">
+          <span className="block h-1 overflow-hidden rounded-full bg-white/25">
+            <span
+              className="block h-full rounded-full bg-white"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </span>
+          <span className="mt-2 flex items-center justify-between text-[11.5px] font-medium text-white/80">
+            <span>{course.title} — intro</span>
+            <span>Simulated playback · demo</span>
           </span>
         </span>
+      </div>
+
+      {/* Fullscreen mode toggle */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Open fullscreen preview"
+        className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm text-white transition-colors hover:bg-white/30"
+      >
+        <Expand className="size-4" aria-hidden />
       </button>
 
-      {/* Simulated player */}
+      {/* Fullscreen Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl gap-0 overflow-hidden p-0" aria-describedby={undefined}>
           <DialogTitle className="sr-only">{course.title} — course preview</DialogTitle>

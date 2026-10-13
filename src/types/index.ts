@@ -103,6 +103,8 @@ export interface User {
   name: string;
   email: string;
   initials: string;
+  avatar?: string;
+  role?: "learner" | "creator" | "admin";
 }
 
 export interface Order {
@@ -275,6 +277,7 @@ export interface CreatorProfile {
   languages: string[];
   initials: string;
   avatarColor: string;
+  avatar?: string;
   website: string;
   topics: string[];
   onboardedAt: string | null;

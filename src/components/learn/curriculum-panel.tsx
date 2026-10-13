@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, ChevronDown, CirclePlay, FileDown, FileText, ListChecks } from "lucide-react";
 import type { Course, Enrollment } from "@/types";
 import type { FlatLesson } from "@/lib/learn";
@@ -53,6 +53,18 @@ export function CurriculumPanel({
       else next.add(id);
       return next;
     });
+
+  // Auto-open the section containing the current lesson when it changes
+  useEffect(() => {
+    const idx = course.curriculum.findIndex((s) => s.lessons.some((l) => l.id === currentLessonId));
+    if (idx >= 0) {
+      setOpen((prev) => {
+        const next = new Set(prev);
+        next.add(course.curriculum[idx].id);
+        return next;
+      });
+    }
+  }, [currentLessonId, course.curriculum]);
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
