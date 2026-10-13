@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -44,7 +45,7 @@ const STEP_HELP: { title: string; text: string }[] = [
   { title: "Thumbnail", text: "A clean 16:9 image. Cards everywhere use the exact preview below." },
   { title: "Pricing", text: "Paid or free — you can change this any time before publishing." },
   { title: "Curriculum", text: "Sections group lessons into milestones. 4–6 sections is a proven structure." },
-  { title: "Course content", text: "Attach videos and downloadable resources. Local preview only in this demo." },
+  { title: "Course content", text: "Attach videos and downloadable resources. Local preview only in this preview." },
   { title: "Course preview", text: "Review everything as learners will see it before submitting." },
   { title: "Submit for review", text: "Simulated submission — transitions this course to Pending Review." },
 ];
@@ -162,29 +163,23 @@ export default function NewCoursePage() {
           <span className="absolute inset-0 animate-ping rounded-full bg-emerald-200/60" aria-hidden />
           <PartyPopper className="relative size-7 text-emerald-600" aria-hidden />
         </span>
-        <h1 className="font-display mt-5 text-2xl font-bold tracking-tight">Submitted for review</h1>
+        <h1 className="font-display mt-5 text-2xl font-bold tracking-tight"><LocalizedText text={"Submitted for review"} /></h1>
         <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-muted-foreground">
-          “{draft.title}” is now <span className="font-medium text-foreground">Pending Review</span> in
-          this local simulation. Track its status and mock review notes from the publish page.
-        </p>
+          “<LocalizedText text={draft.title} /><LocalizedText text={"” is now"} /><span className="font-medium text-foreground"><LocalizedText text={"Pending Review"} /></span><LocalizedText text={"in this local simulation. Track its status and mock review notes from the publish page."} /></p>
         <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
           <Button asChild size="lg">
             <Link href={`/creator/courses/${submittedId}/publish`}>
-              <Send aria-hidden />
-              Open publish page
-            </Link>
+              <Send aria-hidden /><LocalizedText text={"Open publish page"} /></Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href="/creator/courses">Back to My Courses</Link>
+            <Link href="/creator/courses"><LocalizedText text={"Back to My Courses"} /></Link>
           </Button>
         </div>
         <button
           type="button"
           onClick={startFresh}
           className="mt-5 cursor-pointer text-[13px] font-medium text-primary hover:underline"
-        >
-          Create another course
-        </button>
+        ><LocalizedText text={"Create another course"} /></button>
       </div>
     );
   }
@@ -197,36 +192,25 @@ export default function NewCoursePage() {
         <div>
           <Button asChild variant="ghost" size="sm" className="-ml-2">
             <Link href="/creator/courses">
-              <ArrowLeft aria-hidden />
-              My Courses
-            </Link>
+              <ArrowLeft aria-hidden /><LocalizedText text={"My Courses"} /></Link>
           </Button>
-          <h1 className="font-display mt-1 text-[24px] font-bold tracking-tight">Create course</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Drafts autosave to this browser. Nothing is published until you submit.
-          </p>
+          <h1 className="font-display mt-1 text-[24px] font-bold tracking-tight"><LocalizedText text={"Create course"} /></h1>
+          <p className="mt-1 text-[13px] text-muted-foreground"><LocalizedText text={"Drafts autosave to this browser. Nothing is published until you submit."} /></p>
         </div>
         <div className="flex items-center gap-2">
           {dirty ? (
             <span className="flex items-center gap-1.5 text-[12px] font-medium text-amber-600">
-              <Save className="size-3.5" aria-hidden />
-              Unsaved changes
-            </span>
+              <Save className="size-3.5" aria-hidden /><LocalizedText text={"Unsaved changes"} /></span>
           ) : lastSaved ? (
             <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <CircleCheck className="size-3.5 text-emerald-500" aria-hidden />
-              Draft saved{" "}
-              {lastSaved.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
+              <CircleCheck className="size-3.5 text-emerald-500" aria-hidden /><LocalizedText text={"Draft saved"} /><LocalizedText text={" "} />
+              <LocalizedText text={lastSaved.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })} />
             </span>
           ) : null}
           <Button variant="outline" size="sm" onClick={() => { saveDraft(draft); setLastSaved(new Date()); setDirty(false); toast.success("Draft saved"); }}>
-            <Save aria-hidden />
-            Save draft
-          </Button>
+            <Save aria-hidden /><LocalizedText text={"Save draft"} /></Button>
           <Button variant="ghost" size="sm" onClick={startFresh}>
-            <Eraser aria-hidden />
-            Start fresh
-          </Button>
+            <Eraser aria-hidden /><LocalizedText text={"Start fresh"} /></Button>
         </div>
       </div>
 
@@ -251,9 +235,9 @@ export default function NewCoursePage() {
           <div className="rounded-xl border border-border bg-white shadow-card">
             <div className="border-b border-border px-5 py-4 sm:px-6">
               <h2 className="font-display text-[16px] font-semibold">
-                {step + 1}. {STEP_HELP[step].title}
+                {step + 1}. <LocalizedText text={STEP_HELP[step].title} />
               </h2>
-              <p className="mt-0.5 text-[12.5px] text-muted-foreground">{STEP_HELP[step].text}</p>
+              <p className="mt-0.5 text-[12.5px] text-muted-foreground"><LocalizedText text={STEP_HELP[step].text} /></p>
             </div>
 
             <div className="p-5 sm:p-6">
@@ -269,7 +253,7 @@ export default function NewCoursePage() {
                   />
                   {errors.sections && (
                     <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] font-medium text-destructive">
-                      {errors.sections}
+                      <LocalizedText text={errors.sections} />
                     </p>
                   )}
                 </div>
@@ -289,19 +273,13 @@ export default function NewCoursePage() {
           {/* Footer controls */}
           <div className="mt-4 flex items-center justify-between">
             <Button variant="outline" onClick={goBack} disabled={step === 0}>
-              <ArrowLeft aria-hidden />
-              Back
-            </Button>
+              <ArrowLeft aria-hidden /><LocalizedText text={"Back"} /></Button>
             {step < CREATOR_STEPS.length - 1 ? (
-              <Button onClick={goContinue}>
-                Continue
-                <ArrowRight aria-hidden />
+              <Button onClick={goContinue}><LocalizedText text={"Continue"} /><ArrowRight aria-hidden />
               </Button>
             ) : (
               <Button onClick={submit} size="lg">
-                <Send aria-hidden />
-                Submit for review
-              </Button>
+                <Send aria-hidden /><LocalizedText text={"Submit for review"} /></Button>
             )}
           </div>
         </section>
@@ -313,25 +291,23 @@ export default function NewCoursePage() {
 /* --------------------------------- Step 6 ---------------------------------- */
 
 function ContentStep({ draft, update }: { draft: CourseDraft; update: (p: Partial<CourseDraft>) => void }) {
+  const translateUi = useTranslate();
   const [uploads, setUploads] = useState<{ fileName: string; fileSize: number; kind: "video" | "resource" }[]>([]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 text-[13.5px] font-semibold">Lesson videos</h3>
+        <h3 className="mb-2 text-[13.5px] font-semibold"><LocalizedText text={"Lesson videos"} /></h3>
         <UploadSlot
-          title="Select lesson videos"
+          title={translateUi("Select lesson videos")}
           uploads={uploads}
           onChange={setUploads}
         />
         <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-relaxed text-zinc-400">
-          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          Files stay on this device and are only listed here. Persistent upload and transcoding
-          are not connected in this demo.
-        </p>
+          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden /><LocalizedText text={"Files stay on this device and are only listed here. Persistent upload and transcoding are not connected in this preview."} /></p>
       </div>
       <div>
-        <h3 className="mb-2 text-[13.5px] font-semibold">Downloadable resources</h3>
+        <h3 className="mb-2 text-[13.5px] font-semibold"><LocalizedText text={"Downloadable resources"} /></h3>
         <ResourceManager
           resources={draft.draftResources}
           onChange={(draftResources) => update({ draftResources })}
@@ -352,28 +328,27 @@ function PreviewStep({
   category?: string;
   lessonsCount: number;
 }) {
+  const translateUi = useTranslate();
   const outcomes = draft.outcomes.map((o) => o.trim()).filter(Boolean);
   return (
     <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
       {/* Card preview */}
       <div>
-        <p className="mb-2 text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase">
-          Course card (16:9)
-        </p>
+        <p className="mb-2 text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase"><LocalizedText text={"Course card (16:9)"} /></p>
         <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
           <div className="relative aspect-video w-full bg-muted">
             {draft.thumbnail && (
-              <Image src={draft.thumbnail} alt="" fill sizes="300px" className="object-cover" />
+              <Image src={draft.thumbnail} alt={translateUi("")} fill sizes="300px" className="object-cover" />
             )}
           </div>
           <div className="p-3.5">
-            {category && <Badge variant="solid_white" className="mb-2 border">{category}</Badge>}
+            {category && <Badge variant="solid_white" className="mb-2 border"><LocalizedText text={category} /></Badge>}
             <p className="font-display line-clamp-2 text-[14px] font-semibold tracking-tight">
-              {draft.title || "Untitled course"}
+              <LocalizedText text={draft.title || "Untitled course"} />
             </p>
-            <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{draft.subtitle}</p>
+            <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground"><LocalizedText text={draft.subtitle} /></p>
             <p className="mt-2 font-display text-[14px] font-bold">
-              {draft.isFree ? <span className="text-success">Free</span> : formatPrice(draft.price)}
+              {draft.isFree ? <span className="text-success"><LocalizedText text={"Free"} /></span> : formatPrice(draft.price)}
             </p>
           </div>
         </div>
@@ -393,18 +368,18 @@ function PreviewStep({
           },
         ].map((row) => (
           <div key={row.label} className="flex flex-col gap-0.5 rounded-lg border border-border bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <dt className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">{row.label}</dt>
-            <dd className="text-[13.5px] font-medium">{row.value}</dd>
+            <dt className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase"><LocalizedText text={row.label} /></dt>
+            <dd className="text-[13.5px] font-medium"><LocalizedText text={row.value} /></dd>
           </div>
         ))}
         {outcomes.length > 0 && (
           <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
-            <dt className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">Outcomes</dt>
+            <dt className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase"><LocalizedText text={"Outcomes"} /></dt>
             <dd className="mt-2 space-y-1.5">
               {outcomes.map((o) => (
                 <p key={o} className="flex items-start gap-2 text-[13px]">
                   <Check className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                  {o}
+                  <LocalizedText text={o} />
                 </p>
               ))}
             </dd>
@@ -432,9 +407,7 @@ function SubmitStep({ draft, lessonsCount }: { draft: CourseDraft; lessonsCount:
     <div className="space-y-5">
       <div className="rounded-xl border border-border bg-muted/40 p-5">
         <h3 className="flex items-center gap-2 text-[14px] font-semibold">
-          <FileDown className="size-4 text-primary" aria-hidden />
-          Pre-submission checklist
-        </h3>
+          <FileDown className="size-4 text-primary" aria-hidden /><LocalizedText text={"Pre-submission checklist"} /></h3>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2">
           {checks.map((c) => (
             <li key={c.label} className="flex items-center gap-2 text-[13px]">
@@ -443,23 +416,21 @@ function SubmitStep({ draft, lessonsCount }: { draft: CourseDraft; lessonsCount:
               ) : (
                 <span className="size-4 shrink-0 rounded-full border-2 border-amber-400" aria-hidden />
               )}
-              <span className={cn(!c.ok && "text-amber-700")}>{c.label}</span>
+              <span className={cn(!c.ok && "text-amber-700")}><LocalizedText text={c.label} /></span>
             </li>
           ))}
         </ul>
       </div>
       <div className="rounded-xl border border-violet-200 bg-accent p-5 text-[13px] leading-relaxed text-violet-950/70">
-        <p className="font-semibold text-violet-950">What happens next (simulated)</p>
+        <p className="font-semibold text-violet-950"><LocalizedText text={"What happens next (simulated)"} /></p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Your course moves to <strong>Pending Review</strong> in the review queue.</li>
-          <li>A mock review history appears on the publish page.</li>
-          <li>You can withdraw the submission any time to keep editing.</li>
-          <li>No real Zybble administrator reviews anything — this is a local demo.</li>
+          <li><LocalizedText text={"Your course moves to"} /><strong><LocalizedText text={"Pending Review"} /></strong><LocalizedText text={"in the review queue."} /></li>
+          <li><LocalizedText text={"A mock review history appears on the publish page."} /></li>
+          <li><LocalizedText text={"You can withdraw the submission any time to keep editing."} /></li>
+          <li><LocalizedText text={"No real Zybble administrator reviews anything — this is a local preview."} /></li>
         </ul>
         {!allOk && (
-          <p className="mt-3 font-medium text-amber-700">
-            Some checklist items are incomplete — you can still submit, but fix them for a smooth review.
-          </p>
+          <p className="mt-3 font-medium text-amber-700"><LocalizedText text={"Some checklist items are incomplete — you can still submit, but fix them for a smooth review."} /></p>
         )}
       </div>
     </div>

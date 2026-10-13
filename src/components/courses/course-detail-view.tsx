@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import Link from "next/link";
 import { Check, FileDown, Globe2, Languages, RefreshCcw, Signal, Sparkles, Users } from "lucide-react";
@@ -36,7 +37,7 @@ function Section({
 }) {
   return (
     <section id={id} className={cn("mt-10", className)}>
-      <h2 className="font-display mb-4 text-lg font-semibold tracking-tight">{title}</h2>
+      <h2 className="font-display mb-4 text-lg font-semibold tracking-tight"><LocalizedText text={title} /></h2>
       {children}
     </section>
   );
@@ -57,6 +58,7 @@ export function CourseDetailView({
   reviews: Review[];
   related: Course[];
 }) {
+  const translateUi = useTranslate();
   const category = courseCategory(course);
   const CategoryIcon = categoryIcon(category.icon);
   // NB: rendered via createElement below — assigning the icon to a capitalised
@@ -90,49 +92,44 @@ export function CourseDetailView({
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="violet" className="gap-1">
               {React.createElement(CategoryIcon, { "aria-hidden": true })}
-              {category.name}
+              <LocalizedText text={category.name} />
             </Badge>
-            {course.badge === "bestseller" && <Badge variant="amber">Bestseller</Badge>}
-            {course.badge === "popular" && <Badge variant="violet">Popular</Badge>}
-            {course.badge === "new" && <Badge variant="emerald">New</Badge>}
+            {course.badge === "bestseller" && <Badge variant="amber"><LocalizedText text={"Bestseller"} /></Badge>}
+            {course.badge === "popular" && <Badge variant="violet"><LocalizedText text={"Popular"} /></Badge>}
+            {course.badge === "new" && <Badge variant="emerald"><LocalizedText text={"New"} /></Badge>}
           </div>
 
           <h1 className="font-display mt-3 text-2xl leading-tight font-bold tracking-tight sm:text-[32px]">
-            {course.title}
+            <LocalizedText text={course.title} />
           </h1>
           <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
-            {course.subtitle}
+            <LocalizedText text={course.subtitle} />
           </p>
 
           {/* Meta row */}
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
             {isNew ? (
               <span className="flex items-center gap-1.5 font-medium text-emerald-700">
-                <Sparkles className="size-4" aria-hidden />
-                New course
-              </span>
+                <Sparkles className="size-4" aria-hidden /><LocalizedText text={"New course"} /></span>
             ) : (
               <span className="flex items-center gap-2">
                 <span className="font-display text-[15px] font-bold text-foreground">
-                  {course.rating.toFixed(1)}
+                  <LocalizedText text={course.rating.toFixed(1)} />
                 </span>
                 <RatingStars rating={course.rating} />
                 <a href="#reviews" className="text-primary hover:underline">
-                  ({formatCount(course.ratingsCount)} ratings)
-                </a>
+                  (<LocalizedText text={formatCount(course.ratingsCount)} /><LocalizedText text={"ratings)"} /></a>
               </span>
             )}
             <span className="flex items-center gap-1.5">
               <Users className="size-4 text-zinc-400" aria-hidden />
-              {formatCount(course.studentsCount)} students
-            </span>
+              <LocalizedText text={formatCount(course.studentsCount)} /><LocalizedText text={"students"} /></span>
             <span className="flex items-center gap-1.5">
               <Signal className="size-4 text-zinc-400" aria-hidden />
-              {LEVEL_LABELS[course.level]}
+              <LocalizedText text={LEVEL_LABELS[course.level]} />
             </span>
             <span className="flex items-center gap-1.5">
-              <RefreshCcw className="size-3.5 text-zinc-400" aria-hidden />
-              Updated {formatMonthYear(course.lastUpdated)}
+              <RefreshCcw className="size-3.5 text-zinc-400" aria-hidden /><LocalizedText text={"Updated"} /><LocalizedText text={formatMonthYear(course.lastUpdated)} />
             </span>
             <span className="flex items-center gap-1.5">
               <Globe2 className="size-4 text-zinc-400" aria-hidden />
@@ -140,15 +137,14 @@ export function CourseDetailView({
             </span>
             <span className="flex items-center gap-1.5">
               <Languages className="size-4 text-zinc-400" aria-hidden />
-              {course.captions.length} caption languages
-            </span>
+              {course.captions.length}<LocalizedText text={"caption languages"} /></span>
           </div>
 
           {/* Instructor strip */}
           <div className="mt-5 flex items-center gap-3">
             <Avatar className="size-9 ring-1 ring-border">
               <AvatarFallback className={cn("text-[11px]", instructor.avatarColor)}>
-                {instructor.initials}
+                <LocalizedText text={instructor.initials} />
               </AvatarFallback>
             </Avatar>
             <div className="text-[13px]">
@@ -156,9 +152,9 @@ export function CourseDetailView({
                 href={`/instructors/${instructor.username}`}
                 className="font-semibold transition-colors hover:text-primary"
               >
-                {instructor.name}
+                <LocalizedText text={instructor.name} />
               </Link>
-              <p className="text-muted-foreground">{instructor.headline}</p>
+              <p className="text-muted-foreground"><LocalizedText text={instructor.headline} /></p>
             </div>
           </div>
 
@@ -169,13 +165,13 @@ export function CourseDetailView({
 
           {/* What you'll learn */}
           {course.whatYouLearn.length > 0 && (
-            <Section title="What you'll learn">
+            <Section title={translateUi("What you'll learn")}>
               <div className="rounded-xl border border-border bg-white p-5 sm:p-6">
                 <ul className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
                   {course.whatYouLearn.map((item) => (
                     <li key={item} className="flex items-start gap-2.5 text-[13.5px] leading-relaxed">
                       <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                      {item}
+                      <LocalizedText text={item} />
                     </li>
                   ))}
                 </ul>
@@ -185,30 +181,27 @@ export function CourseDetailView({
 
           {/* Curriculum */}
           {course.curriculum.length > 0 && (
-            <Section title="Course curriculum">
+            <Section title={translateUi("Course curriculum")}>
               <Curriculum course={course} />
               {course.downloadableResources > 0 && (
                 <p className="mt-3 flex items-center gap-2 text-[12.5px] text-muted-foreground">
-                  <FileDown className="size-4 text-zinc-400" aria-hidden />
-                  Includes {course.downloadableResources} downloadable resources marked in the
-                  curriculum.
-                </p>
+                  <FileDown className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Includes"} />{course.downloadableResources}<LocalizedText text={"downloadable resources marked in the curriculum."} /></p>
               )}
             </Section>
           )}
 
           {/* Description */}
-          <Section title="About this course">
+          <Section title={translateUi("About this course")}>
             <div className="space-y-4 text-[14px] leading-relaxed text-muted-foreground">
               {course.longDescription.map((p, i) => (
-                <p key={i}>{p}</p>
+                <p key={i}><LocalizedText text={p} /></p>
               ))}
             </div>
             {course.tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {course.tags.map((tag) => (
                   <Badge key={tag} variant="secondary" className="font-normal">
-                    {tag}
+                    <LocalizedText text={tag} />
                   </Badge>
                 ))}
               </div>
@@ -216,22 +209,22 @@ export function CourseDetailView({
           </Section>
 
           {/* Instructor */}
-          <Section title="Meet your instructor">
+          <Section title={translateUi("Meet your instructor")}>
             <InstructorCard instructor={instructor} />
           </Section>
 
           {/* Requirements & audience */}
           {(course.requirements.length > 0 || course.audience.length > 0) && (
-            <Section title="Who this course is for">
+            <Section title={translateUi("Who this course is for")}>
               <div className="grid gap-4 sm:grid-cols-2">
                 {course.requirements.length > 0 && (
                   <div className="rounded-xl border border-border bg-white p-5">
-                    <h3 className="text-[13.5px] font-semibold">Requirements</h3>
+                    <h3 className="text-[13.5px] font-semibold"><LocalizedText text={"Requirements"} /></h3>
                     <ul className="mt-3 space-y-2">
                       {course.requirements.map((r) => (
                         <li key={r} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-muted-foreground">
                           <span className="mt-[7px] size-1 shrink-0 rounded-full bg-zinc-400" aria-hidden />
-                          {r}
+                          <LocalizedText text={r} />
                         </li>
                       ))}
                     </ul>
@@ -239,12 +232,12 @@ export function CourseDetailView({
                 )}
                 {course.audience.length > 0 && (
                   <div className="rounded-xl border border-border bg-white p-5">
-                    <h3 className="text-[13.5px] font-semibold">Target audience</h3>
+                    <h3 className="text-[13.5px] font-semibold"><LocalizedText text={"Target audience"} /></h3>
                     <ul className="mt-3 space-y-2">
                       {course.audience.map((a) => (
                         <li key={a} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-muted-foreground">
                           <Check className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                          {a}
+                          <LocalizedText text={a} />
                         </li>
                       ))}
                     </ul>
@@ -255,18 +248,18 @@ export function CourseDetailView({
           )}
 
           {/* Reviews */}
-          <Section id="reviews" title="Learner reviews">
+          <Section id="reviews" title={translateUi("Learner reviews")}>
             {isNew ? (
               <EmptyState
                 icon={Sparkles}
-                title="No reviews yet"
-                description="This course just launched. Be one of the first learners to enroll and review it."
+                title={translateUi("No reviews yet")}
+                description={translateUi("This course just launched. Be one of the first learners to enroll and review it.")}
               />
             ) : visibleReviews.length === 0 ? (
               <EmptyState
                 icon={Sparkles}
-                title="No visible reviews"
-                description="All reviews for this course are currently moderated. Check back later."
+                title={translateUi("No visible reviews")}
+                description={translateUi("All reviews for this course are currently moderated. Check back later.")}
               />
             ) : (
               <>
@@ -287,8 +280,8 @@ export function CourseDetailView({
       {related.length > 0 && (
         <div className="mt-14">
           <SectionHeader
-            title="Related courses"
-            description="Learners who took this course also explored"
+            title={translateUi("Related courses")}
+            description={translateUi("Learners who took this course also explored")}
             viewAllHref={`/categories/${category.slug}`}
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

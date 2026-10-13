@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -33,6 +34,7 @@ import { slugify } from "@/lib/creator";
 import { cn } from "@/lib/utils";
 
 export default function AdminCategoriesPage() {
+  const translateUi = useTranslate();
   const { hydrated, categories, addCategory, updateCategory, reorderCategories, toggleCategoryVisible } =
     useAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -89,7 +91,7 @@ export default function AdminCategoriesPage() {
       addCategory({
         name: name.trim(),
         slug: finalSlug,
-        description: description.trim() || "Custom marketplace category (demo).",
+        description: description.trim() || "Custom marketplace category .",
         order: sorted.length + 1,
         visible: true,
       });
@@ -104,17 +106,12 @@ export default function AdminCategoriesPage() {
     <div className="max-w-4xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Marketplace</p>
-          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">Categories</h1>
-          <p className="mt-1.5 max-w-xl text-[14px] text-muted-foreground">
-            The 8 official Zybble categories plus any local additions. Changes persist in this
-            browser only.
-          </p>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Marketplace"} /></p>
+          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Categories"} /></h1>
+          <p className="mt-1.5 max-w-xl text-[14px] text-muted-foreground"><LocalizedText text={"The 8 official Zybble categories plus any local additions. Changes persist in this browser only."} /></p>
         </div>
         <Button onClick={openAdd}>
-          <Plus aria-hidden />
-          Add category
-        </Button>
+          <Plus aria-hidden /><LocalizedText text={"Add category"} /></Button>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
@@ -131,18 +128,18 @@ export default function AdminCategoriesPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-[13.5px] font-semibold">{cat.name}</p>
-                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-500">{cat.slug}</span>
-                    {!cat.visible && <Badge variant="secondary">Hidden</Badge>}
+                    <p className="truncate text-[13.5px] font-semibold"><LocalizedText text={cat.name} /></p>
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-500"><LocalizedText text={cat.slug} /></span>
+                    {!cat.visible && <Badge variant="secondary"><LocalizedText text={"Hidden"} /></Badge>}
                   </div>
                   <p className="truncate text-[12px] text-muted-foreground">
-                    {cat.description} · {cat.courseCount} {cat.courseCount === 1 ? "course" : "courses"}
+                    <LocalizedText text={cat.description} /> · {cat.courseCount} {cat.courseCount === 1 ? "course" : "courses"}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">
                   <button
                     type="button"
-                    aria-label={`Move ${cat.name} up`}
+                    aria-label={translateUi(`Move ${cat.name} up`)}
                     disabled={i === 0}
                     onClick={() => {
                       reorderCategories(i, i - 1);
@@ -154,7 +151,7 @@ export default function AdminCategoriesPage() {
                   </button>
                   <button
                     type="button"
-                    aria-label={`Move ${cat.name} down`}
+                    aria-label={translateUi(`Move ${cat.name} down`)}
                     disabled={i === sorted.length - 1}
                     onClick={() => {
                       reorderCategories(i, i + 1);
@@ -166,7 +163,7 @@ export default function AdminCategoriesPage() {
                   </button>
                   <button
                     type="button"
-                    aria-label={`Edit ${cat.name}`}
+                    aria-label={translateUi(`Edit ${cat.name}`)}
                     onClick={() => openEdit(cat)}
                     className="cursor-pointer rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-muted hover:text-foreground"
                   >
@@ -174,7 +171,7 @@ export default function AdminCategoriesPage() {
                   </button>
                   <button
                     type="button"
-                    aria-label={cat.visible ? `Hide ${cat.name}` : `Show ${cat.name}`}
+                    aria-label={translateUi(cat.visible ? `Hide ${cat.name}` : `Show ${cat.name}`)}
                     aria-pressed={!cat.visible}
                     onClick={() => {
                       toggleCategoryVisible(cat.id);
@@ -195,10 +192,7 @@ export default function AdminCategoriesPage() {
       </div>
 
       <p className="flex items-start gap-1.5 text-[12px] leading-relaxed text-zinc-400">
-        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-        Category edits, ordering and visibility are persisted locally for the portal demo. The
-        public storefront keeps its curated catalog structure.
-      </p>
+        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden /><LocalizedText text={"Category edits, ordering and visibility are persisted locally for the portal preview. The public storefront keeps its curated catalog structure."} /></p>
 
       {/* Add / edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -213,7 +207,7 @@ export default function AdminCategoriesPage() {
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <LayoutGrid className="size-4 text-primary" aria-hidden />
-                <Label htmlFor="cat-name">Name *</Label>
+                <Label htmlFor="cat-name"><LocalizedText text={"Name *"} /></Label>
               </div>
               <Input
                 id="cat-name"
@@ -222,11 +216,11 @@ export default function AdminCategoriesPage() {
                   setName(e.target.value);
                   if (!slugEdited) setSlug(slugify(e.target.value));
                 }}
-                placeholder="e.g. AI for Healthcare"
+                placeholder={translateUi("e.g. AI for Healthcare")}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cat-slug">Slug * (must be unique)</Label>
+              <Label htmlFor="cat-slug"><LocalizedText text={"Slug * (must be unique)"} /></Label>
               <Input
                 id="cat-slug"
                 value={slug}
@@ -234,27 +228,25 @@ export default function AdminCategoriesPage() {
                   setSlugEdited(true);
                   setSlug(e.target.value.toLowerCase());
                 }}
-                placeholder="ai-healthcare"
+                placeholder={translateUi("ai-healthcare")}
                 className="font-mono text-[13px]"
                 aria-invalid={!!error}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cat-desc">Description</Label>
+              <Label htmlFor="cat-desc"><LocalizedText text={"Description"} /></Label>
               <Textarea
                 id="cat-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="One line describing what belongs here."
+                placeholder={translateUi("One line describing what belongs here.")}
                 className="min-h-16"
               />
             </div>
-            {error && <p className="text-[12px] font-medium text-destructive">{error}</p>}
+            {error && <p className="text-[12px] font-medium text-destructive"><LocalizedText text={error} /></p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}><LocalizedText text={"Cancel"} /></Button>
             <Button onClick={save}>{editing ? "Save changes" : "Add category"}</Button>
           </DialogFooter>
         </DialogContent>

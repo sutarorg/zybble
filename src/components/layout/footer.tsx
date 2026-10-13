@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { ZybbleMark } from "@/components/layout/logo";
 import { CATEGORIES } from "@/data/mock-data";
@@ -7,6 +8,7 @@ import { getDictionary } from "@/lib/i18n";
 import { useApp } from "@/components/providers/app-providers";
 
 export function Footer() {
+  const translateUi = useTranslate();
   const { language } = useApp();
   const dict = getDictionary(language);
 
@@ -40,16 +42,16 @@ export function Footer() {
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2.5">
               <ZybbleMark />
-              <span className="font-display text-lg font-bold tracking-tight">Zybble</span>
+              <span className="font-display text-lg font-bold tracking-tight"><LocalizedText text={"Zybble"} /></span>
             </div>
             <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-muted-foreground">
-              {dict.footerTagline}
+              <LocalizedText text={dict.footerTagline} />
             </p>
           </div>
           {columns.map((col) => (
-            <nav key={col.title} aria-label={col.title}>
+            <nav key={col.title} aria-label={translateUi(col.title)}>
               <p className="text-[11.5px] font-semibold tracking-wider text-zinc-400 uppercase">
-                {col.title}
+                <LocalizedText text={col.title} />
               </p>
               <ul className="mt-3 space-y-2">
                 {col.links.map((link) => (
@@ -58,7 +60,7 @@ export function Footer() {
                       href={link.href}
                       className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      {link.label}
+                      <LocalizedText text={link.label} />
                     </Link>
                   </li>
                 ))}
@@ -68,11 +70,8 @@ export function Footer() {
         </div>
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 sm:flex-row sm:items-center">
           <p className="text-[12.5px] text-zinc-400">
-            © {new Date().getFullYear()} Zybble Inc. Crafted for learners everywhere.
-          </p>
-          <p className="text-[12.5px] text-zinc-400">
-            Frontend demo — courses, prices and statistics are sample data.
-          </p>
+            <LocalizedText text={dict.footerCopyright(new Date().getFullYear())} /></p>
+
         </div>
       </div>
     </footer>

@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -21,9 +22,9 @@ export function SectionHeader({
   return (
     <div className={cn("mb-4 flex items-end justify-between gap-4", className)}>
       <div>
-        <h2 className="font-display text-lg font-semibold tracking-tight sm:text-xl">{title}</h2>
+        <h2 className="font-display text-lg font-semibold tracking-tight sm:text-xl"><LocalizedText text={title} /></h2>
         {description && (
-          <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground"><LocalizedText text={description} /></p>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -32,9 +33,7 @@ export function SectionHeader({
           <Link
             href={viewAllHref}
             className="group flex items-center gap-1 text-[13px] font-medium text-primary transition-colors hover:text-primary-hover"
-          >
-            View all
-            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          ><LocalizedText text={"View all"} /><ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </Link>
         )}
         {onViewAll && (
@@ -42,9 +41,7 @@ export function SectionHeader({
             type="button"
             onClick={onViewAll}
             className="group flex cursor-pointer items-center gap-1 text-[13px] font-medium text-primary transition-colors hover:text-primary-hover"
-          >
-            View all
-            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+          ><LocalizedText text={"View all"} /><ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </button>
         )}
       </div>

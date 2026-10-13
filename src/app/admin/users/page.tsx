@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
@@ -52,6 +53,7 @@ export default function AdminUsersPage({
 }: {
   searchParams: Promise<{ role?: string; selected?: string }>;
 }) {
+  const translateUi = useTranslate();
   const sp = use(searchParams);
   const router = useRouter();
   const pathname = usePathname();
@@ -109,16 +111,13 @@ export default function AdminUsersPage({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">People</p>
-        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">User management</h1>
-        <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground">
-          Creators, learners and staff as mock accounts. Status and role changes update demo data
-          only — no real permissions are ever granted.
-        </p>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"People"} /></p>
+        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"User management"} /></h1>
+        <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground"><LocalizedText text={"Creators, learners and staff as mock accounts. Status and role changes update sample data only — no real permissions are ever granted."} /></p>
       </div>
 
       {/* Role chips */}
-      <div className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide" role="tablist" aria-label="Filter by role">
+      <div className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide" role="tablist" aria-label={translateUi("Filter by role")}>
         {(["all", "admin", "moderator", "creator", "learner"] as const).map((r) => {
           const active = role === r;
           const count = r === "all" ? users.length : users.filter((u) => u.role === r).length;
@@ -139,7 +138,7 @@ export default function AdminUsersPage({
                 active ? "border-primary bg-primary text-white shadow-sm" : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:text-foreground"
               )}
             >
-              {r === "all" ? "All accounts" : `${ROLE_META[r].label}s`}
+              <LocalizedText text={r === "all" ? "All accounts" : `${ROLE_META[r].label}s`} />
               <span className={cn("rounded px-1 text-[10.5px] tabular-nums", active ? "bg-white/20" : "bg-muted")}>{count}</span>
             </button>
           );
@@ -154,21 +153,21 @@ export default function AdminUsersPage({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, email or country…"
-            aria-label="Search users"
+            placeholder={translateUi("Search name, email or country…")}
+            aria-label={translateUi("Search users")}
             className="h-9.5 w-full rounded-lg border border-input bg-white pr-3 pl-9 text-sm shadow-xs outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
         <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
-          <SelectTrigger className="w-44" aria-label="Sort users">
+          <SelectTrigger className="w-44" aria-label={translateUi("Sort users")}>
             <ArrowUpDown className="size-3.5 text-zinc-400" aria-hidden />
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
-            <SelectItem value="registered">Newest first</SelectItem>
-            <SelectItem value="active">Recently active</SelectItem>
-            <SelectItem value="courses">Most courses</SelectItem>
-            <SelectItem value="name">Name A–Z</SelectItem>
+            <SelectItem value="registered"><LocalizedText text={"Newest first"} /></SelectItem>
+            <SelectItem value="active"><LocalizedText text={"Recently active"} /></SelectItem>
+            <SelectItem value="courses"><LocalizedText text={"Most courses"} /></SelectItem>
+            <SelectItem value="name"><LocalizedText text={"Name A–Z"} /></SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -179,11 +178,9 @@ export default function AdminUsersPage({
         <EmptyState
           icon={query ? SearchX : Users}
           title={query ? "No users match" : "No users in this segment"}
-          description="Try a different search or role filter."
+          description={translateUi("Try a different search or role filter.")}
           action={
-            <Button variant="outline" onClick={() => { setQuery(""); setRole("all"); router.replace(pathname, { scroll: false }); }}>
-              Clear filters
-            </Button>
+            <Button variant="outline" onClick={() => { setQuery(""); setRole("all"); router.replace(pathname, { scroll: false }); }}><LocalizedText text={"Clear filters"} /></Button>
           }
         />
       ) : (
@@ -193,13 +190,13 @@ export default function AdminUsersPage({
               <table className="w-full min-w-200 text-left">
                 <thead>
                   <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                    <th className="py-3 pr-4 pl-5">User</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Registered</th>
-                    <th className="px-4 py-3">Activity</th>
-                    <th className="px-4 py-3">Status</th>
+                    <th className="py-3 pr-4 pl-5"><LocalizedText text={"User"} /></th>
+                    <th className="px-4 py-3"><LocalizedText text={"Role"} /></th>
+                    <th className="px-4 py-3"><LocalizedText text={"Registered"} /></th>
+                    <th className="px-4 py-3"><LocalizedText text={"Activity"} /></th>
+                    <th className="px-4 py-3"><LocalizedText text={"Status"} /></th>
                     <th className="py-3 pr-5 pl-4 text-right">
-                      <span className="sr-only">Profile</span>
+                      <span className="sr-only"><LocalizedText text={"Profile"} /></span>
                     </th>
                   </tr>
                 </thead>
@@ -209,42 +206,38 @@ export default function AdminUsersPage({
                       <td className="max-w-64 py-3 pr-4 pl-5">
                         <div className="flex items-center gap-3">
                           <Avatar className="size-9">
-                            <AvatarFallback className={cn("text-[11px]", u.avatarColor)}>{u.initials}</AvatarFallback>
+                            <AvatarFallback className={cn("text-[11px]", u.avatarColor)}><LocalizedText text={u.initials} /></AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
-                            <p className="truncate text-[13px] font-semibold">{u.name}</p>
-                            <p className="truncate text-[11.5px] text-muted-foreground">{u.email}</p>
+                            <p className="truncate text-[13px] font-semibold"><LocalizedText text={u.name} /></p>
+                            <p className="truncate text-[11.5px] text-muted-foreground"><LocalizedText text={u.email} /></p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={ROLE_META[u.role].variant}>{ROLE_META[u.role].label}</Badge>
+                        <Badge variant={ROLE_META[u.role].variant}><LocalizedText text={ROLE_META[u.role].label} /></Badge>
                       </td>
                       <td className="px-4 py-3 text-[12px] whitespace-nowrap text-muted-foreground">
-                        {formatDate(u.registeredAt)}
+                        <LocalizedText text={formatDate(u.registeredAt)} />
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-[12px] text-muted-foreground">
-                          {u.role === "creator"
+                          {<LocalizedText text={u.role === "creator"
                             ? `${u.coursesCreated} ${u.coursesCreated === 1 ? "course" : "courses"}`
                             : u.role === "learner"
                               ? `${u.enrollments} enrollments`
-                              : "Staff"}
-                          {" · "}
-                          <span className="text-zinc-400">{timeAgo(u.lastActiveAt)}</span>
+                              : "Staff"} />}
+                          <LocalizedText text={" · "} />
+                          <span className="text-zinc-400"><LocalizedText text={timeAgo(u.lastActiveAt)} /></span>
                         </p>
                       </td>
                       <td className="px-4 py-3">
                         {u.status === "active" ? (
                           <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-emerald-700">
-                            <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
-                            Active
-                          </span>
+                            <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden /><LocalizedText text={"Active"} /></span>
                         ) : (
                           <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-red-600">
-                            <span className="size-1.5 rounded-full bg-red-500" aria-hidden />
-                            Suspended
-                          </span>
+                            <span className="size-1.5 rounded-full bg-red-500" aria-hidden /><LocalizedText text={"Suspended"} /></span>
                         )}
                       </td>
                       <td className="py-3 pr-5 pl-4 text-right">
@@ -255,9 +248,7 @@ export default function AdminUsersPage({
                             setSelectedId(u.id);
                             syncUrl(u.id);
                           }}
-                        >
-                          View
-                        </Button>
+                        ><LocalizedText text={"View"} /></Button>
                       </td>
                     </tr>
                   ))}
@@ -266,9 +257,7 @@ export default function AdminUsersPage({
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[12.5px] text-muted-foreground">
-              Page {current} of {totalPages} · {filtered.length} users
-            </p>
+            <p className="text-[12.5px] text-muted-foreground"><LocalizedText text={"Page"} />{current}<LocalizedText text={"of"} />{totalPages} · {filtered.length}<LocalizedText text={"users"} /></p>
             <Pagination page={current} totalPages={totalPages} onChange={setPage} />
           </div>
         </>
@@ -290,19 +279,19 @@ export default function AdminUsersPage({
             <div className="flex flex-wrap items-center gap-2">
               {selected.status === "active" ? (
                 <ActionButton
-                  label="Suspend account"
+                  label={translateUi("Suspend account")}
                   icon={Ban}
                   danger
                   size="sm"
                   confirmTitle={`Suspend ${selected.name}?`}
-                  confirmBody="The account is marked suspended in this local demo. No real access is revoked — the demo role preview is unaffected."
+                  confirmBody="The account is marked suspended in this local preview. No real access is revoked — the preview role preview is unaffected."
                   confirmLabel="Suspend account"
                   onAction={() => setUserStatus(selected.id, "suspended")}
                   toastText="Account suspended (simulated)"
                 />
               ) : (
                 <ActionButton
-                  label="Reactivate account"
+                  label={translateUi("Reactivate account")}
                   icon={UserCheck}
                   size="sm"
                   confirmTitle={`Reactivate ${selected.name}?`}
@@ -313,12 +302,12 @@ export default function AdminUsersPage({
                 />
               )}
               <div className="flex items-center gap-1.5">
-                <span className="text-[11.5px] font-semibold text-zinc-400 uppercase">Role:</span>
+                <span className="text-[11.5px] font-semibold text-zinc-400 uppercase"><LocalizedText text={"Role:"} /></span>
                 {(["creator", "learner", "moderator"] as const).map((r) =>
                   selected.role !== r ? (
                     <ActionButton
                       key={r}
-                      label={ROLE_META[r].label}
+                      label={translateUi(ROLE_META[r].label)}
                       icon={UserCog}
                       variant="outline"
                       size="sm"
@@ -353,11 +342,11 @@ function UserDrawerTitle({ user }: { user: AdminUser }) {
   return (
     <div className="flex items-center gap-3">
       <Avatar className="size-11">
-        <AvatarFallback className={cn("text-[12px]", user.avatarColor)}>{user.initials}</AvatarFallback>
+        <AvatarFallback className={cn("text-[12px]", user.avatarColor)}><LocalizedText text={user.initials} /></AvatarFallback>
       </Avatar>
       <div className="min-w-0">
-        <p className="text-[15.5px] font-semibold">{user.name}</p>
-        <p className="truncate text-[12px] text-muted-foreground">{user.email}</p>
+        <p className="text-[15.5px] font-semibold"><LocalizedText text={user.name} /></p>
+        <p className="truncate text-[12px] text-muted-foreground"><LocalizedText text={user.email} /></p>
       </div>
     </div>
   );
@@ -402,7 +391,7 @@ function UserDrawerBody({
         ].map((s) => (
           <div key={s.label} className="rounded-lg border border-border p-2.5">
             <p className="font-display text-[15px] font-bold tabular-nums">{s.value}</p>
-            <p className="text-[10.5px] text-muted-foreground">{s.label}</p>
+            <p className="text-[10.5px] text-muted-foreground"><LocalizedText text={s.label} /></p>
           </div>
         ))}
       </div>
@@ -415,13 +404,13 @@ function UserDrawerBody({
         </h3>
         {isCreatorPersona ? (
           personaCourses.length === 0 ? (
-            <p className="text-[12.5px] text-zinc-400">No courses created.</p>
+            <p className="text-[12.5px] text-zinc-400"><LocalizedText text={"No courses created."} /></p>
           ) : (
             <ul className="space-y-1.5">
               {personaCourses.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-                  <span className="truncate text-[12.5px] font-medium">{c.title}</span>
-                  <span className="shrink-0 text-[11.5px] tabular-nums text-zinc-400">{c.price === 0 ? "Free" : formatPrice(c.price)}</span>
+                  <span className="truncate text-[12.5px] font-medium"><LocalizedText text={c.title} /></span>
+                  <span className="shrink-0 text-[11.5px] tabular-nums text-zinc-400"><LocalizedText text={c.price === 0 ? "Free" : formatPrice(c.price)} /></span>
                 </li>
               ))}
             </ul>
@@ -429,21 +418,19 @@ function UserDrawerBody({
         ) : user.role === "learner" ? (
           learnerOrders.length === 0 && enrollments.length === 0 ? (
             <p className="text-[12.5px] text-zinc-400">
-              {user.enrollments} mock enrollments recorded in the seed data. Local demo enrollments
-              appear here when you complete a simulated checkout yourself.
-            </p>
+              {user.enrollments}<LocalizedText text={"mock enrollments recorded in the seed data. Local preview enrollments appear here when you complete a simulated checkout yourself."} /></p>
           ) : (
             <ul className="space-y-1.5">
               {learnerOrders.slice(0, 5).map((o) => (
                 <li key={o.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-                  <span className="truncate font-mono text-[11.5px] text-zinc-500">{o.id}</span>
-                  <span className="shrink-0 text-[11.5px] tabular-nums">{formatPrice(o.total)}</span>
+                  <span className="truncate font-mono text-[11.5px] text-zinc-500"><LocalizedText text={o.id} /></span>
+                  <span className="shrink-0 text-[11.5px] tabular-nums"><LocalizedText text={formatPrice(o.total)} /></span>
                 </li>
               ))}
             </ul>
           )
         ) : (
-          <p className="text-[12.5px] text-zinc-400">Staff accounts don&apos;t own or enroll in courses.</p>
+          <p className="text-[12.5px] text-zinc-400"><LocalizedText text={"Staff accounts don't own or enroll in courses."} /></p>
         )}
       </section>
 
@@ -451,18 +438,15 @@ function UserDrawerBody({
       {(userReviews.length > 0 || reports.length > 0) && (
         <section>
           <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold">
-            <Star className="size-3.5 text-zinc-400" aria-hidden />
-            Reviews & reports
-          </h3>
+            <Star className="size-3.5 text-zinc-400" aria-hidden /><LocalizedText text={"Reviews & reports"} /></h3>
           <ul className="space-y-1.5">
             {userReviews.slice(0, 3).map((r) => (
               <li key={r.id} className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
-                “{r.title}” · {r.rating}★
+                “<LocalizedText text={r.title} />” · {r.rating}★
               </li>
             ))}
             {reports.slice(0, 3).map((r) => (
-              <li key={r.id} className="rounded-lg border border-red-200 bg-red-50/60 px-3 py-2 text-[12px] text-red-700">
-                Report: {r.targetTitle} · {r.status}
+              <li key={r.id} className="rounded-lg border border-red-200 bg-red-50/60 px-3 py-2 text-[12px] text-red-700"><LocalizedText text={"Report:"} /><LocalizedText text={r.targetTitle} /> · {r.status}
               </li>
             ))}
           </ul>
@@ -472,15 +456,13 @@ function UserDrawerBody({
       {/* Activity timeline */}
       <section>
         <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold">
-          <GraduationCap className="size-3.5 text-zinc-400" aria-hidden />
-          Activity timeline (mock)
-        </h3>
+          <GraduationCap className="size-3.5 text-zinc-400" aria-hidden /><LocalizedText text={"Activity timeline (mock)"} /></h3>
         <ul className="space-y-2.5 border-l border-border pl-4">
           {timeline.map((t, i) => (
             <li key={i} className="relative">
               <span className="absolute top-1.5 -left-[21px] size-2 rounded-full bg-primary" aria-hidden />
-              <p className="text-[12.5px]">{t.text}</p>
-              <p className="text-[11px] text-zinc-400">{formatDate(t.at)}</p>
+              <p className="text-[12.5px]"><LocalizedText text={t.text} /></p>
+              <p className="text-[11px] text-zinc-400"><LocalizedText text={formatDate(t.at)} /></p>
             </li>
           ))}
         </ul>
@@ -494,9 +476,6 @@ function UserDrawerBody({
 function selectedGuardNote() {
   return (
     <p className="flex items-start gap-1.5 rounded-lg border border-violet-200 bg-accent p-3 text-[11.5px] leading-relaxed text-violet-950/70">
-      <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-      Account changes in this drawer only update local mock data. Nothing touches real accounts,
-      permissions or servers.
-    </p>
+      <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden /><LocalizedText text={"Account changes in this drawer only update local mock data. Nothing touches real accounts, permissions or servers."} /></p>
   );
 }

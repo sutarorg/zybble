@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { use, useState } from "react";
 import Link from "next/link";
@@ -27,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export default function PublishPage({ params }: { params: Promise<{ id: string }> }) {
+  const translateUi = useTranslate();
   const { id } = use(params);
   const { hydrated, getCourse, submitForReview, withdrawSubmission } = useCreator();
   const [busy, setBusy] = useState(false);
@@ -78,27 +80,21 @@ export default function PublishPage({ params }: { params: Promise<{ id: string }
       <div>
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link href="/creator/courses">
-            <ArrowLeft aria-hidden />
-            My Courses
-          </Link>
+            <ArrowLeft aria-hidden /><LocalizedText text={"My Courses"} /></Link>
         </Button>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-[24px] font-bold tracking-tight">Preview & publish</h1>
-            <p className="mt-1 text-[13px] text-muted-foreground">{course.title}</p>
+            <h1 className="font-display text-[24px] font-bold tracking-tight"><LocalizedText text={"Preview & publish"} /></h1>
+            <p className="mt-1 text-[13px] text-muted-foreground"><LocalizedText text={course.title} /></p>
           </div>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm">
               <Link href={`/creator/courses/${id}/edit`}>
-                <Pencil aria-hidden />
-                Edit details
-              </Link>
+                <Pencil aria-hidden /><LocalizedText text={"Edit details"} /></Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={`/courses/${course.slug}`}>
-                <Eye aria-hidden />
-                Public preview
-              </Link>
+                <Eye aria-hidden /><LocalizedText text={"Public preview"} /></Link>
             </Button>
           </div>
         </div>
@@ -117,7 +113,7 @@ export default function PublishPage({ params }: { params: Promise<{ id: string }
       >
         <div className="flex items-center gap-3">
           <StatusBadge status={course.status} />
-          <p className="text-[13px] text-muted-foreground">{meta.description} Local simulation — no real admin review happens.</p>
+          <p className="text-[13px] text-muted-foreground"><LocalizedText text={meta.description} /><LocalizedText text={"Local simulation — no real admin review happens."} /></p>
         </div>
         <div className="flex items-center gap-2">
           {canSubmit && (
@@ -128,9 +124,7 @@ export default function PublishPage({ params }: { params: Promise<{ id: string }
           )}
           {canWithdraw && (
             <Button onClick={doWithdraw} variant="outline" size="sm">
-              <RotateCcw aria-hidden />
-              Withdraw submission
-            </Button>
+              <RotateCcw aria-hidden /><LocalizedText text={"Withdraw submission"} /></Button>
           )}
         </div>
       </div>
@@ -138,32 +132,31 @@ export default function PublishPage({ params }: { params: Promise<{ id: string }
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Preview card */}
         <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-          <h2 className="font-display text-[15.5px] font-semibold">Course preview</h2>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Course preview"} /></h2>
           <div className="mt-4 overflow-hidden rounded-xl border border-border">
             <div className="relative aspect-video w-full bg-muted">
-              <Image src={course.thumbnail} alt="" fill sizes="480px" className="object-cover" />
+              <Image src={course.thumbnail} alt={translateUi("")} fill sizes="480px" className="object-cover" />
             </div>
             <div className="p-4">
               <div className="flex flex-wrap items-center gap-2">
-                {category && <Badge variant="violet">{category.name}</Badge>}
-                <Badge variant="secondary">{LEVEL_LABELS[course.level]}</Badge>
+                {category && <Badge variant="violet"><LocalizedText text={category.name} /></Badge>}
+                <Badge variant="secondary"><LocalizedText text={LEVEL_LABELS[course.level]} /></Badge>
                 <Badge variant="secondary">{course.language}</Badge>
               </div>
-              <p className="font-display mt-2.5 text-[15px] font-semibold tracking-tight">{course.title}</p>
-              <p className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">{course.subtitle}</p>
+              <p className="font-display mt-2.5 text-[15px] font-semibold tracking-tight"><LocalizedText text={course.title} /></p>
+              <p className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground"><LocalizedText text={course.subtitle} /></p>
               <div className="mt-3 flex items-center justify-between">
                 <span className="font-display text-[15px] font-bold">
-                  {course.price === 0 ? <span className="text-success">Free</span> : formatPrice(course.price)}
+                  {course.price === 0 ? <span className="text-success"><LocalizedText text={"Free"} /></span> : formatPrice(course.price)}
                 </span>
                 <span className="text-[12px] text-muted-foreground">
-                  {lessonsCount} lessons · {course.curriculum.length} sections
-                </span>
+                  {lessonsCount}<LocalizedText text={"lessons ·"} />{course.curriculum.length}<LocalizedText text={"sections"} /></span>
               </div>
             </div>
           </div>
 
           {/* Checklist */}
-          <h3 className="mt-5 text-[13px] font-semibold">Readiness checklist</h3>
+          <h3 className="mt-5 text-[13px] font-semibold"><LocalizedText text={"Readiness checklist"} /></h3>
           <ul className="mt-2.5 space-y-2">
             {checks.map((c) => (
               <li key={c.label} className="flex items-center gap-2 text-[13px]">
@@ -172,24 +165,21 @@ export default function PublishPage({ params }: { params: Promise<{ id: string }
                 ) : (
                   <span className="size-4 shrink-0 rounded-full border-2 border-amber-400" aria-hidden />
                 )}
-                <span className={cn(!c.ok && "text-amber-700")}>{c.label}</span>
+                <span className={cn(!c.ok && "text-amber-700")}><LocalizedText text={c.label} /></span>
               </li>
             ))}
           </ul>
-          <p className="mt-2.5 text-[12px] text-zinc-400">{readyCount}/{checks.length} complete</p>
+          <p className="mt-2.5 text-[12px] text-zinc-400">{readyCount}/{checks.length}<LocalizedText text={"complete"} /></p>
         </section>
 
         {/* Review history */}
         <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-          <h2 className="font-display text-[15.5px] font-semibold">Review history</h2>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Review history"} /></h2>
           <div className="mt-4">
             <ReviewTimeline events={course.reviewHistory} />
           </div>
           <div className="mt-5 flex items-start gap-2 rounded-lg border border-violet-200 bg-accent p-3 text-[12px] leading-relaxed text-violet-950/70">
-            <Info className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-            Reviewer notes in this timeline are simulated locally. A real marketplace review would
-            appear here once processed.
-          </div>
+            <Info className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden /><LocalizedText text={"Reviewer notes in this timeline are simulated locally. A real marketplace review would appear here once processed."} /></div>
         </section>
       </div>
     </div>

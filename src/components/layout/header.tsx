@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import { useState } from "react";
 import { Menu, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -13,6 +14,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
 export function Header() {
+  const translateUi = useTranslate();
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -22,7 +24,7 @@ export function Header() {
         {/* Mobile nav trigger */}
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <IconButton
-            label="Open navigation"
+            label={translateUi("Open navigation")}
             onClick={() => setNavOpen(true)}
             className="lg:hidden"
           >
@@ -30,7 +32,7 @@ export function Header() {
           </IconButton>
           <SheetContent side="left" className="w-72 p-0">
             <VisuallyHidden.Root>
-              <SheetTitle>Navigation</SheetTitle>
+              <SheetTitle><LocalizedText text={"Navigation"} /></SheetTitle>
             </VisuallyHidden.Root>
             <SidebarContent onNavigate={() => setNavOpen(false)} />
           </SheetContent>
@@ -44,14 +46,14 @@ export function Header() {
         {/* Mobile: search collapses to an icon that opens a full-height sheet */}
         <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
           <IconButton
-            label="Search courses"
+            label={translateUi("Search courses")}
             onClick={() => setSearchOpen(true)}
             className="ml-auto sm:hidden"
           >
             <Search className="size-5" aria-hidden />
           </IconButton>
           <SheetContent side="top" className="p-0">
-            <SheetTitle className="sr-only">Search courses</SheetTitle>
+            <SheetTitle className="sr-only"><LocalizedText text={"Search courses"} /></SheetTitle>
             <div className="px-4 py-4 pt-5">
               <SearchBox
                 mode="panel"

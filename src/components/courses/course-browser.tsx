@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import { Plus, SearchX, SlidersHorizontal, X } from "lucide-react";
@@ -60,6 +61,7 @@ export function CourseBrowser({
   onResetQuery?: () => void;
   className?: string;
 }) {
+  const translateUi = useTranslate();
   const [filters, setFilters] = useState<CourseFilters>({ ...DEFAULT_FILTERS, ...initialFilters });
   const [sort, setSort] = useState<SortOption>(defaultSort);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -124,11 +126,11 @@ export function CourseBrowser({
         {/* Toolbar */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-[13.5px] text-muted-foreground">
-            <span className="font-semibold text-foreground">{results.length}</span>{" "}
+            <span className="font-semibold text-foreground">{results.length}</span><LocalizedText text={" "} />
             {results.length === 1 ? "result" : "results"}
             {q?.trim() && (
               <>
-                {" "}for <span className="font-medium text-foreground">“{q.trim()}”</span>
+                <LocalizedText text={" "} /><LocalizedText text={"for"} /><span className="font-medium text-foreground">“<LocalizedText text={q.trim()} />”</span>
               </>
             )}
           </p>
@@ -139,9 +141,7 @@ export function CourseBrowser({
               className="lg:hidden"
               onClick={() => setDrawerOpen(true)}
             >
-              <SlidersHorizontal aria-hidden />
-              Filters
-              {activeCount > 0 && (
+              <SlidersHorizontal aria-hidden /><LocalizedText text={"Filters"} />{activeCount > 0 && (
                 <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-md bg-accent px-1 text-[10.5px] font-semibold text-accent-foreground">
                   {activeCount}
                 </span>
@@ -170,9 +170,9 @@ export function CourseBrowser({
                   }
                   className="flex cursor-pointer items-center gap-1 rounded-full border border-violet-200 bg-accent py-1 pr-2 pl-2.5 text-[12px] font-medium text-accent-foreground transition-colors hover:bg-violet-100 focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
                 >
-                  {chip.label}
+                  <LocalizedText text={chip.label} />
                   <X className="size-3" aria-hidden />
-                  <span className="sr-only">Remove filter</span>
+                  <span className="sr-only"><LocalizedText text={"Remove filter"} /></span>
                 </button>
               </li>
             ))}
@@ -181,9 +181,7 @@ export function CourseBrowser({
                 type="button"
                 onClick={() => setFilters(DEFAULT_FILTERS)}
                 className="cursor-pointer rounded-full px-2 py-1 text-[12px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
-              >
-                Clear all
-              </button>
+              ><LocalizedText text={"Clear all"} /></button>
             </li>
           </ul>
         )}
@@ -192,11 +190,10 @@ export function CourseBrowser({
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <SheetContent side="left" className="w-80 overflow-y-auto p-5 pb-safe scrollbar-thin">
             <SheetHeader className="p-0 pb-4">
-              <SheetTitle>Filter courses</SheetTitle>
+              <SheetTitle><LocalizedText text={"Filter courses"} /></SheetTitle>
             </SheetHeader>
             <FilterPanel value={filters} onChange={setFilters} pool={scopedPool} />
-            <Button className="mt-6 mb-2 w-full" onClick={() => setDrawerOpen(false)}>
-              Show {results.length} {results.length === 1 ? "result" : "results"}
+            <Button className="mt-6 mb-2 w-full" onClick={() => setDrawerOpen(false)}><LocalizedText text={"Show"} />{results.length} {results.length === 1 ? "result" : "results"}
             </Button>
           </SheetContent>
         </Sheet>
@@ -205,12 +202,10 @@ export function CourseBrowser({
         {results.length === 0 ? (
           <EmptyState
             icon={SearchX}
-            title="No courses match your filters"
-            description="Try broadening your search, removing a filter or two, or exploring another category."
+            title={translateUi("No courses match your filters")}
+            description={translateUi("Try broadening your search, removing a filter or two, or exploring another category.")}
             action={
-              <Button variant="outline" onClick={resetAll}>
-                Clear all filters
-              </Button>
+              <Button variant="outline" onClick={resetAll}><LocalizedText text={"Clear all filters"} /></Button>
             }
           />
         ) : (
@@ -223,11 +218,8 @@ export function CourseBrowser({
             {remaining > 0 && (
               <div className="mt-8 flex flex-col items-center gap-2">
                 <Button variant="outline" size="lg" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
-                  <Plus aria-hidden />
-                  Show {Math.min(remaining, PAGE_SIZE)} more of {results.length} courses
-                </Button>
-                <p className="text-[12px] text-zinc-400">
-                  Showing {shown.length} of {results.length}
+                  <Plus aria-hidden /><LocalizedText text={"Show"} />{Math.min(remaining, PAGE_SIZE)}<LocalizedText text={"more of"} />{results.length}<LocalizedText text={"courses"} /></Button>
+                <p className="text-[12px] text-zinc-400"><LocalizedText text={"Showing"} />{shown.length}<LocalizedText text={"of"} />{results.length}
                 </p>
               </div>
             )}

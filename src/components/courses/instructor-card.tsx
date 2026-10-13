@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import Link from "next/link";
 import { useState } from "react";
@@ -20,7 +21,7 @@ export function InstructorCard({ instructor }: { instructor: Instructor }) {
         <Link href={`/instructors/${instructor.username}`} className="shrink-0">
           <Avatar className="size-16 ring-1 ring-border">
             <AvatarFallback className={cn("text-lg font-bold", instructor.avatarColor)}>
-              {instructor.initials}
+              <LocalizedText text={instructor.initials} />
             </AvatarFallback>
           </Avatar>
         </Link>
@@ -29,23 +30,20 @@ export function InstructorCard({ instructor }: { instructor: Instructor }) {
             href={`/instructors/${instructor.username}`}
             className="font-display text-[15.5px] font-semibold tracking-tight transition-colors hover:text-primary"
           >
-            {instructor.name}
+            <LocalizedText text={instructor.name} />
           </Link>
-          <p className="text-[13px] text-muted-foreground">{instructor.headline}</p>
+          <p className="text-[13px] text-muted-foreground"><LocalizedText text={instructor.headline} /></p>
 
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <Star className="size-3.5 fill-star text-star" aria-hidden />
-              <span className="font-semibold text-foreground">{stats.rating}</span> instructor rating
-            </span>
+              <span className="font-semibold text-foreground">{stats.rating}</span><LocalizedText text={"instructor rating"} /></span>
             <span className="flex items-center gap-1.5">
               <Award className="size-3.5 text-zinc-400" aria-hidden />
-              {formatCompact(stats.reviews)} reviews
-            </span>
+              <LocalizedText text={formatCompact(stats.reviews)} /><LocalizedText text={"reviews"} /></span>
             <span className="flex items-center gap-1.5">
               <Users className="size-3.5 text-zinc-400" aria-hidden />
-              {formatCompact(stats.students)} students
-            </span>
+              <LocalizedText text={formatCompact(stats.students)} /><LocalizedText text={"students"} /></span>
             <span className="flex items-center gap-1.5">
               <BookOpen className="size-3.5 text-zinc-400" aria-hidden />
               {stats.courses} {stats.courses === 1 ? "course" : "courses"}
@@ -53,7 +51,7 @@ export function InstructorCard({ instructor }: { instructor: Instructor }) {
           </div>
 
           <p className={cn("mt-3 text-[13.5px] leading-relaxed text-muted-foreground", !expanded && "line-clamp-2")}>
-            {instructor.bio}
+            <LocalizedText text={instructor.bio} />
           </p>
           <div className="mt-2 flex items-center gap-4">
             <button
@@ -66,9 +64,7 @@ export function InstructorCard({ instructor }: { instructor: Instructor }) {
             <Link
               href={`/instructors/${instructor.username}`}
               className="group flex items-center gap-1 text-[13px] font-medium text-primary hover:text-primary-hover"
-            >
-              View profile
-              <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            ><LocalizedText text={"View profile"} /><ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
           </div>
         </div>

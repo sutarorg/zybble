@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState } from "react";
 import Link from "next/link";
@@ -41,6 +42,7 @@ import { cn } from "@/lib/utils";
 const GOALS = [15, 30, 45, 60, 90, 120];
 
 export default function LearnerSettingsPage() {
+  const translateUi = useTranslate();
   const router = useRouter();
   const {
     hydrated,
@@ -79,8 +81,7 @@ export default function LearnerSettingsPage() {
     }
     setSavingProfile(true);
     window.setTimeout(() => {
-      const email = user?.email ?? `${name.trim().split(" ")[0].toLowerCase()}@zybble.demo`;
-      signIn({ id: user?.id ?? `usr_${Date.now()}`, name: name.trim(), email, initials: initialsOf(name.trim()) });
+      if (user) signIn({ ...user, name: name.trim(), initials: initialsOf(name.trim()) });
       setSavingProfile(false);
       toast.success("Profile saved (locally)");
     }, 400);
@@ -96,48 +97,39 @@ export default function LearnerSettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-7 pb-12 sm:px-6 sm:py-9 lg:px-8">
       <div>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Settings</p>
-        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">
-          Learner preferences
-        </h1>
-        <p className="mt-1.5 text-[14px] text-muted-foreground">
-          Profile, goals and notifications — all stored locally on this device.
-        </p>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Settings"} /></p>
+        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Learner preferences"} /></h1>
+        <p className="mt-1.5 text-[14px] text-muted-foreground"><LocalizedText text={"Profile, goals and notifications — all stored locally on this device."} /></p>
       </div>
 
       {/* Profile */}
       <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
-          <UserRound className="size-4.5 text-primary" aria-hidden />
-          Profile
-        </h2>
+          <UserRound className="size-4.5 text-primary" aria-hidden /><LocalizedText text={"Profile"} /></h2>
         <div className="mt-4 flex items-center gap-4">
           <Avatar className="size-14 ring-1 ring-border">
             <AvatarFallback className="bg-primary text-sm text-white">
-              {initialsOf(name || "Z L")}
+              <LocalizedText text={initialsOf(name || "Z L")} />
             </AvatarFallback>
           </Avatar>
-          <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-            Your learner identity for this demo. Signed in as{" "}
-            <span className="font-medium text-foreground">{user?.email ?? "guest (demo)"}</span>.
+          <p className="text-[12.5px] leading-relaxed text-muted-foreground"><LocalizedText text={"Your learner identity for this preview. Signed in as"} /><LocalizedText text={" "} />
+            <span className="font-medium text-foreground"><LocalizedText text={user?.email ?? "guest "} /></span>.
           </p>
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="space-y-1.5">
-            <Label htmlFor="ls-name">Display name</Label>
+            <Label htmlFor="ls-name"><LocalizedText text={"Display name"} /></Label>
             <Input
               id="ls-name"
               value={name}
               onChange={(e) => setNameDraft(e.target.value)}
-              placeholder="Your name"
+              placeholder={translateUi("Your name")}
               autoComplete="name"
             />
           </div>
           <div className="flex items-end">
             <Button onClick={saveProfile} loading={savingProfile} disabled={!nameDirty}>
-              <Save aria-hidden />
-              Save
-            </Button>
+              <Save aria-hidden /><LocalizedText text={"Save"} /></Button>
           </div>
         </div>
       </section>
@@ -145,9 +137,7 @@ export default function LearnerSettingsPage() {
       {/* Learning goal */}
       <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
-          <Target className="size-4.5 text-primary" aria-hidden />
-          Daily learning goal
-        </h2>
+          <Target className="size-4.5 text-primary" aria-hidden /><LocalizedText text={"Daily learning goal"} /></h2>
         <div className="mt-4 flex flex-wrap gap-2">
           {GOALS.map((g) => (
             <button
@@ -166,18 +156,17 @@ export default function LearnerSettingsPage() {
               )}
             >
               {learnerPrefs.goalMinutesPerDay === g && <Check className="size-3.5" aria-hidden />}
-              {g} min
-            </button>
+              {g}<LocalizedText text={"min"} /></button>
           ))}
         </div>
-        <p className="mt-2 text-[12px] text-zinc-400">Shown as the streak panel in your sidebar (simulated).</p>
+        <p className="mt-2 text-[12px] text-zinc-400"><LocalizedText text={"Shown as the streak panel in your sidebar (simulated)."} /></p>
       </section>
 
       {/* Language */}
       <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <Globe className="size-4.5 text-primary" aria-hidden />
-          {getDictionary(language).interfaceLanguage}
+          <LocalizedText text={getDictionary(language).interfaceLanguage} />
         </h2>
         <div className="mt-4 max-w-xs">
           <Select
@@ -187,13 +176,13 @@ export default function LearnerSettingsPage() {
               toast.success(getDictionary(v).languageChanged(LANGUAGES.find((l) => l.code === v)?.label ?? v));
             }}
           >
-            <SelectTrigger aria-label={getDictionary(language).interfaceLanguage}>
+            <SelectTrigger aria-label={translateUi(getDictionary(language).interfaceLanguage)}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {LANGUAGES.map((l) => (
                 <SelectItem key={l.code} value={l.code}>
-                  {l.native} ({l.label})
+                  <LocalizedText text={l.native} /> (<LocalizedText text={l.label} />)
                 </SelectItem>
               ))}
             </SelectContent>
@@ -204,12 +193,8 @@ export default function LearnerSettingsPage() {
       {/* Notifications */}
       <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
-          <BellRing className="size-4.5 text-primary" aria-hidden />
-          Email preferences
-        </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          Illustrative — no emails are ever sent from this demo.
-        </p>
+          <BellRing className="size-4.5 text-primary" aria-hidden /><LocalizedText text={"Email preferences"} /></h2>
+        <p className="mt-1 text-[12.5px] text-muted-foreground"><LocalizedText text={"Illustrative — no emails are ever sent from this preview."} /></p>
         <ul className="mt-3 space-y-1">
           {prefs.map((item) => (
             <li key={item.key}>
@@ -220,8 +205,8 @@ export default function LearnerSettingsPage() {
                   onCheckedChange={(v) => setLearnerPrefs({ [item.key]: v === true })}
                 />
                 <span>
-                  <span className="block text-[13.5px] font-medium">{item.title}</span>
-                  <span className="block text-[12px] text-muted-foreground">{item.text}</span>
+                  <span className="block text-[13.5px] font-medium"><LocalizedText text={item.title} /></span>
+                  <span className="block text-[12px] text-muted-foreground"><LocalizedText text={item.text} /></span>
                 </span>
               </label>
             </li>
@@ -241,8 +226,8 @@ export default function LearnerSettingsPage() {
             className="flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-muted"
           >
             <span>
-              <span className="block text-[13.5px] font-medium">{link.label}</span>
-              <span className="block text-[12px] text-muted-foreground">{link.text}</span>
+              <span className="block text-[13.5px] font-medium"><LocalizedText text={link.label} /></span>
+              <span className="block text-[12px] text-muted-foreground"><LocalizedText text={link.text} /></span>
             </span>
             <ChevronRight className="size-4 text-zinc-300" aria-hidden />
           </Link>
@@ -253,8 +238,8 @@ export default function LearnerSettingsPage() {
       <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-display text-[15.5px] font-semibold">Sign out</h2>
-            <p className="mt-0.5 text-[12.5px] text-muted-foreground">Your data stays on this device.</p>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Sign out"} /></h2>
+            <p className="mt-0.5 text-[12.5px] text-muted-foreground"><LocalizedText text={"Your data stays on this device."} /></p>
           </div>
           {user ? (
             <Button
@@ -265,12 +250,10 @@ export default function LearnerSettingsPage() {
                 router.push("/");
               }}
             >
-              <LogOut aria-hidden />
-              Sign out
-            </Button>
+              <LogOut aria-hidden /><LocalizedText text={"Sign out"} /></Button>
           ) : (
             <Button asChild>
-              <Link href="/login">Sign in</Link>
+              <Link href="/login"><LocalizedText text={"Sign in"} /></Link>
             </Button>
           )}
         </div>
@@ -278,26 +261,18 @@ export default function LearnerSettingsPage() {
 
       {/* Danger zone */}
       <section className="rounded-xl border border-red-200 bg-white p-5 shadow-card sm:p-6">
-        <h2 className="font-display text-[15.5px] font-semibold text-destructive">Danger zone</h2>
+        <h2 className="font-display text-[15.5px] font-semibold text-destructive"><LocalizedText text={"Danger zone"} /></h2>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-sm text-[13px] text-muted-foreground">
-            Clears your enrollments, progress, orders, notes, certificates, wishlist and preferences.
-            Creator studio data is untouched.
-          </p>
+          <p className="max-w-sm text-[13px] text-muted-foreground"><LocalizedText text={"Clears your enrollments, progress, orders, notes, certificates, wishlist and preferences. Creator studio data is untouched."} /></p>
           <Button
             variant="outline"
             className="border-red-200 text-destructive hover:bg-red-50 hover:text-destructive"
             onClick={() => setResetOpen(true)}
           >
-            <Trash2 aria-hidden />
-            Reset learner data
-          </Button>
+            <Trash2 aria-hidden /><LocalizedText text={"Reset learner data"} /></Button>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-red-100 pt-4">
-          <p className="max-w-sm text-[13px] text-muted-foreground">
-            Nuke everything: clears all Zybble keys (learner and creator) and reloads from a clean
-            slate.
-          </p>
+          <p className="max-w-sm text-[13px] text-muted-foreground"><LocalizedText text={"Nuke everything: clears all Zybble keys (learner and creator) and reloads from a clean slate."} /></p>
           <Button
             variant="destructive"
             onClick={() => {
@@ -307,25 +282,18 @@ export default function LearnerSettingsPage() {
               window.location.href = "/";
             }}
           >
-            <RotateCcw aria-hidden />
-            Reset all demo data
-          </Button>
+            <RotateCcw aria-hidden /><LocalizedText text={"Reset all sample data"} /></Button>
         </div>
       </section>
 
       <Dialog open={resetOpen} onOpenChange={setResetOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Reset learner data?</DialogTitle>
-            <DialogDescription>
-              Your courses-in-progress, orders and notes will be removed from this browser. You can
-              re-enroll any time — this only affects the demo state.
-            </DialogDescription>
+            <DialogTitle><LocalizedText text={"Reset learner data?"} /></DialogTitle>
+            <DialogDescription><LocalizedText text={"Your courses-in-progress, orders and notes will be removed from this browser. You can re-enroll any time — this only affects the preview state."} /></DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResetOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setResetOpen(false)}><LocalizedText text={"Cancel"} /></Button>
             <Button
               variant="destructive"
               onClick={() => {
@@ -334,9 +302,7 @@ export default function LearnerSettingsPage() {
                 toast.success("Learner data cleared");
                 router.push("/");
               }}
-            >
-              Reset learner data
-            </Button>
+            ><LocalizedText text={"Reset learner data"} /></Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

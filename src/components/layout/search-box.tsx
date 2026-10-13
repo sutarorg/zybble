@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -71,6 +72,7 @@ function SuggestionRow({
   onSelect: () => void;
   optionId: string;
 }) {
+  const translateUi = useTranslate();
   return (
     <Link
       id={optionId}
@@ -86,12 +88,12 @@ function SuggestionRow({
       {suggestion.kind === "course" ? (
         <>
           <span className="relative block h-9 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
-            <Image src={suggestion.thumbnail} alt="" fill sizes="64px" className="object-cover" />
+            <Image src={suggestion.thumbnail} alt={translateUi("")} fill sizes="64px" className="object-cover" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium">{suggestion.title}</span>
+            <span className="block truncate text-[13px] font-medium"><LocalizedText text={suggestion.title} /></span>
             <span className="block truncate text-[11.5px] text-muted-foreground">
-              {suggestion.meta}
+              <LocalizedText text={suggestion.meta} />
             </span>
           </span>
         </>
@@ -103,12 +105,12 @@ function SuggestionRow({
               suggestion.avatarColor
             )}
           >
-            {suggestion.initials}
+            <LocalizedText text={suggestion.initials} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium">{suggestion.name}</span>
+            <span className="block truncate text-[13px] font-medium"><LocalizedText text={suggestion.name} /></span>
             <span className="block truncate text-[11.5px] text-muted-foreground">
-              {suggestion.headline}
+              <LocalizedText text={suggestion.headline} />
             </span>
           </span>
           <UserRound className="size-3.5 shrink-0 text-zinc-300" aria-hidden />
@@ -136,6 +138,7 @@ export function SearchBox({
   autoFocus?: boolean;
   onSubmit?: () => void;
 }) {
+  const translateUi = useTranslate();
   const router = useRouter();
   const { language } = useApp();
   const dict = getDictionary(language);
@@ -224,8 +227,8 @@ export function SearchBox({
             if (!isPanel) setTimeout(() => setOpen(false), 150);
           }}
           onKeyDown={onKeyDown}
-          placeholder={isPanel ? dict.searchPlaceholderShort : dict.searchPlaceholder}
-          aria-label="Search courses"
+          placeholder={translateUi(isPanel ? dict.searchPlaceholderShort : dict.searchPlaceholder)}
+          aria-label={translateUi("Search courses")}
           role="combobox"
           aria-expanded={showResults}
           aria-controls={showResults ? listId : undefined}
@@ -255,7 +258,7 @@ export function SearchBox({
             <div
               id={listId}
               role="listbox"
-              aria-label="Search suggestions"
+              aria-label={translateUi("Search suggestions")}
               className={cn(
                 "p-1.5",
                 isPanel ? "max-h-none" : "max-h-[min(24rem,60dvh)] overflow-y-auto scrollbar-thin"
@@ -275,9 +278,7 @@ export function SearchBox({
               ))}
             </div>
           ) : (
-            <p className="px-4 py-5 text-center text-[13px] text-muted-foreground">
-              No matches for “{trimmed}”. Try a tool, topic or instructor name.
-            </p>
+            <p className="px-4 py-5 text-center text-[13px] text-muted-foreground"><LocalizedText text={"No matches for “"} /><LocalizedText text={trimmed} /><LocalizedText text={"”. Try a tool, topic or instructor name."} /></p>
           )}
 
           <button
@@ -286,7 +287,7 @@ export function SearchBox({
             onClick={() => submit()}
             className="flex w-full cursor-pointer items-center justify-between gap-2 border-t border-border px-3.5 py-2.5 text-left text-[12.5px] font-medium text-primary transition-colors hover:bg-accent"
           >
-            <span className="truncate">See all results for “{trimmed}”</span>
+            <span className="truncate"><LocalizedText text={"See all results for “"} /><LocalizedText text={trimmed} />”</span>
             <CornerDownLeft className="size-3.5 shrink-0" aria-hidden />
           </button>
         </div>

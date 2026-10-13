@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import { Check, Globe } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,6 +16,7 @@ import { useApp } from "@/components/providers/app-providers";
 import { getDictionary } from "@/lib/i18n";
 
 export function LanguageMenu() {
+  const translateUi = useTranslate();
   const { language, setLanguage } = useApp();
   const dict = getDictionary(language);
   const current = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
@@ -24,14 +26,14 @@ export function LanguageMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`Language: ${current.label}`}
-          className="hidden size-9.5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none md:flex"
+          aria-label={translateUi(`Language: ${current.label}`)}
+          className="flex size-9.5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
         >
           <Globe className="size-4.5" aria-hidden />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel>{dict.interfaceLanguage}</DropdownMenuLabel>
+        <DropdownMenuLabel><LocalizedText text={dict.interfaceLanguage} /></DropdownMenuLabel>
         <DropdownMenuSeparator />
         {LANGUAGES.map((lang) => (
           <DropdownMenuItem

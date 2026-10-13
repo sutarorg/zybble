@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { Bookmark, Compass } from "lucide-react";
 import { COURSES } from "@/data/mock-data";
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function WishlistClient() {
+  const translateUi = useTranslate();
   const { wishlist, hydrated } = useApp();
   const community = useCommunityCourses();
   const pool = [...community, ...COURSES];
@@ -19,16 +21,14 @@ export function WishlistClient() {
   return (
     <div className="page-container py-7 sm:py-9">
       <header>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Saved</p>
-        <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]">
-          Your wishlist
-        </h1>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Saved"} /></p>
+        <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]"><LocalizedText text={"Your wishlist"} /></h1>
         <p className="mt-2 text-[14.5px] text-muted-foreground">
-          {hydrated
+          {<LocalizedText text={hydrated
             ? courses.length > 0
               ? `${courses.length} ${courses.length === 1 ? "course" : "courses"} saved for later. Shared with the public storefront.`
               : "Courses you bookmark will live here — saved on this device."
-            : "Loading your saved courses…"}
+            : "Loading your saved courses…"} />}
         </p>
       </header>
 
@@ -42,14 +42,12 @@ export function WishlistClient() {
         ) : courses.length === 0 ? (
           <EmptyState
             icon={Bookmark}
-            title="Your wishlist is empty"
-            description="Found something interesting? Tap the bookmark on any course card and it'll be waiting for you here."
+            title={translateUi("Your wishlist is empty")}
+            description={translateUi("Found something interesting? Tap the bookmark on any course card and it'll be waiting for you here.")}
             action={
               <Button asChild>
                 <Link href="/">
-                  <Compass aria-hidden />
-                  Explore courses
-                </Link>
+                  <Compass aria-hidden /><LocalizedText text={"Explore courses"} /></Link>
               </Button>
             }
           />

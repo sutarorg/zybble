@@ -22,7 +22,7 @@ export const getInstructorByUsername = (username: string) =>
   INSTRUCTORS.find((i) => i.username === username);
 
 export function getCourseInstructor(course: Course): Instructor {
-  const instructor = getInstructorById(course.instructorId);
+  const instructor = course.instructor ?? getInstructorById(course.instructorId);
   if (!instructor) throw new Error(`Missing instructor for ${course.slug}`);
   return instructor;
 }

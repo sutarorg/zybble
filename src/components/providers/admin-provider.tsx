@@ -61,7 +61,7 @@ interface AdminContextValue {
   users: AdminUser[];
   setUserStatus: (id: string, status: "active" | "suspended") => void;
   setUserRole: (id: string, role: AdminUser["role"]) => void;
-  /* orders (composite demo set + learner's local orders) */
+  /* orders (composite preview set + learner's local orders) */
   orders: AdminOrder[];
   /* payouts */
   payouts: AdminPayout[];

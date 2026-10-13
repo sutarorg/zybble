@@ -1,7 +1,7 @@
 "use client";
 
 import { notFound } from "next/navigation";
-import { getInstructorById, relatedCourses } from "@/lib/courses";
+import { getCourseInstructor, relatedCourses } from "@/lib/courses";
 import { COURSES } from "@/data/mock-data";
 import { useCreator } from "@/components/providers/creator-provider";
 import { CourseDetailView } from "@/components/courses/course-detail-view";
@@ -31,7 +31,7 @@ export function UserCoursePage({ slug }: { slug: string }) {
   return (
     <CourseDetailView
       course={course}
-      instructor={getInstructorById(course.instructorId)!}
+      instructor={getCourseInstructor(course)}
       reviews={[]}
       related={relatedCourses(COURSES.find((c) => c.category === course.category) ?? COURSES[0], 3).filter(
         (c) => c.id !== course.id

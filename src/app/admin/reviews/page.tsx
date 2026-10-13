@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import {
@@ -22,6 +23,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 
 export default function AdminReviewsPage() {
+  const translateUi = useTranslate();
   const { hydrated, hiddenReviewIds, hideReview, restoreReview } = useAdmin();
   const [query, setQuery] = useState("");
   const [starsFilter, setStarsFilter] = useState("all");
@@ -50,13 +52,11 @@ export default function AdminReviewsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Trust & Safety</p>
-        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">Review moderation</h1>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Trust & Safety"} /></p>
+        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Review moderation"} /></h1>
         <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground">
-          {summary.total} marketplace reviews ·{" "}
-          <span className="font-medium text-foreground">{summary.hidden} hidden</span> · average
-          rating {summary.avg.toFixed(1)}. Moderation actions confirm first and persist locally.
-        </p>
+          {summary.total}<LocalizedText text={"marketplace reviews ·"} /><LocalizedText text={" "} />
+          <span className="font-medium text-foreground">{summary.hidden}<LocalizedText text={"hidden"} /></span><LocalizedText text={"· average rating"} /><LocalizedText text={summary.avg.toFixed(1)} /><LocalizedText text={". Moderation actions confirm first and persist locally."} /></p>
       </div>
 
       {/* Toolbar */}
@@ -67,12 +67,12 @@ export default function AdminReviewsPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search reviewer, text or course…"
-            aria-label="Search reviews"
+            placeholder={translateUi("Search reviewer, text or course…")}
+            aria-label={translateUi("Search reviews")}
             className="h-9.5 w-full rounded-lg border border-input bg-white pr-3 pl-9 text-sm shadow-xs outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
-        <div className="flex gap-1 rounded-lg bg-muted p-1" role="tablist" aria-label="Rating filter">
+        <div className="flex gap-1 rounded-lg bg-muted p-1" role="tablist" aria-label={translateUi("Rating filter")}>
           {["all", "5", "4", "3"].map((s) => (
             <button
               key={s}
@@ -85,11 +85,11 @@ export default function AdminReviewsPage() {
                 starsFilter === s ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {s === "all" ? "All ratings" : <>{s}<Star className="size-3 fill-star text-star" aria-hidden />+</>}
+              {s === "all" ? "All ratings" : <><LocalizedText text={s} /><Star className="size-3 fill-star text-star" aria-hidden />+</>}
             </button>
           ))}
         </div>
-        <div className="flex gap-1 rounded-lg bg-muted p-1" role="tablist" aria-label="Visibility filter">
+        <div className="flex gap-1 rounded-lg bg-muted p-1" role="tablist" aria-label={translateUi("Visibility filter")}>
           {(["all", "visible", "hidden"] as const).map((v) => (
             <button
               key={v}
@@ -102,7 +102,7 @@ export default function AdminReviewsPage() {
                 visibility === v ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {v === "all" ? "All" : v === "visible" ? "Visible" : `Hidden (${hiddenReviewIds.length})`}
+              <LocalizedText text={v === "all" ? "All" : v === "visible" ? "Visible" : `Hidden (${hiddenReviewIds.length})`} />
             </button>
           ))}
         </div>
@@ -111,16 +111,14 @@ export default function AdminReviewsPage() {
       {rows.length === 0 ? (
         <EmptyState
           icon={SearchX}
-          title="No reviews match"
-          description="Try another search, rating or visibility filter."
+          title={translateUi("No reviews match")}
+          description={translateUi("Try another search, rating or visibility filter.")}
           action={
             <Button
               variant="outline"
               size="sm"
               onClick={() => { setQuery(""); setStarsFilter("all"); setVisibility("all"); }}
-            >
-              Clear filters
-            </Button>
+            ><LocalizedText text={"Clear filters"} /></Button>
           }
         />
       ) : (
@@ -133,28 +131,28 @@ export default function AdminReviewsPage() {
                 <div className="flex items-start gap-3">
                   <Avatar className="size-9.5">
                     <AvatarFallback className={cn("text-[11px]", review.avatarColor)}>
-                      {review.initials}
+                      <LocalizedText text={review.initials} />
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                      <p className="text-[13.5px] font-semibold">{review.author}</p>
-                      {review.role && <span className="text-[11.5px] text-zinc-400">· {review.role}</span>}
+                      <p className="text-[13.5px] font-semibold"><LocalizedText text={review.author} /></p>
+                      {review.role && <span className="text-[11.5px] text-zinc-400">· <LocalizedText text={review.role} /></span>}
                       <RatingStars rating={review.rating} />
-                      <span className="text-[11.5px] text-zinc-400">{formatDate(review.date)}</span>
-                      {hidden && <Badge variant="secondary">Hidden</Badge>}
+                      <span className="text-[11.5px] text-zinc-400"><LocalizedText text={formatDate(review.date)} /></span>
+                      {hidden && <Badge variant="secondary"><LocalizedText text={"Hidden"} /></Badge>}
                     </div>
-                    <p className={cn("mt-1.5 text-[13.5px] font-medium", hidden && "text-muted-foreground")}>{review.title}</p>
-                    <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-muted-foreground">{review.text}</p>
+                    <p className={cn("mt-1.5 text-[13.5px] font-medium", hidden && "text-muted-foreground")}><LocalizedText text={review.title} /></p>
+                    <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-muted-foreground"><LocalizedText text={review.text} /></p>
                     <div className="mt-2 flex flex-wrap items-center gap-2.5">
                       {course && (
                         <Badge variant="secondary" className="font-normal">
-                          {course.title}
+                          <LocalizedText text={course.title} />
                         </Badge>
                       )}
                       {hidden ? (
                         <ActionButton
-                          label="Restore review"
+                          label={translateUi("Restore review")}
                           icon={RotateCcw}
                           variant="outline"
                           size="sm"
@@ -166,13 +164,13 @@ export default function AdminReviewsPage() {
                         />
                       ) : (
                         <ActionButton
-                          label="Hide review"
+                          label={translateUi("Hide review")}
                           icon={EyeOff}
                           variant="outline"
                           danger
                           size="sm"
                           confirmTitle={`Hide the review by ${review.author}?`}
-                          confirmBody="Hidden reviews disappear from public course pages in this demo. You can restore them any time."
+                          confirmBody="Hidden reviews disappear from public course pages in this preview. You can restore them any time."
                           confirmLabel="Hide review"
                           onAction={() => hideReview(review.id)}
                           toastText="Review hidden (simulated)"

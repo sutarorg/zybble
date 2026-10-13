@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, MessageSquare, SendHorizonal } from "lucide-react";
@@ -9,12 +10,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 const CANNED_REPLIES = [
-  "Thanks for reaching out — I'll get back to you with a detailed answer shortly. (This is a simulated demo reply.)",
-  "Great question! The course Q&A has a full thread on this — check lesson 2. (Simulated demo reply.)",
-  "Happy to help. Give it a try and let me know how it goes! (Simulated demo reply.)",
+  "Thanks for reaching out — I'll get back to you with a detailed answer shortly. (This is a simulated preview reply.)",
+  "Great question! The course Q&A has a full thread on this — check lesson 2. (Simulated preview reply.)",
+  "Happy to help. Give it a try and let me know how it goes! (Simulated preview reply.)",
 ];
 
 export function MessagesClient() {
+  const translateUi = useTranslate();
   const [threads, setThreads] = useState<Conversation[]>(CONVERSATIONS);
   const [activeId, setActiveId] = useState<string>(CONVERSATIONS[0].id);
   const [draft, setDraft] = useState("");
@@ -72,10 +74,8 @@ export function MessagesClient() {
   };
 
   const threadList = (
-    <nav aria-label="Conversations" className="flex h-full flex-col">
-      <p className="px-4 pt-5 pb-3 text-[11px] font-bold tracking-[0.14em] text-primary uppercase">
-        Messages
-      </p>
+    <nav aria-label={translateUi("Conversations")} className="flex h-full flex-col">
+      <p className="px-4 pt-5 pb-3 text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Messages"} /></p>
       <ul className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4 scrollbar-thin">
         {threads.map((thread) => {
           const last = thread.messages[thread.messages.length - 1];
@@ -97,21 +97,21 @@ export function MessagesClient() {
                 <span className="relative shrink-0">
                   <Avatar className="size-10">
                     <AvatarFallback className={cn("text-[12px]", thread.avatarColor)}>
-                      {thread.initials}
+                      <LocalizedText text={thread.initials} />
                     </AvatarFallback>
                   </Avatar>
                   {thread.online && (
-                    <span className="absolute right-0 bottom-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white" aria-label="Online" />
+                    <span className="absolute right-0 bottom-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white" aria-label={translateUi("Online")} />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-[13.5px] font-semibold">{thread.name}</span>
-                    <span className="shrink-0 text-[11px] text-zinc-400">{last?.time}</span>
+                    <span className="truncate text-[13.5px] font-semibold"><LocalizedText text={thread.name} /></span>
+                    <span className="shrink-0 text-[11px] text-zinc-400"><LocalizedText text={last?.time} /></span>
                   </span>
                   <span className="mt-0.5 line-clamp-1 block text-[12.5px] text-muted-foreground">
                     {last?.sender === "me" ? "You: " : ""}
-                    {last?.text}
+                    <LocalizedText text={last?.text} />
                   </span>
                 </span>
               </button>
@@ -129,21 +129,21 @@ export function MessagesClient() {
         <button
           type="button"
           onClick={() => setMobileThread(false)}
-          aria-label="Back to conversations"
+          aria-label={translateUi("Back to conversations")}
           className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-muted md:hidden"
         >
           <ArrowLeft className="size-4.5" />
         </button>
         <Avatar className="size-10">
           <AvatarFallback className={cn("text-[12px]", active.avatarColor)}>
-            {active.initials}
+            <LocalizedText text={active.initials} />
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <p className="truncate text-[14px] font-semibold">{active.name}</p>
+          <p className="truncate text-[14px] font-semibold"><LocalizedText text={active.name} /></p>
           <p className="flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">
             {active.online && <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />}
-            {active.role}
+            <LocalizedText text={active.role} />
           </p>
         </div>
       </div>
@@ -163,14 +163,14 @@ export function MessagesClient() {
                   : "rounded-bl-md border border-border bg-white text-foreground"
               )}
             >
-              <p>{msg.text}</p>
+              <p><LocalizedText text={msg.text} /></p>
               <p
                 className={cn(
                   "mt-1 text-right text-[10.5px]",
                   msg.sender === "me" ? "text-white/70" : "text-zinc-400"
                 )}
               >
-                {msg.time}
+                <LocalizedText text={msg.time} />
               </p>
             </div>
           </div>
@@ -180,20 +180,18 @@ export function MessagesClient() {
 
       {/* Composer */}
       <form onSubmit={send} className="flex items-center gap-2 border-t border-border bg-white p-3">
-        <label htmlFor="message-input" className="sr-only">
-          Message
-        </label>
+        <label htmlFor="message-input" className="sr-only"><LocalizedText text={"Message"} /></label>
         <input
           id="message-input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={`Message ${active.name.split(" ")[0]}…`}
+          placeholder={translateUi(`Message ${active.name.split(" ")[0]}…`)}
           className="h-10 flex-1 rounded-full border border-input bg-background px-4 text-sm outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20"
         />
         <button
           type="submit"
           disabled={!draft.trim()}
-          aria-label="Send message"
+          aria-label={translateUi("Send message")}
           className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-primary text-white shadow-sm transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           <SendHorizonal className="size-4.5" aria-hidden />
@@ -205,10 +203,8 @@ export function MessagesClient() {
   return (
     <div className="page-container py-7 sm:py-9">
       <header className="mb-6 md:hidden">
-        <h1 className="font-display text-[26px] font-bold tracking-tight">Messages</h1>
-        <p className="mt-1 text-[13.5px] text-muted-foreground">
-          Chat with instructors and support. Replies are simulated in this demo.
-        </p>
+        <h1 className="font-display text-[26px] font-bold tracking-tight"><LocalizedText text={"Messages"} /></h1>
+        <p className="mt-1 text-[13.5px] text-muted-foreground"><LocalizedText text={"Chat with instructors and support. Replies are simulated in this preview."} /></p>
       </header>
       <div className="h-[calc(100dvh-16rem)] min-h-105 overflow-hidden rounded-2xl border border-border bg-white shadow-card md:h-[calc(100dvh-13rem)]">
         <div className="grid h-full md:grid-cols-[300px_minmax(0,1fr)]">
@@ -219,7 +215,7 @@ export function MessagesClient() {
             {active ? threadView : (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <MessageSquare className="size-8 text-zinc-300" aria-hidden />
-                <p className="mt-3 text-sm text-muted-foreground">Select a conversation</p>
+                <p className="mt-3 text-sm text-muted-foreground"><LocalizedText text={"Select a conversation"} /></p>
               </div>
             )}
           </div>

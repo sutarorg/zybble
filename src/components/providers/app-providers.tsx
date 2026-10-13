@@ -4,7 +4,7 @@ import * as React from "react";
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useLocalStorage } from "@/lib/hooks";
+import { clearSessionNamespace, useLocalStorage } from "@/lib/hooks";
 import type {
   ActivityItem,
   Certificate,
@@ -107,7 +107,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const activity = useLocalStorage<ActivityItem[]>(KEYS.activity, []);
   const learnerPrefs = useLocalStorage<LearnerPrefs>(KEYS.learnerPrefs, DEFAULT_LEARNER_PREFS);
 
-  // Interface language actually drives the UI: mirror the stored code onto
+  // Mirror the selected interface language onto
   // <html lang> (the root layout can only render the SSR default) so screen
   // readers, hyphenation and the browser follow the learner's choice.
   React.useEffect(() => {
@@ -360,7 +360,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       hydrated,
       user: user.hydrated ? user.value : null,
       signIn: (u) => user.set(u),
-      signOut: () => user.clear(),
+      signOut: () => clearSessionNamespace("zybble."),
       uploadAvatar,
       wishlist: wishlist.hydrated ? wishlist.value : [],
       toggleWishlist,

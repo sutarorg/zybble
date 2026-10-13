@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -46,7 +47,7 @@ export function EnrollCard({ course }: { course: Course }) {
       {/* Price */}
       <div className="flex items-baseline gap-2">
         {course.price === 0 ? (
-          <span className="font-display text-3xl font-bold tracking-tight text-success">Free</span>
+          <span className="font-display text-3xl font-bold tracking-tight text-success"><LocalizedText text={"Free"} /></span>
         ) : (
           <>
             <span className="font-display text-3xl font-bold tracking-tight">${course.price}</span>
@@ -55,24 +56,19 @@ export function EnrollCard({ course }: { course: Course }) {
             )}
             {discount > 0 && (
               <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11.5px] font-semibold text-emerald-700">
-                {discount}% off
-              </span>
+                {discount}<LocalizedText text={"% off"} /></span>
             )}
           </>
         )}
       </div>
-      <p className="mt-1 text-[12.5px] text-muted-foreground">
-        One-time purchase · USD · demo checkout
-      </p>
+      <p className="mt-1 text-[12.5px] text-muted-foreground"><LocalizedText text={"One-time purchase · USD · preview checkout"} /></p>
 
       {/* Actions */}
       <div className="mt-4 space-y-2">
         {enrolled ? (
           <Button asChild size="lg" className="w-full">
             <Link href="/my-learning">
-              <GraduationCap aria-hidden />
-              Go to My Learning
-            </Link>
+              <GraduationCap aria-hidden /><LocalizedText text={"Go to My Learning"} /></Link>
           </Button>
         ) : (
           <Button
@@ -101,12 +97,12 @@ export function EnrollCard({ course }: { course: Course }) {
       <Separator className="my-5" />
 
       {/* Includes */}
-      <p className="mb-3 text-[13px] font-semibold">This course includes</p>
+      <p className="mb-3 text-[13px] font-semibold"><LocalizedText text={"This course includes"} /></p>
       <ul className="space-y-2.5">
         {includes.map((item) => (
           <li key={item.label} className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
             <item.icon className="size-4 shrink-0 text-zinc-400" aria-hidden />
-            {item.label}
+            <LocalizedText text={item.label} />
           </li>
         ))}
       </ul>

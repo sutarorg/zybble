@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState } from "react";
 import type { CreatorProfile } from "@/types";
@@ -26,6 +27,7 @@ const AVATAR_COLORS = [
 ];
 
 export default function CreatorProfilePage() {
+  const translateUi = useTranslate();
   const { hydrated, profile, saveProfile } = useCreator();
   /* Derived draft: follows the stored creator profile until the creator edits it. */
   const [formDraft, setFormDraft] = useState<CreatorProfile | null>(null);
@@ -77,25 +79,17 @@ export default function CreatorProfilePage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Creator Studio</p>
-          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">
-            Instructor profile
-          </h1>
-          <p className="mt-1.5 text-[14px] text-muted-foreground">
-            How learners see you across Zybble. Changes stay in this browser.
-          </p>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Creator Studio"} /></p>
+          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Instructor profile"} /></h1>
+          <p className="mt-1.5 text-[14px] text-muted-foreground"><LocalizedText text={"How learners see you across Zybble. Changes stay in this browser."} /></p>
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
             <Link href="/instructors/maya-lindqvist">
-              <Eye aria-hidden />
-              View public profile
-            </Link>
+              <Eye aria-hidden /><LocalizedText text={"View public profile"} /></Link>
           </Button>
           <Button onClick={save} loading={saving} disabled={!dirty}>
-            <Save aria-hidden />
-            Save changes
-          </Button>
+            <Save aria-hidden /><LocalizedText text={"Save changes"} /></Button>
         </div>
       </div>
 
@@ -105,17 +99,17 @@ export default function CreatorProfilePage() {
           <div className="flex items-center gap-4">
             <Avatar className="size-16 ring-1 ring-border">
               <AvatarFallback className={cn("text-lg font-bold", form.avatarColor)}>
-                {displayInitials}
+                <LocalizedText text={displayInitials} />
               </AvatarFallback>
             </Avatar>
             <div>
-              <Label>Avatar color</Label>
+              <Label><LocalizedText text={"Avatar color"} /></Label>
               <div className="mt-1.5 flex gap-1.5">
                 {AVATAR_COLORS.map((c) => (
                   <button
                     key={c}
                     type="button"
-                    aria-label={`Avatar theme ${c}`}
+                    aria-label={translateUi(`Avatar theme ${c}`)}
                     aria-pressed={form.avatarColor === c}
                     onClick={() => update({ avatarColor: c })}
                     className={cn(
@@ -131,22 +125,22 @@ export default function CreatorProfilePage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="p-name">Display name *</Label>
+              <Label htmlFor="p-name"><LocalizedText text={"Display name *"} /></Label>
               <Input id="p-name" value={form.displayName} onChange={(e) => update({ displayName: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="p-headline">Headline</Label>
-              <Input id="p-headline" value={form.headline} onChange={(e) => update({ headline: e.target.value })} placeholder="e.g. AI Product Lead · ex-Google" />
+              <Label htmlFor="p-headline"><LocalizedText text={"Headline"} /></Label>
+              <Input id="p-headline" value={form.headline} onChange={(e) => update({ headline: e.target.value })} placeholder={translateUi("e.g. AI Product Lead · ex-Google")} />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="p-country">Country</Label>
+              <Label htmlFor="p-country"><LocalizedText text={"Country"} /></Label>
               <Input id="p-country" value={form.country} onChange={(e) => update({ country: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="p-languages">Languages <span className="font-normal text-zinc-400">(comma-separated)</span></Label>
+              <Label htmlFor="p-languages"><LocalizedText text={"Languages"} /><span className="font-normal text-zinc-400"><LocalizedText text={"(comma-separated)"} /></span></Label>
               <Input
                 id="p-languages"
                 value={form.languages.join(", ")}
@@ -156,25 +150,25 @@ export default function CreatorProfilePage() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="p-website">Website</Label>
-            <Input id="p-website" value={form.website} onChange={(e) => update({ website: e.target.value })} placeholder="https://…" />
+            <Label htmlFor="p-website"><LocalizedText text={"Website"} /></Label>
+            <Input id="p-website" value={form.website} onChange={(e) => update({ website: e.target.value })} placeholder={translateUi("https://…")} />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="p-bio">Bio</Label>
+            <Label htmlFor="p-bio"><LocalizedText text={"Bio"} /></Label>
             <Textarea id="p-bio" value={form.bio} onChange={(e) => update({ bio: e.target.value })} className="min-h-32" />
-            <p className="text-[11.5px] text-zinc-400">{form.bio.length} characters · shown on your public profile</p>
+            <p className="text-[11.5px] text-zinc-400">{form.bio.length}<LocalizedText text={"characters · shown on your public profile"} /></p>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Teaching topics</Label>
+            <Label><LocalizedText text={"Teaching topics"} /></Label>
             <div className="flex flex-wrap items-center gap-1.5">
               {form.topics.map((t) => (
                 <span key={t} className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[12px] font-medium">
-                  {t}
+                  <LocalizedText text={t} />
                   <button
                     type="button"
-                    aria-label={`Remove topic ${t}`}
+                    aria-label={translateUi(`Remove topic ${t}`)}
                     onClick={() => update({ topics: form.topics.filter((x) => x !== t) })}
                     className="cursor-pointer text-zinc-400 hover:text-destructive"
                   >
@@ -186,7 +180,7 @@ export default function CreatorProfilePage() {
                 <Input
                   value={topicInput}
                   onChange={(e) => setTopicInput(e.target.value)}
-                  placeholder="Add topic…"
+                  placeholder={translateUi("Add topic…")}
                   className="h-8 w-32 text-[12.5px]"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -195,7 +189,7 @@ export default function CreatorProfilePage() {
                     }
                   }}
                 />
-                <Button type="button" variant="outline" size="icon-sm" onClick={addTopic} aria-label="Add topic">
+                <Button type="button" variant="outline" size="icon-sm" onClick={addTopic} aria-label={translateUi("Add topic")}>
                   <Plus aria-hidden />
                 </Button>
               </div>
@@ -205,37 +199,35 @@ export default function CreatorProfilePage() {
 
         {/* Live preview */}
         <aside className="space-y-3">
-          <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase">
-            Public preview
-          </p>
+          <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase"><LocalizedText text={"Public preview"} /></p>
           <div className="rounded-xl border border-border bg-gradient-to-br from-muted/70 to-white p-5 shadow-card">
             <div className="flex items-center gap-3.5">
               <Avatar className="size-14 ring-2 ring-white shadow-sm">
                 <AvatarFallback className={cn("text-base font-bold", form.avatarColor)}>
-                  {displayInitials}
+                  <LocalizedText text={displayInitials} />
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="font-display text-[16px] font-bold tracking-tight">{form.displayName || "Your name"}</p>
-                <p className="text-[12.5px] text-muted-foreground">{form.headline || "Your headline"}</p>
+                <p className="font-display text-[16px] font-bold tracking-tight"><LocalizedText text={form.displayName || "Your name"} /></p>
+                <p className="text-[12.5px] text-muted-foreground"><LocalizedText text={form.headline || "Your headline"} /></p>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
               {form.country && (
                 <span className="flex items-center gap-1">
                   <MapPin className="size-3 text-zinc-400" aria-hidden />
-                  {form.country}
+                  <LocalizedText text={form.country} />
                 </span>
               )}
               {form.languages.length > 0 && (
                 <span className="flex items-center gap-1">
                   <Globe2 className="size-3 text-zinc-400" aria-hidden />
-                  {form.languages.join(", ")}
+                  <LocalizedText text={form.languages.join(", ")} />
                 </span>
               )}
             </div>
             <p className="mt-3 line-clamp-4 text-[12.5px] leading-relaxed text-muted-foreground">
-              {form.bio || "Tell learners who you are and what you teach."}
+              <LocalizedText text={form.bio || "Tell learners who you are and what you teach."} />
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center">
               {[
@@ -244,16 +236,13 @@ export default function CreatorProfilePage() {
                 { label: "Courses", value: String(stats.courses) },
               ].map((s) => (
                 <div key={s.label} className="rounded-lg border border-border bg-white px-2 py-2.5">
-                  <p className="font-display text-[15px] font-bold tabular-nums">{s.value}</p>
-                  <p className="text-[10.5px] text-muted-foreground">{s.label}</p>
+                  <p className="font-display text-[15px] font-bold tabular-nums"><LocalizedText text={s.value} /></p>
+                  <p className="text-[10.5px] text-muted-foreground"><LocalizedText text={s.label} /></p>
                 </div>
               ))}
             </div>
           </div>
-          <p className="text-[11.5px] leading-relaxed text-zinc-400">
-            Statistics come from the shared catalog data. In this demo, the public instructor page
-            shows the seed profile; your edits are stored locally for the next phases.
-          </p>
+          <p className="text-[11.5px] leading-relaxed text-zinc-400"><LocalizedText text={"Statistics come from the shared catalog data. In this preview, the public instructor page shows the seed profile; your edits are stored locally for the next phases."} /></p>
         </aside>
       </div>
     </div>

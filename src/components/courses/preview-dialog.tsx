@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -12,11 +13,12 @@ import { cn } from "@/lib/utils";
 const PREVIEW_SECONDS = 14;
 
 /**
- * Simulated course-preview player. Honest demo behavior: an animated
+ * Simulated course-preview player. Honest preview behavior: an animated
  * "preview" plays (no real video file exists) with a working play/pause
  * control and progress bar.
  */
 export function PreviewDialog({ course }: { course: Course }) {
+  const translateUi = useTranslate();
   const [open, setOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -49,7 +51,7 @@ export function PreviewDialog({ course }: { course: Course }) {
       <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-zinc-950">
         <Image
           src={course.thumbnail}
-          alt={`${course.title} preview`}
+          alt={translateUi(`${course.title} preview`)}
           fill
           sizes="(max-width: 1024px) 100vw, 768px"
           className={cn("object-cover opacity-95 transition-transform duration-300", playing ? "opacity-70" : "opacity-95")}
@@ -59,7 +61,7 @@ export function PreviewDialog({ course }: { course: Course }) {
           aria-hidden
         />
         <span className="absolute top-3 left-3 flex items-center gap-2">
-          <Badge variant="solid_white">Preview</Badge>
+          <Badge variant="solid_white"><LocalizedText text={"Preview"} /></Badge>
         </span>
 
         <button
@@ -89,8 +91,8 @@ export function PreviewDialog({ course }: { course: Course }) {
             />
           </span>
           <span className="mt-2 flex items-center justify-between text-[11.5px] font-medium text-white/80">
-            <span>{course.title} — intro</span>
-            <span>Simulated playback · demo</span>
+            <span><LocalizedText text={course.title} /><LocalizedText text={"— intro"} /></span>
+            <span><LocalizedText text={"Simulated playback · preview"} /></span>
           </span>
         </span>
       </div>
@@ -99,7 +101,7 @@ export function PreviewDialog({ course }: { course: Course }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Open fullscreen preview"
+        aria-label={translateUi("Open fullscreen preview")}
         className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm text-white transition-colors hover:bg-white/30"
       >
         <Expand className="size-4" aria-hidden />
@@ -108,11 +110,11 @@ export function PreviewDialog({ course }: { course: Course }) {
       {/* Fullscreen Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl gap-0 overflow-hidden p-0" aria-describedby={undefined}>
-          <DialogTitle className="sr-only">{course.title} — course preview</DialogTitle>
+          <DialogTitle className="sr-only"><LocalizedText text={course.title} /><LocalizedText text={"— course preview"} /></DialogTitle>
           <div className="relative aspect-video w-full bg-zinc-950">
             <Image
               src={course.thumbnail}
-              alt=""
+              alt={translateUi("")}
               fill
               sizes="768px"
               className={cn("object-cover transition-opacity", playing ? "opacity-70" : "opacity-45")}
@@ -152,17 +154,14 @@ export function PreviewDialog({ course }: { course: Course }) {
                 />
               </span>
               <span className="mt-2 flex items-center justify-between text-[11.5px] font-medium text-white/80">
-                <span>{course.title} — intro</span>
-                <span>Simulated playback · demo</span>
+                <span><LocalizedText text={course.title} /><LocalizedText text={"— intro"} /></span>
+                <span><LocalizedText text={"Simulated playback · preview"} /></span>
               </span>
             </span>
           </div>
           <div className="p-4">
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              This is a simulated preview for the demo. Enroll to access all{" "}
-              <span className="font-medium text-foreground">{course.lessonsCount} lessons</span> — the free
-              curriculum previews marked below are open to everyone.
-            </p>
+            <p className="text-[13px] leading-relaxed text-muted-foreground"><LocalizedText text={"This is a simulated preview for the preview. Enroll to access all"} /><LocalizedText text={" "} />
+              <span className="font-medium text-foreground">{course.lessonsCount}<LocalizedText text={"lessons"} /></span><LocalizedText text={"— the free curriculum previews marked below are open to everyone."} /></p>
           </div>
         </DialogContent>
       </Dialog>

@@ -5,7 +5,7 @@ import { CheckoutLookup } from "./checkout-lookup";
 
 export const metadata: Metadata = {
   title: "Checkout",
-  description: "Complete your enrollment. Demo checkout — no real payment is processed.",
+  description: "Complete your enrollment. preview checkout — no real payment is processed.",
 };
 
 export default async function CheckoutPage({

@@ -1,5 +1,8 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
+import { useApp } from "@/components/providers/app-providers";
+import { getDictionary, localeOf, translateCourse } from "@/lib/i18n";
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,12 +24,18 @@ const STATUS_BADGE: Record<string, { label: string; variant: "amber" | "violet" 
 };
 
 export function CourseCard({
-  course,
+  course: authoredCourse,
   className,
 }: {
   course: Course;
   className?: string;
 }) {
+  const translateUi = useTranslate();
+  const { language } = useApp();
+  const d = getDictionary(language);
+  const course = translateCourse(authoredCourse, language);
+  const numbers = new Intl.NumberFormat(localeOf(language));
+  const currency = new Intl.NumberFormat(localeOf(language), { style: "currency", currency: "USD" });
   const instructor = getCourseInstructor(course);
   const category = courseCategory(course);
   const CategoryIcon = categoryIcon(category.icon);
@@ -42,75 +51,74 @@ export function CourseCard({
       <Link
         href={`/courses/${course.slug}`}
         className="flex h-full flex-col outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-        aria-label={course.title}
+        aria-label={translateUi(course.title)}
       >
         {/* Thumbnail — always 16:9 */}
         <div className="relative aspect-video w-full overflow-hidden bg-muted">
           <Image
             src={course.thumbnail}
-            alt={course.title}
+            alt={translateUi(course.title)}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 320px"
             className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
           />
           <div className="absolute top-2.5 left-2.5 flex max-w-[75%] flex-wrap gap-1.5">
-            {status && <Badge variant={status.variant}>{status.label}</Badge>}
+            {status && <Badge variant={status.variant}><LocalizedText text={status.label} /></Badge>}
           </div>
         </div>
 
         {/* Body */}
         <div className="flex min-w-0 flex-1 flex-col gap-2 p-3.5 sm:p-4">
           <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight transition-colors group-hover:text-primary">
-            {course.title}
+            <LocalizedText text={course.title} />
           </h3>
           <p className="line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">
-            {course.subtitle}
+            <LocalizedText text={course.subtitle} />
           </p>
 
           <div className="flex items-center gap-2 pt-0.5">
             <Avatar className="size-5.5">
               <AvatarFallback className={cn("text-[8.5px]", instructor.avatarColor)}>
-                {instructor.initials}
+                <LocalizedText text={instructor.initials} />
               </AvatarFallback>
             </Avatar>
-            <span className="truncate text-[12px] text-muted-foreground">{instructor.name}</span>
+            <span className="truncate text-[12px] text-muted-foreground"><LocalizedText text={instructor.name} /></span>
           </div>
 
           <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[12.5px]">
             <Star className="size-3.5 shrink-0 fill-star text-star" aria-hidden />
-            <span className="font-semibold text-foreground">{course.rating.toFixed(1)}</span>
-            <span className="text-zinc-400">({formatCount(course.ratingsCount)})</span>
+            <span className="font-semibold text-foreground"><LocalizedText text={course.rating.toFixed(1)} /></span>
+            <span className="text-zinc-400">(<LocalizedText text={numbers.format(course.ratingsCount)} />)</span>
             <span className="px-0.5 text-zinc-300" aria-hidden>·</span>
-            <span className="text-muted-foreground">{formatCompact(course.studentsCount)} students</span>
+            <span className="text-muted-foreground"><LocalizedText text={new Intl.NumberFormat(localeOf(language), { notation: "compact", maximumFractionDigits: 1 }).format(course.studentsCount)} /><LocalizedText text={" "} /><LocalizedText text={d.studentsLabel} /></span>
           </div>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
             <span className="flex items-center gap-1 whitespace-nowrap">
               <CirclePlay className="size-3.5 text-zinc-400" aria-hidden />
-              {course.lessonsCount} lessons
-            </span>
+              <LocalizedText text={d.lessons(course.lessonsCount)} /></span>
             <span className="flex items-center gap-1 whitespace-nowrap">
               <Clock3 className="size-3.5 text-zinc-400" aria-hidden />
-              {formatDuration(course.durationMinutes)}
+              <LocalizedText text={formatDuration(course.durationMinutes, language)} />
             </span>
             <span className="flex items-center gap-1 whitespace-nowrap">
               <Signal className="size-3.5 text-zinc-400" aria-hidden />
-              {LEVEL_LABELS[course.level]}
+              <LocalizedText text={course.level === "beginner" ? d.levelBeginner : course.level === "intermediate" ? d.levelIntermediate : d.levelAdvanced} />
             </span>
           </div>
 
           {/* Price row pinned to bottom for grid alignment */}
           <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
             {course.price === 0 ? (
-              <span className="font-display text-[15px] font-bold text-success">Free</span>
+              <span className="font-display text-[15px] font-bold text-success"><LocalizedText text={"Free"} /></span>
             ) : (
               <span className="flex items-baseline gap-1.5">
                 <span className="font-display text-[15.5px] font-bold tracking-tight">
-                  ${course.price}
+                  <LocalizedText text={currency.format(course.price)} />
                 </span>
                 {course.compareAtPrice && (
                   <span className="text-[12px] text-zinc-400 line-through">
-                    ${course.compareAtPrice}
+                    <LocalizedText text={currency.format(course.compareAtPrice)} />
                   </span>
                 )}
               </span>

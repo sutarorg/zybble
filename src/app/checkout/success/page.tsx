@@ -3,7 +3,7 @@ import { CheckoutSuccessClient } from "./success-client";
 
 export const metadata: Metadata = {
   title: "Enrollment confirmed",
-  description: "Your demo enrollment was completed successfully.",
+  description: "Your preview enrollment was completed successfully.",
 };
 
 export default async function CheckoutSuccessPage({

@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -39,6 +40,7 @@ const RANGES: { id: Range; label: string }[] = [
 ];
 
 export default function AdminOverviewPage() {
+  const translateUi = useTranslate();
   const { hydrated, users, orders, payouts, reports, activity } = useAdmin();
   const { courses } = useCreator();
   const [range, setRange] = useState<Range>("30d");
@@ -98,28 +100,24 @@ export default function AdminOverviewPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Admin Portal</p>
-          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">
-            Marketplace operations
-          </h1>
-          <p className="mt-1.5 text-[14px] text-muted-foreground">
-            All statistics on this page are demo data — the portal is a frontend simulation.
-          </p>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Admin Portal"} /></p>
+          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Marketplace operations"} /></h1>
+          <p className="mt-1.5 text-[14px] text-muted-foreground"><LocalizedText text={"All statistics on this page are sample data — the portal is a frontend simulation."} /></p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5">
           <ShieldCheck className="size-4 text-amber-600" aria-hidden />
-          <span className="text-[12.5px] font-semibold text-amber-700">Simulation mode · local state only</span>
+          <span className="text-[12.5px] font-semibold text-amber-700"><LocalizedText text={"Simulation mode · local state only"} /></span>
         </div>
       </div>
 
       {/* Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <StatCard icon={Users} label="Total users" value={formatCompact(stats.users)} hint={`${users.filter((u) => u.status === "suspended").length} suspended`} />
-        <StatCard icon={LibraryBig} label="Published courses" value={String(stats.published)} hint={`${stats.published - COURSES.length} community`} />
-        <StatCard icon={Clock3} label="Pending reviews" value={String(stats.pending)} hint="in queue" />
-        <StatCard icon={Wallet} label="Gross sales" value={money(stats.gross)} hint="illustrative" />
-        <StatCard icon={BadgePercent} label="Platform commission" value={money(stats.commission)} hint="10% of gross" />
-        <StatCard icon={Flag} label="Open reports" value={String(stats.reports)} hint="needs attention" />
+        <StatCard icon={Users} label={translateUi("Total users")} value={formatCompact(stats.users)} hint={`${users.filter((u) => u.status === "suspended").length} suspended`} />
+        <StatCard icon={LibraryBig} label={translateUi("Published courses")} value={String(stats.published)} hint={`${stats.published - COURSES.length} community`} />
+        <StatCard icon={Clock3} label={translateUi("Pending reviews")} value={String(stats.pending)} hint="in queue" />
+        <StatCard icon={Wallet} label={translateUi("Gross sales")} value={money(stats.gross)} hint="illustrative" />
+        <StatCard icon={BadgePercent} label={translateUi("Platform commission")} value={money(stats.commission)} hint="10% of gross" />
+        <StatCard icon={Flag} label={translateUi("Open reports")} value={String(stats.reports)} hint="needs attention" />
       </div>
 
       {/* Charts */}
@@ -131,10 +129,8 @@ export default function AdminOverviewPage() {
             </h2>
             <p className="mt-0.5 text-[12.5px] text-muted-foreground">
               <span className="font-display text-[17px] font-bold text-foreground tabular-nums">
-                {metric === "revenue" ? money(total) : formatCompact(total)}
-              </span>{" "}
-              in range · hover for details
-            </p>
+                <LocalizedText text={metric === "revenue" ? money(total) : formatCompact(total)} />
+              </span><LocalizedText text={" "} /><LocalizedText text={"in range · hover for details"} /></p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex gap-1 rounded-lg bg-muted p-1">
@@ -165,7 +161,7 @@ export default function AdminOverviewPage() {
                     range === r.id ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {r.label}
+                  <LocalizedText text={r.label} />
                 </button>
               ))}
             </div>
@@ -179,15 +175,12 @@ export default function AdminOverviewPage() {
         {/* Moderation queue */}
         <section className="rounded-xl border border-border bg-white shadow-card xl:col-span-1">
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-            <h2 className="font-display text-[15.5px] font-semibold">Moderation queue</h2>
-            <Link href="/admin/courses" className="group flex items-center gap-1 text-[12.5px] font-medium text-primary hover:underline">
-              Open queue <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Moderation queue"} /></h2>
+            <Link href="/admin/courses" className="group flex items-center gap-1 text-[12.5px] font-medium text-primary hover:underline"><LocalizedText text={"Open queue"} /><ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
           </div>
           {queue.length === 0 ? (
-            <p className="px-5 py-8 text-center text-[13px] text-muted-foreground">
-              Queue is clear — no submissions waiting.
-            </p>
+            <p className="px-5 py-8 text-center text-[13px] text-muted-foreground"><LocalizedText text={"Queue is clear — no submissions waiting."} /></p>
           ) : (
             <ul className="divide-y divide-border">
               {queue.slice(0, 4).map((c) => (
@@ -197,9 +190,9 @@ export default function AdminOverviewPage() {
                     className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-muted/40"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-[13px] font-semibold">{c.title}</p>
+                      <p className="truncate text-[13px] font-semibold"><LocalizedText text={c.title} /></p>
                       <p className="text-[11.5px] text-zinc-400">
-                        {STATUS_META[c.status].label} · updated {timeAgo(c.lastUpdated)}
+                        <LocalizedText text={STATUS_META[c.status].label} /><LocalizedText text={"· updated"} /><LocalizedText text={timeAgo(c.lastUpdated)} />
                       </p>
                     </div>
                     <ClipboardCheck className="size-4 shrink-0 text-zinc-300" aria-hidden />
@@ -213,33 +206,32 @@ export default function AdminOverviewPage() {
         {/* Recent orders */}
         <section className="overflow-hidden rounded-xl border border-border bg-white shadow-card xl:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-            <h2 className="font-display text-[15.5px] font-semibold">Recent orders</h2>
-            <Link href="/admin/orders" className="group flex items-center gap-1 text-[12.5px] font-medium text-primary hover:underline">
-              All orders <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Recent orders"} /></h2>
+            <Link href="/admin/orders" className="group flex items-center gap-1 text-[12.5px] font-medium text-primary hover:underline"><LocalizedText text={"All orders"} /><ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-140 text-left">
               <thead>
                 <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                  <th className="py-2.5 pr-4 pl-5">Order</th>
-                  <th className="px-4 py-2.5">Learner</th>
-                  <th className="px-4 py-2.5">Course</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="py-2.5 pr-5 pl-4 text-right">Gross</th>
+                  <th className="py-2.5 pr-4 pl-5"><LocalizedText text={"Order"} /></th>
+                  <th className="px-4 py-2.5"><LocalizedText text={"Learner"} /></th>
+                  <th className="px-4 py-2.5"><LocalizedText text={"Course"} /></th>
+                  <th className="px-4 py-2.5"><LocalizedText text={"Status"} /></th>
+                  <th className="py-2.5 pr-5 pl-4 text-right"><LocalizedText text={"Gross"} /></th>
                 </tr>
               </thead>
               <tbody>
                 {recentOrders.map((o) => (
                   <tr key={o.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                    <td className="py-2.5 pr-4 pl-5 font-mono text-[11.5px] text-zinc-500">{o.orderRef}</td>
-                    <td className="max-w-32 truncate px-4 py-2.5 text-[12.5px]">{o.learnerName}</td>
-                    <td className="max-w-52 truncate px-4 py-2.5 text-[12.5px] text-muted-foreground">{o.courseTitle}</td>
+                    <td className="py-2.5 pr-4 pl-5 font-mono text-[11.5px] text-zinc-500"><LocalizedText text={o.orderRef} /></td>
+                    <td className="max-w-32 truncate px-4 py-2.5 text-[12.5px]"><LocalizedText text={o.learnerName} /></td>
+                    <td className="max-w-52 truncate px-4 py-2.5 text-[12.5px] text-muted-foreground"><LocalizedText text={o.courseTitle} /></td>
                     <td className="px-4 py-2.5">
                       <OrderStatusBadge status={o.status} />
                     </td>
                     <td className="py-2.5 pr-5 pl-4 text-right text-[12.5px] font-semibold tabular-nums">
-                      {formatPrice(o.gross)}
+                      <LocalizedText text={formatPrice(o.gross)} />
                     </td>
                   </tr>
                 ))}
@@ -253,21 +245,19 @@ export default function AdminOverviewPage() {
         {/* Recent creator registrations */}
         <section className="rounded-xl border border-border bg-white p-5 shadow-card">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-[15.5px] font-semibold">Creator registrations</h2>
-            <Link href="/admin/users?role=creator" className="text-[12.5px] font-medium text-primary hover:underline">
-              All users
-            </Link>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Creator registrations"} /></h2>
+            <Link href="/admin/users?role=creator" className="text-[12.5px] font-medium text-primary hover:underline"><LocalizedText text={"All users"} /></Link>
           </div>
           <ul className="mt-4 space-y-3">
             {recentCreators.map((u) => (
               <li key={u.id} className="flex items-center gap-3">
                 <span className={cn("flex size-8.5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", u.avatarColor)}>
-                  {u.initials}
+                  <LocalizedText text={u.initials} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium">{u.name}</p>
+                  <p className="truncate text-[13px] font-medium"><LocalizedText text={u.name} /></p>
                   <p className="text-[11.5px] text-zinc-400">
-                    {u.coursesCreated} {u.coursesCreated === 1 ? "course" : "courses"} · joined {formatDate(u.registeredAt)}
+                    {u.coursesCreated} {u.coursesCreated === 1 ? "course" : "courses"}<LocalizedText text={"· joined"} /><LocalizedText text={formatDate(u.registeredAt)} />
                   </p>
                 </div>
               </li>
@@ -277,7 +267,7 @@ export default function AdminOverviewPage() {
 
         {/* Admin activity */}
         <section className="rounded-xl border border-border bg-white p-5 shadow-card xl:col-span-2">
-          <h2 className="font-display text-[15.5px] font-semibold">Recent admin activity</h2>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Recent admin activity"} /></h2>
           <ul className="mt-4 space-y-3">
             {activity.slice(0, 6).map((a) => (
               <li key={a.id} className="flex items-start gap-2.5">
@@ -298,11 +288,11 @@ export default function AdminOverviewPage() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-[12.5px] leading-snug">
-                    <span className="font-semibold">{a.actor.split(" ")[0]}</span>{" "}
-                    <span className="text-muted-foreground">{a.action.toLowerCase()}</span>{" "}
-                    <span className="font-medium">{a.target}</span>
+                    <span className="font-semibold"><LocalizedText text={a.actor.split(" ")[0]} /></span><LocalizedText text={" "} />
+                    <span className="text-muted-foreground"><LocalizedText text={a.action.toLowerCase()} /></span><LocalizedText text={" "} />
+                    <span className="font-medium"><LocalizedText text={a.target} /></span>
                   </p>
-                  <p className="text-[11px] text-zinc-400">{timeAgo(a.at)}</p>
+                  <p className="text-[11px] text-zinc-400"><LocalizedText text={timeAgo(a.at)} /></p>
                 </div>
               </li>
             ))}
@@ -313,13 +303,11 @@ export default function AdminOverviewPage() {
       {/* Open reports strip */}
       <section className="rounded-xl border border-border bg-white p-5 shadow-card">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-[15.5px] font-semibold">Reports needing review</h2>
-          <Link href="/admin/reports" className="text-[12.5px] font-medium text-primary hover:underline">
-            All reports
-          </Link>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Reports needing review"} /></h2>
+          <Link href="/admin/reports" className="text-[12.5px] font-medium text-primary hover:underline"><LocalizedText text={"All reports"} /></Link>
         </div>
         {reports.filter((r) => r.status === "open" || r.status === "under_review").length === 0 ? (
-          <p className="mt-4 text-[13px] text-muted-foreground">No open reports. Nice.</p>
+          <p className="mt-4 text-[13px] text-muted-foreground"><LocalizedText text={"No open reports. Nice."} /></p>
         ) : (
           <ul className="mt-4 grid gap-3 md:grid-cols-2">
             {reports
@@ -328,12 +316,12 @@ export default function AdminOverviewPage() {
               .map((r) => (
                 <li key={r.id} className="rounded-lg border border-border bg-muted/40 p-3.5">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-[13px] font-semibold">{r.targetTitle}</p>
+                    <p className="truncate text-[13px] font-semibold"><LocalizedText text={r.targetTitle} /></p>
                     <ReportStatusBadge status={r.status} />
                   </div>
-                  <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{r.reason}</p>
+                  <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground"><LocalizedText text={r.reason} /></p>
                   <p className="mt-1.5 text-[11px] text-zinc-400">
-                    {r.type} · by {r.reporterName} · {timeAgo(r.submittedAt)}
+                    {r.type}<LocalizedText text={"· by"} /><LocalizedText text={r.reporterName} /> · <LocalizedText text={timeAgo(r.submittedAt)} />
                   </p>
                 </li>
               ))}
@@ -345,8 +333,8 @@ export default function AdminOverviewPage() {
 }
 
 function OrderStatusBadge({ status }: { status: "paid" | "pending" | "refunded" | "failed" }) {
-  if (status === "paid") return <Badge variant="emerald">Paid</Badge>;
-  if (status === "pending") return <Badge variant="amber">Pending</Badge>;
-  if (status === "refunded") return <Badge variant="secondary">Refunded</Badge>;
-  return <Badge className="border-red-200 bg-red-50 text-red-600">Failed</Badge>;
+  if (status === "paid") return <Badge variant="emerald"><LocalizedText text={"Paid"} /></Badge>;
+  if (status === "pending") return <Badge variant="amber"><LocalizedText text={"Pending"} /></Badge>;
+  if (status === "refunded") return <Badge variant="secondary"><LocalizedText text={"Refunded"} /></Badge>;
+  return <Badge className="border-red-200 bg-red-50 text-red-600"><LocalizedText text={"Failed"} /></Badge>;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -44,6 +45,7 @@ const TIPS = [
 ];
 
 export default function CreatorDashboardPage() {
+  const translateUi = useTranslate();
   const { hydrated, courses, profile, finances, transactions, creatorNotifications, deleteCourse } =
     useCreator();
   const [range, setRange] = useState<AnalyticsRange>("30d");
@@ -57,11 +59,11 @@ export default function CreatorDashboardPage() {
 
   const chartData = useMemo(
     () =>
-      analyticsSeries(range, ANALYTICS_BASE.revenue30d, ANALYTICS_BASE.enrollments30d).map((p) => ({
+      analyticsSeries(range, finances.lifetimeGross, courses.reduce((sum, c) => sum + c.studentsCount, 0)).map((p) => ({
         label: p.label,
         value: p.revenue,
       })),
-    [range]
+    [range, finances.lifetimeGross, courses]
   );
   const rangeTotal = useMemo(() => chartData.reduce((a, p) => a + p.value, 0), [chartData]);
 
@@ -120,30 +122,22 @@ export default function CreatorDashboardPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">
-            Creator Studio
-          </p>
-          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">
-            Create. Teach. Earn.
-          </h1>
-          <p className="mt-1.5 text-[14px] text-muted-foreground">
-            Welcome back, {profile.displayName.split(" ")[0]} — here&apos;s how your courses are doing.
-          </p>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Creator Studio"} /></p>
+          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Create. Teach. Earn."} /></h1>
+          <p className="mt-1.5 text-[14px] text-muted-foreground"><LocalizedText text={"Welcome back,"} /><LocalizedText text={profile.displayName.split(" ")[0]} /><LocalizedText text={"— here's how your courses are doing."} /></p>
         </div>
         <Button asChild size="lg">
           <Link href="/creator/courses/new">
-            <Plus aria-hidden />
-            Create Course
-          </Link>
+            <Plus aria-hidden /><LocalizedText text={"Create Course"} /></Link>
         </Button>
       </div>
 
       {/* Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Users} label="Total students" value={formatCompact(stats.students)} delta="12%" hint="vs last month" />
-        <StatCard icon={Wallet} label="Course revenue" value={money(finances.lifetimeGross)} delta="8.4%" hint="all time, gross" />
-        <StatCard icon={BookOpenCheck} label="Published courses" value={String(stats.published)} hint={`of ${courses.length} total`} />
-        <StatCard icon={Clock} label="Pending review" value={String(stats.pending)} hint={stats.pending > 0 ? "action may be needed" : "queue clear"} />
+        <StatCard icon={Users} label={translateUi("Total students")} value={formatCompact(stats.students)}  />
+        <StatCard icon={Wallet} label={translateUi("Course revenue")} value={money(finances.lifetimeGross)} hint="all time, gross" />
+        <StatCard icon={BookOpenCheck} label={translateUi("Published courses")} value={String(stats.published)} hint={`of ${courses.length} total`} />
+        <StatCard icon={Clock} label={translateUi("Pending review")} value={String(stats.pending)} hint={stats.pending > 0 ? "action may be needed" : "queue clear"} />
       </div>
 
       {/* Revenue chart + right rail */}
@@ -151,13 +145,11 @@ export default function CreatorDashboardPage() {
         <section className="rounded-xl border border-border bg-white p-5 shadow-card xl:col-span-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="font-display text-[15.5px] font-semibold">Revenue trend</h2>
+              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Revenue trend"} /></h2>
               <p className="mt-0.5 text-[12.5px] text-muted-foreground">
                 <span className="font-display text-[17px] font-bold text-foreground tabular-nums">
-                  {money(rangeTotal)}
-                </span>{" "}
-                in this range · demo data
-              </p>
+                  <LocalizedText text={money(rangeTotal)} />
+                </span><LocalizedText text={" "} /><LocalizedText text={"in this range · this period"} /></p>
             </div>
             <div className="flex gap-1 rounded-lg bg-muted p-1">
               {RANGES.map((r) => (
@@ -171,7 +163,7 @@ export default function CreatorDashboardPage() {
                     range === r.id ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {r.label}
+                  <LocalizedText text={r.label} />
                 </button>
               ))}
             </div>
@@ -183,29 +175,21 @@ export default function CreatorDashboardPage() {
           {/* Creator tip */}
           <section className="rounded-xl border border-violet-200/80 bg-accent p-5">
             <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] text-accent-foreground uppercase">
-              <Sparkles className="size-3.5" aria-hidden />
-              Creator tip
-            </p>
-            <p className="mt-2 text-[13.5px] leading-relaxed text-violet-950/80">{tip}</p>
+              <Sparkles className="size-3.5" aria-hidden /><LocalizedText text={"Creator tip"} /></p>
+            <p className="mt-2 text-[13.5px] leading-relaxed text-violet-950/80"><LocalizedText text={tip} /></p>
             <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-medium">
               <Link href="/creator/profile" className="inline-flex items-center gap-1 text-primary hover:underline">
-                <Pencil className="size-3" aria-hidden /> Edit profile
-              </Link>
-              <span className="text-violet-300" aria-hidden>·</span>
-              <Link href="/instructors/maya-lindqvist" className="inline-flex items-center gap-1 text-primary hover:underline">
-                <Eye className="size-3" aria-hidden /> Public profile
-              </Link>
+                <Pencil className="size-3" aria-hidden /><LocalizedText text={"Edit profile"} /></Link>
               <span className="text-violet-300" aria-hidden>·</span>
               <Link href="/" className="inline-flex items-center gap-1 text-primary hover:underline">
-                <Compass className="size-3" aria-hidden /> View catalog
-              </Link>
+                <Compass className="size-3" aria-hidden /><LocalizedText text={"View catalog"} /></Link>
             </div>
           </section>
 
           {/* Top courses */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold">Top performing</h2>
-            <p className="mb-4 text-[12px] text-muted-foreground">By lifetime gross (illustrative)</p>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Top performing"} /></h2>
+            <p className="mb-4 text-[12px] text-muted-foreground"><LocalizedText text={"By lifetime gross (illustrative)"} /></p>
             <BarList data={topCourses} formatValue={(v) => money(v)} />
           </section>
         </div>
@@ -215,10 +199,9 @@ export default function CreatorDashboardPage() {
       <div className="grid gap-4 xl:grid-cols-3">
         <section className="xl:col-span-2">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-[15.5px] font-semibold">My courses</h2>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"My courses"} /></h2>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/creator/courses">
-                View all {courses.length}
+              <Link href="/creator/courses"><LocalizedText text={"View all"} />{courses.length}
                 <ArrowRight aria-hidden />
               </Link>
             </Button>
@@ -231,12 +214,11 @@ export default function CreatorDashboardPage() {
             emptySlot={
               <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-10 text-center">
                 <GraduationCap className="mx-auto size-8 text-zinc-300" aria-hidden />
-                <p className="mt-3 text-sm font-medium">No courses yet</p>
-                <p className="mt-1 text-[13px] text-muted-foreground">Create your first course to get started.</p>
+                <p className="mt-3 text-sm font-medium"><LocalizedText text={"No courses yet"} /></p>
+                <p className="mt-1 text-[13px] text-muted-foreground"><LocalizedText text={"Create your first course to get started."} /></p>
                 <Button asChild className="mt-4" size="sm">
                   <Link href="/creator/courses/new">
-                    <Plus aria-hidden /> Create Course
-                  </Link>
+                    <Plus aria-hidden /><LocalizedText text={"Create Course"} /></Link>
                 </Button>
               </div>
             }
@@ -245,7 +227,7 @@ export default function CreatorDashboardPage() {
 
         {/* Recent activity */}
         <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-          <h2 className="font-display text-[15.5px] font-semibold">Recent activity</h2>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Recent activity"} /></h2>
           <ul className="mt-4 space-y-3.5">
             {recentActivity.map((a) => (
               <li key={a.id} className="flex items-start gap-2.5">
@@ -263,16 +245,15 @@ export default function CreatorDashboardPage() {
                 </span>
                 <div className="min-w-0">
                   <Link href={a.href} className="block truncate text-[13px] font-medium hover:text-primary">
-                    {a.text}
+                    <LocalizedText text={a.text} />
                   </Link>
-                  <p className="text-[11.5px] text-zinc-400">{timeAgo(a.at)}</p>
+                  <p className="text-[11.5px] text-zinc-400"><LocalizedText text={timeAgo(a.at)} /></p>
                 </div>
               </li>
             ))}
           </ul>
           <p className="mt-4 border-t border-border pt-3 text-[11.5px] text-zinc-400">
-            {creatorNotifications.length} studio notifications · activity is simulated locally
-          </p>
+            {creatorNotifications.length}<LocalizedText text={"studio notifications · activity is simulated locally"} /></p>
         </section>
       </div>
     </div>

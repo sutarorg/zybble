@@ -10,21 +10,21 @@ A demo AI-course marketplace built with Next.js. Zybble showcases four complete 
 | Creator | `/creator/*` | Course creation wizard, curriculum editor, pricing, publish flow, analytics, earnings, payouts |
 | Admin | `/admin/*` | Moderation queue, users, orders, payouts, categories, reports, settings |
 
-Everything is client-side and mock-data driven: there is no storefront API, no auth server and no payment provider. User activity (enrollments, notes, progress, creator drafts, admin settings) is persisted in `localStorage` so a refresh keeps your place.
+Everything is client-side and mock-data driven: there is no storefront API, no auth server and no payment provider. Account state and activity (enrollments, notes, progress, creator drafts, admin settings) live in a shared **in-memory document session**. Client-side navigation keeps them; a refresh starts signed out with a clean learner and creator workspace. Legacy Zybble localStorage account/activity keys are removed on hydration. Only the interface-language preference is saved between refreshes.
 
 ## Requirements
 
-- Node.js 20+
-- npm (the repository ships without a lockfile — `npm install` is the supported install path)
+- Node.js 22.17+ (22.x) or 24+; the packaged browser tests require these versions
+- npm (use `npm ci` with the checked-in lockfile)
 
 ## Getting started
 
 ```bash
-npm install
+npm ci
 npm run dev            # http://localhost:3000
 ```
 
-`/` is the full catalog (the former Explore page; `/explore` redirects to `/` and there is no `/home` page). To move between shells, use the account switcher in the header (the demo has fixed learner/creator/admin personas).
+`/` is the full catalog (the former Explore page; `/explore` redirects to `/` and there is no `/home` page). Sign in as a learner, choose **Start teaching**, then complete the profile and review steps at `/creator/signup`. This upgrades the same account to a creator without replacing its identity or learner activity. **Go to Studio** appears in the public/learner surfaces only for creators. The studio is role-gated. Deleting the creator account under `/creator/settings` clears its namespace and returns the same account to learner mode.
 
 ### Certificates
 
@@ -32,7 +32,7 @@ Finishing every lesson in a course issues a certificate. The parchment artwork i
 `public/certificate-template.jpg` is the template; `src/lib/certificate.ts` paints the learner name,
 course title, instructor name, issue date and verification code onto a 1920×1080 (16:9) canvas at
 runtime. The same painter drives both the on-screen preview and the **Download PNG** button, so what
-you see is exactly what you download. Certificates are stored in `localStorage` and listed at
+you see is exactly what you download. Certificates are stored for the document session and listed at
 `/certificates` (inside the learner shell), where any of them can be re-opened and re-downloaded.
 
 ## Scripts
@@ -80,7 +80,7 @@ src/
     certificate/   canvas-backed certificate preview + completion dialog
     learn/         player, curriculum list
     creator/, admin/, learner/   shell-specific building blocks
-    providers/     localStorage-backed state (learning, creator, admin, notifications)
+    providers/     document-session state (learning, creator, admin, notifications)
   data/mock-data.ts    seeded catalog, users, orders, payouts, reports
   lib/                 utilities, hooks, formatting, domain helpers
   lib/certificate.ts   16:9 certificate painter + PNG export
@@ -100,8 +100,37 @@ public/certificate-template.jpg   generated certificate artwork (template only, 
 
 ## Known limitations
 
-- There is no authentication, no payment provider and no persistence beyond the browser. Demo personas are switchable from the header.
+- Authentication is a frontend-only credential-checked walkthrough, not a secure auth service. There is one preconfigured learner account; credentials are supplied outside the UI. Signups create temporary accounts for the current document session. There is no payment provider or server-backed account persistence. Refreshing or signing out clears account/activity state.
 - There is no AI Tutor: the feature was removed from the product surface (sidebar promo, Explore banner, lesson player panel, course badges, filters, help/legal copy) and its mock engine (`src/lib/tutor.ts`) is gone.
 - Certificates are generated in the browser and are illustrative — the verification code is not resolvable publicly.
 - `/api/health` returns `500` unless `DATABASE_URL` is configured.
-- Verification in this environment is limited to `npm run typecheck`, `npm run lint` and `npm run build`; no automated browser test suite is included.
+- Browser regression tests cover credential rejection, full-screen signup, learner-to-creator conversion, creator deletion/cancellation, learner wishlist preservation, legacy state cleanup, refresh reset, all six catalog languages and 320px responsiveness.
+
+## Browser verification
+
+```bash
+npm test
+npm run build
+npm run start -- --hostname 0.0.0.0  # in a separate terminal
+npm run test:e2e                    # against http://localhost:3000
+```
+
+`E2E_URL` can point the browser tests at another running instance. The browser is
+packaged as a development dependency, so the suite does not download a browser
+from an external CDN. Its runtime libraries are extracted to the system temp
+directory, not checked into Git.
+
+## Localization
+
+English, Spanish, Portuguese, French, German and Japanese use typed interface
+dictionaries. React-rendered text, navigation, controls, onboarding and catalog
+cards respond to the language preference. Cards localize their titles, subtitles,
+levels, badges, lesson counts, duration, numbers and prices. Interface copy is
+resolved offline without a translation service or DOM mutation. The language
+control is available on mobile, authentication and studio headers too.
+
+Translations are curated: unknown strings and locally authored course content
+retain their original text rather than being guessed. Lesson/curriculum content,
+reviews and some long-form/legal copy are not yet fully translated. Spanish also
+includes course descriptions and learning outcomes; expanding that content
+coverage to every locale remains follow-up work.

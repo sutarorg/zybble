@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -25,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PLATFORM_COMMISSION } from "@/lib/creator";
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
+  const translateUi = useTranslate();
   const { orders, hydrated, isEnrolled } = useApp();
   const community = useCommunityCourses();
 
@@ -46,7 +48,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
   const downloadReceipt = () => {
     const lines = [
-      "ZYBBLE — DEMO RECEIPT",
+      "ZYBBLE — preview RECEIPT",
       "=====================",
       "",
       `Order:        ${order.id}`,
@@ -54,12 +56,12 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       `Course:       ${course?.title ?? order.courseId}`,
       `Status:       ${order.status.toUpperCase()} (simulated)`,
       `Amount:       ${order.total === 0 ? "Free" : formatPrice(order.total)}`,
-      `Payment:      ${order.cardLast4 === "FREE" ? "Free enrollment" : `Demo card •••• ${order.cardLast4}`}`,
+      `Payment:      ${order.cardLast4 === "FREE" ? "Free enrollment" : `Test card •••• ${order.cardLast4}`}`,
       `Billed to:    ${order.email}`,
       "",
       `Marketplace commission (10%, illustrative): ${order.total === 0 ? "$0.00" : formatPrice(order.total * PLATFORM_COMMISSION)}`,
       "",
-      "This receipt documents a SIMULATED checkout in the Zybble demo.",
+      "This receipt documents a SIMULATED checkout in the Zybble preview.",
       "No real payment was processed and no card data was stored.",
     ].join("\n");
     const blob = new Blob([lines], { type: "text/plain" });
@@ -69,16 +71,14 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     a.download = `zybble-receipt-${order.id}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Demo receipt downloaded");
+    toast.success("Receipt downloaded");
   };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link href="/orders">
-          <ArrowLeft aria-hidden />
-          All orders
-        </Link>
+          <ArrowLeft aria-hidden /><LocalizedText text={"All orders"} /></Link>
       </Button>
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-white shadow-card">
@@ -99,12 +99,11 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             <p className="font-display text-[15px] font-semibold">
               {paid ? "Payment successful (simulated)" : "Payment declined (simulated)"}
             </p>
-            <p className="text-[12px] break-anywhere text-muted-foreground">
-              Order <span className="font-mono">{order.id}</span> · {formatDate(order.createdAt)}
+            <p className="text-[12px] break-anywhere text-muted-foreground"><LocalizedText text={"Order"} /><span className="font-mono"><LocalizedText text={order.id} /></span> · <LocalizedText text={formatDate(order.createdAt)} />
             </p>
           </div>
           <div className="ml-auto">
-            {paid ? <Badge variant="emerald">Paid</Badge> : <Badge variant="secondary">Declined</Badge>}
+            {paid ? <Badge variant="emerald"><LocalizedText text={"Paid"} /></Badge> : <Badge variant="secondary"><LocalizedText text={"Declined"} /></Badge>}
           </div>
         </div>
 
@@ -117,68 +116,63 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                   href={`/courses/${course.slug}`}
                   className="relative block aspect-video w-full shrink-0 overflow-hidden rounded-lg border border-border bg-muted sm:w-52"
                 >
-                  <Image src={course.thumbnail} alt={course.title} fill sizes="208px" className="object-cover" />
+                  <Image src={course.thumbnail} alt={translateUi(course.title)} fill sizes="208px" className="object-cover" />
                 </Link>
                 <div className="min-w-0">
                   <Link
                     href={`/courses/${course.slug}`}
                     className="font-display text-[16px] font-semibold tracking-tight hover:text-primary"
                   >
-                    {course.title}
+                    <LocalizedText text={course.title} />
                   </Link>
-                  <p className="mt-1 line-clamp-2 text-[13px] text-muted-foreground">{course.subtitle}</p>
+                  <p className="mt-1 line-clamp-2 text-[13px] text-muted-foreground"><LocalizedText text={course.subtitle} /></p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {paid &&
                       (enrolled ? (
                         <Button asChild size="sm">
                           <Link href={`/learn/${course.id}`}>
-                            <GraduationCap aria-hidden />
-                            Start learning
-                          </Link>
+                            <GraduationCap aria-hidden /><LocalizedText text={"Start learning"} /></Link>
                         </Button>
                       ) : null)}
                     <Button asChild variant="outline" size="sm">
                       <Link href={`/courses/${course.slug}`}>
-                        <Eye aria-hidden />
-                        Course page
-                      </Link>
+                        <Eye aria-hidden /><LocalizedText text={"Course page"} /></Link>
                     </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <p className="text-[13px] text-muted-foreground">
-                This course is no longer available in the catalog (id: {order.courseId}).
+              <p className="text-[13px] text-muted-foreground"><LocalizedText text={"This course is no longer available in the catalog (id:"} /><LocalizedText text={order.courseId} />).
               </p>
             )}
 
             {/* Breakdown */}
             <dl className="mt-6 max-w-sm space-y-2 text-[13.5px]">
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Amount</dt>
-                <dd className="tabular-nums">{order.total === 0 ? "Free" : formatPrice(order.total)}</dd>
+                <dt className="text-muted-foreground"><LocalizedText text={"Amount"} /></dt>
+                <dd className="tabular-nums"><LocalizedText text={order.total === 0 ? "Free" : formatPrice(order.total)} /></dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Platform commission (10%, illustrative)</dt>
+                <dt className="text-muted-foreground"><LocalizedText text={"Platform commission (10%, illustrative)"} /></dt>
                 <dd className="shrink-0 tabular-nums text-zinc-500">
-                  −{order.total === 0 ? formatPrice(0) : formatPrice(order.total * PLATFORM_COMMISSION)}
+                  −<LocalizedText text={order.total === 0 ? formatPrice(0) : formatPrice(order.total * PLATFORM_COMMISSION)} />
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Payment method</dt>
+                <dt className="text-muted-foreground"><LocalizedText text={"Payment method"} /></dt>
                 <dd className="tabular-nums">
-                  {order.cardLast4 === "FREE" ? "Free enrollment" : `Demo card •••• ${order.cardLast4}`}
+                  <LocalizedText text={order.cardLast4 === "FREE" ? "Free enrollment" : `Test card •••• ${order.cardLast4}`} />
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Billed to</dt>
-                <dd className="min-w-0 truncate pl-4">{order.email}</dd>
+                <dt className="text-muted-foreground"><LocalizedText text={"Billed to"} /></dt>
+                <dd className="min-w-0 truncate pl-4"><LocalizedText text={order.email} /></dd>
               </div>
               <Separator className="!my-3" />
               <div className="flex justify-between gap-4 font-semibold">
-                <dt>Total</dt>
+                <dt><LocalizedText text={"Total"} /></dt>
                 <dd className="font-display tabular-nums">
-                  {order.total === 0 ? "Free" : formatPrice(order.total)}
+                  <LocalizedText text={order.total === 0 ? "Free" : formatPrice(order.total)} />
                 </dd>
               </div>
             </dl>
@@ -187,13 +181,9 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           {/* Actions rail */}
           <aside className="h-fit space-y-2 rounded-xl border border-border bg-muted/40 p-4">
             <Button variant="outline" className="w-full" onClick={downloadReceipt}>
-              <Download aria-hidden />
-              Download receipt
-            </Button>
+              <Download aria-hidden /><LocalizedText text={"Download receipt"} /></Button>
             <p className="flex items-start gap-1.5 text-[11.5px] leading-relaxed text-zinc-400">
-              <CreditCard className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              Demo order — no real payment or provider involved.
-            </p>
+              <CreditCard className="mt-0.5 size-3.5 shrink-0" aria-hidden /><LocalizedText text={"Sample order — no real payment or provider involved."} /></p>
           </aside>
         </div>
       </div>

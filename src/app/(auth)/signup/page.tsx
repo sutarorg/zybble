@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -14,11 +15,8 @@ export default function SignupPage() {
       title="Create your account"
       subtitle="Free forever for free courses. Upgrade any course when you're ready."
       footer={
-        <>
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            Sign in
-          </Link>
+        <><LocalizedText text={"Already have an account?"} /><LocalizedText text={" "} />
+          <Link href="/login" className="font-medium text-primary hover:underline"><LocalizedText text={"Sign in"} /></Link>
         </>
       }
     >

@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -47,6 +48,7 @@ const CATEGORY_FUNNEL: Record<string, number> = {
 };
 
 export default function AdminAnalyticsPage() {
+  const translateUi = useTranslate();
   const { hydrated, orders, users, settings } = useAdmin();
   const { communityCourses } = useCreator();
   const [range, setRange] = useState<Range>("30d");
@@ -90,11 +92,11 @@ export default function AdminAnalyticsPage() {
 
   const exportCsv = () => {
     downloadCsv(
-      "zybble-marketplace-analytics-demo.csv",
+      "zybble-marketplace-analytics-preview.csv",
       ["Period label", "Gross revenue (USD)", "New users", "Enrollments"],
       series.map((p) => [p.label, p.revenue, p.users, p.enrollments])
     );
-    toast.success("Analytics CSV exported (demo data)");
+    toast.success("Analytics CSV exported (sample data)");
   };
 
   if (!hydrated) return <Skeleton className="h-96 rounded-xl" />;
@@ -103,25 +105,21 @@ export default function AdminAnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Admin Portal</p>
-          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">Marketplace analytics</h1>
-          <p className="mt-1.5 text-[14px] text-muted-foreground">
-            Illustrative demo metrics for the whole marketplace. Commission reflects the configured{" "}
-            {Math.round(settings.commissionRate * 100)}% rate.
-          </p>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Admin Portal"} /></p>
+          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Marketplace analytics"} /></h1>
+          <p className="mt-1.5 text-[14px] text-muted-foreground"><LocalizedText text={"Illustrative preview metrics for the whole marketplace. Commission reflects the configured"} /><LocalizedText text={" "} />
+            {Math.round(settings.commissionRate * 100)}<LocalizedText text={"% rate."} /></p>
         </div>
         <Button variant="outline" onClick={exportCsv}>
-          <Download aria-hidden />
-          Export CSV
-        </Button>
+          <Download aria-hidden /><LocalizedText text={"Export CSV"} /></Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard icon={TrendingUp} label="Gross sales" value={money(totals.gross)} hint="paid + pending" />
-        <StatCard icon={BadgePercent} label="Platform commission" value={money(totals.commission)} hint={`${Math.round(settings.commissionRate * 100)}% of gross`} />
-        <StatCard icon={Landmark} label="Creator earnings" value={money(totals.creator)} hint="before adjustments" />
-        <StatCard icon={BookOpen} label="Enrollments" value={formatCompact(totals.enrollments)} hint="derived, illustrative" />
-        <StatCard icon={MousePointerClick} label="Conversion sample" value={`${totals.conversion}%`} hint="visit → purchase" />
+        <StatCard icon={TrendingUp} label={translateUi("Gross sales")} value={money(totals.gross)} hint="paid + pending" />
+        <StatCard icon={BadgePercent} label={translateUi("Platform commission")} value={money(totals.commission)} hint={`${Math.round(settings.commissionRate * 100)}% of gross`} />
+        <StatCard icon={Landmark} label={translateUi("Creator earnings")} value={money(totals.creator)} hint="before adjustments" />
+        <StatCard icon={BookOpen} label={translateUi("Enrollments")} value={formatCompact(totals.enrollments)} hint="derived, illustrative" />
+        <StatCard icon={MousePointerClick} label={translateUi("Conversion sample")} value={`${totals.conversion}%`} hint="visit → purchase" />
       </div>
 
       {/* Trend chart */}
@@ -133,10 +131,8 @@ export default function AdminAnalyticsPage() {
             </h2>
             <p className="mt-0.5 text-[12.5px] text-muted-foreground">
               <span className="font-display text-[17px] font-bold text-foreground tabular-nums">
-                {metric === "revenue" ? money(chartData.reduce((a, p) => a + p.value, 0)) : formatCompact(chartData.reduce((a, p) => a + p.value, 0))}
-              </span>{" "}
-              in range
-            </p>
+                <LocalizedText text={metric === "revenue" ? money(chartData.reduce((a, p) => a + p.value, 0)) : formatCompact(chartData.reduce((a, p) => a + p.value, 0))} />
+              </span><LocalizedText text={" "} /><LocalizedText text={"in range"} /></p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex gap-1 rounded-lg bg-muted p-1">
@@ -167,7 +163,7 @@ export default function AdminAnalyticsPage() {
                     range === r.id ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {r.label}
+                  <LocalizedText text={r.label} />
                 </button>
               ))}
             </div>
@@ -185,18 +181,18 @@ export default function AdminAnalyticsPage() {
         <section className="rounded-xl border border-border bg-white p-5 shadow-card">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-display text-[15.5px] font-semibold">Top courses</h2>
-              <p className="text-[12px] text-muted-foreground">Revenue proxy: students × price · illustrative</p>
+              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Top courses"} /></h2>
+              <p className="text-[12px] text-muted-foreground"><LocalizedText text={"Revenue proxy: students × price · illustrative"} /></p>
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="h-8.5 w-44 text-[12.5px]" aria-label="Filter by category">
+              <SelectTrigger className="h-8.5 w-44 text-[12.5px]" aria-label={translateUi("Filter by category")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent align="end">
-                <SelectItem value="all">All categories</SelectItem>
+                <SelectItem value="all"><LocalizedText text={"All categories"} /></SelectItem>
                 {CATEGORIES.map((c) => (
                   <SelectItem key={c.slug} value={c.slug}>
-                    {c.name}
+                    <LocalizedText text={c.name} />
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -205,14 +201,13 @@ export default function AdminAnalyticsPage() {
           <BarList className="mt-4" data={topCourses} formatValue={(v) => money(v)} />
           {communityCourses.length > 0 && (
             <p className="mt-3 text-[11.5px] text-zinc-400">
-              {communityCourses.length} locally published community course(s) are tracked separately in Moderation.
-            </p>
+              {communityCourses.length}<LocalizedText text={"locally published community course(s) are tracked separately in Moderation."} /></p>
           )}
         </section>
 
         {/* Top categories + conversion */}
         <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-          <h2 className="font-display text-[15.5px] font-semibold">Categories by enrollment</h2>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Categories by enrollment"} /></h2>
           <ul className="mt-4 space-y-3">
             {topCategories.map((cat) => {
               const Icon = categoryIcon(cat.id);
@@ -223,8 +218,8 @@ export default function AdminAnalyticsPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="truncate text-[13px] font-medium">{cat.label}</p>
-                      <p className="shrink-0 text-[12px] font-semibold tabular-nums">{formatCompact(cat.value)}</p>
+                      <p className="truncate text-[13px] font-medium"><LocalizedText text={cat.label} /></p>
+                      <p className="shrink-0 text-[12px] font-semibold tabular-nums"><LocalizedText text={formatCompact(cat.value)} /></p>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
                       <div
@@ -233,7 +228,7 @@ export default function AdminAnalyticsPage() {
                       />
                     </div>
                     <p className="mt-1 text-[11px] text-zinc-400">
-                      {cat.sub} · conversion sample {CATEGORY_FUNNEL[cat.id]}%
+                      <LocalizedText text={cat.sub} /><LocalizedText text={"· conversion sample"} />{CATEGORY_FUNNEL[cat.id]}%
                     </p>
                   </div>
                 </li>
@@ -244,9 +239,7 @@ export default function AdminAnalyticsPage() {
       </div>
 
       <p className="flex items-center gap-1.5 text-[12px] text-zinc-400">
-        <Info className="size-3.5" aria-hidden />
-        Funnel percentages and derived enrollments are illustrative samples, not measured data.
-      </p>
+        <Info className="size-3.5" aria-hidden /><LocalizedText text={"Funnel percentages and derived enrollments are illustrative samples, not measured data."} /></p>
     </div>
   );
 }

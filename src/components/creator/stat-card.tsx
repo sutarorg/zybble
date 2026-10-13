@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,16 +35,16 @@ export function StatCard({
             ) : (
               <TrendingUp className="size-3" aria-hidden />
             )}
-            {delta}
+            <LocalizedText text={delta} />
           </span>
         )}
       </div>
       <p className="font-display mt-3 text-[22px] leading-none font-bold tracking-tight tabular-nums">
-        {value}
+        <LocalizedText text={value} />
       </p>
       <p className="mt-1.5 text-[12.5px] text-muted-foreground">
-        {label}
-        {hint && <span className="text-zinc-400"> · {hint}</span>}
+        <LocalizedText text={label} />
+        {hint && <span className="text-zinc-400"> · <LocalizedText text={hint} /></span>}
       </p>
     </div>
   );

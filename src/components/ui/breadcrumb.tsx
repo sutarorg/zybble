@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -28,7 +29,7 @@ export function Breadcrumb({
                   href={item.href}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  {item.label}
+                  <LocalizedText text={item.label} />
                 </Link>
               ) : (
                 <span
@@ -37,7 +38,7 @@ export function Breadcrumb({
                     isLast ? "max-w-56 truncate font-medium text-foreground sm:max-w-96" : "text-muted-foreground"
                   )}
                 >
-                  {item.label}
+                  <LocalizedText text={item.label} />
                 </span>
               )}
             </li>

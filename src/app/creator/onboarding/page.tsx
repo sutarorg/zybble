@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState } from "react";
 import Link from "next/link";
@@ -33,6 +34,7 @@ const TOPIC_SUGGESTIONS = [
 ];
 
 export default function OnboardingPage() {
+  const translateUi = useTranslate();
   const router = useRouter();
   const { hydrated, profile, saveProfile, payoutSettings, savePayoutSettings } = useCreator();
 
@@ -115,15 +117,13 @@ export default function OnboardingPage() {
     <div className="mx-auto max-w-xl">
       {/* Header */}
       <div className="text-center">
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Creator onboarding</p>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Creator onboarding"} /></p>
         <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">
           {step === 0 && "Tell learners who you are"}
           {step === 1 && "What will you teach?"}
           {step === 2 && "One last thing — getting paid"}
         </h1>
-        <p className="mt-1.5 text-[14px] text-muted-foreground">
-          Takes about a minute. Everything saves locally in this demo.
-        </p>
+        <p className="mt-1.5 text-[14px] text-muted-foreground"><LocalizedText text={"Takes about a minute. Everything saves locally in this preview."} /></p>
       </div>
 
       {/* Progress */}
@@ -131,7 +131,7 @@ export default function OnboardingPage() {
         {steps.map((s, i) => (
           <React.Fragment key={s.id}>
             <div
-              aria-label={`Step ${i + 1} of ${steps.length}: ${s.title}`}
+              aria-label={translateUi(`Step ${i + 1} of ${steps.length}: ${s.title}`)}
               className={cn(
                 "flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full text-[12px] font-medium transition-colors",
                 i === step
@@ -142,7 +142,7 @@ export default function OnboardingPage() {
               )}
             >
               {i < step ? <Check className="size-3.5" strokeWidth={3} aria-hidden /> : <s.icon className="size-3.5" aria-hidden />}
-              <span className="hidden sm:inline" aria-hidden>{s.title}</span>
+              <span className="hidden sm:inline" aria-hidden><LocalizedText text={s.title} /></span>
             </div>
           </React.Fragment>
         ))}
@@ -155,30 +155,27 @@ export default function OnboardingPage() {
             <div className="flex items-center gap-4">
               <Avatar className="size-14 ring-1 ring-border">
                 <AvatarFallback className={cn("text-base font-bold", profile.avatarColor)}>
-                  {initialsOf(displayName || "Z C")}
+                  <LocalizedText text={initialsOf(displayName || "Z C")} />
                 </AvatarFallback>
               </Avatar>
-              <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-                This is your public instructor identity. You can polish everything later in{" "}
-                <Link href="/creator/profile" className="font-medium text-primary hover:underline">
-                  Profile
-                </Link>
+              <p className="text-[12.5px] leading-relaxed text-muted-foreground"><LocalizedText text={"This is your public instructor identity. You can polish everything later in"} /><LocalizedText text={" "} />
+                <Link href="/creator/profile" className="font-medium text-primary hover:underline"><LocalizedText text={"Profile"} /></Link>
                 .
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ob-name">Display name *</Label>
+              <Label htmlFor="ob-name"><LocalizedText text={"Display name *"} /></Label>
               <Input id="ob-name" value={displayName} onChange={(e) => setField("displayName", e.target.value)} aria-invalid={!!errors.displayName} />
-              {errors.displayName && <p className="text-[12px] font-medium text-destructive">{errors.displayName}</p>}
+              {errors.displayName && <p className="text-[12px] font-medium text-destructive"><LocalizedText text={errors.displayName} /></p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ob-headline">Headline *</Label>
-              <Input id="ob-headline" value={headline} onChange={(e) => setField("headline", e.target.value)} placeholder="e.g. Data scientist · ex-Spotify" aria-invalid={!!errors.headline} />
-              {errors.headline && <p className="text-[12px] font-medium text-destructive">{errors.headline}</p>}
+              <Label htmlFor="ob-headline"><LocalizedText text={"Headline *"} /></Label>
+              <Input id="ob-headline" value={headline} onChange={(e) => setField("headline", e.target.value)} placeholder={translateUi("e.g. Data scientist · ex-Spotify")} aria-invalid={!!errors.headline} />
+              {errors.headline && <p className="text-[12px] font-medium text-destructive"><LocalizedText text={errors.headline} /></p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ob-country">Country</Label>
-              <Input id="ob-country" value={country} onChange={(e) => setField("country", e.target.value)} placeholder="e.g. Portugal" />
+              <Label htmlFor="ob-country"><LocalizedText text={"Country"} /></Label>
+              <Input id="ob-country" value={country} onChange={(e) => setField("country", e.target.value)} placeholder={translateUi("e.g. Portugal")} />
             </div>
           </div>
         )}
@@ -186,7 +183,7 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label>Teaching topics *</Label>
+              <Label><LocalizedText text={"Teaching topics *"} /></Label>
               <div className="flex flex-wrap gap-1.5">
                 {TOPIC_SUGGESTIONS.map((topic) => {
                   const active = topics.includes(topic);
@@ -203,15 +200,15 @@ export default function OnboardingPage() {
                           : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:text-foreground"
                       )}
                     >
-                      {topic}
+                      <LocalizedText text={topic} />
                     </button>
                   );
                 })}
               </div>
-              {errors.topics && <p className="text-[12px] font-medium text-destructive">{errors.topics}</p>}
+              {errors.topics && <p className="text-[12px] font-medium text-destructive"><LocalizedText text={errors.topics} /></p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Your first course will likely be in…</Label>
+              <Label><LocalizedText text={"Your first course will likely be in…"} /></Label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {CATEGORIES.map((c) => {
                   const Icon = categoryIcon(c.icon);
@@ -228,7 +225,7 @@ export default function OnboardingPage() {
                       )}
                     >
                       <Icon className={cn("size-4.5", active ? "text-primary" : "text-zinc-400")} aria-hidden />
-                      <span className="text-[11px] leading-tight font-medium">{c.shortName}</span>
+                      <span className="text-[11px] leading-tight font-medium"><LocalizedText text={c.shortName} /></span>
                     </button>
                   );
                 })}
@@ -261,8 +258,8 @@ export default function OnboardingPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ob-details">
-                {method === "bank" ? "IBAN / account (masked display)" : "PayPal email"}{" "}
-                <span className="font-normal text-zinc-400">(optional — skip for now)</span>
+                {method === "bank" ? "IBAN / account (masked display)" : "PayPal email"}<LocalizedText text={" "} />
+                <span className="font-normal text-zinc-400"><LocalizedText text={"(optional — skip for now)"} /></span>
               </Label>
               <Input
                 id="ob-details"
@@ -274,19 +271,19 @@ export default function OnboardingPage() {
 
             {/* Review summary */}
             <div className="rounded-xl border border-border bg-muted/40 p-4">
-              <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase">Your setup</p>
+              <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase"><LocalizedText text={"Your setup"} /></p>
               <dl className="mt-2 space-y-1.5 text-[13px]">
                 <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Name</dt>
-                  <dd className="font-medium">{displayName || "—"}</dd>
+                  <dt className="text-muted-foreground"><LocalizedText text={"Name"} /></dt>
+                  <dd className="font-medium"><LocalizedText text={displayName || "—"} /></dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Topics</dt>
-                  <dd className="text-right font-medium capitalize">{topics.join(", ") || "—"}</dd>
+                  <dt className="text-muted-foreground"><LocalizedText text={"Topics"} /></dt>
+                  <dd className="text-right font-medium capitalize"><LocalizedText text={topics.join(", ") || "—"} /></dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">First category</dt>
-                  <dd className="font-medium">{CATEGORIES.find((c) => c.slug === firstCategory)?.name ?? "—"}</dd>
+                  <dt className="text-muted-foreground"><LocalizedText text={"First category"} /></dt>
+                  <dd className="font-medium"><LocalizedText text={CATEGORIES.find((c) => c.slug === firstCategory)?.name ?? "—"} /></dd>
                 </div>
               </dl>
             </div>
@@ -299,28 +296,20 @@ export default function OnboardingPage() {
             <Button
               variant="ghost"
               onClick={() => {
-                toast("Skipped — using the existing demo profile.");
+                toast("Skipped — using the existing preview profile.");
                 router.push("/creator");
               }}
-            >
-              Skip for now
-            </Button>
+            ><LocalizedText text={"Skip for now"} /></Button>
           ) : (
             <Button variant="outline" onClick={() => setStep((s) => s - 1)}>
-              <ArrowLeft aria-hidden />
-              Back
-            </Button>
+              <ArrowLeft aria-hidden /><LocalizedText text={"Back"} /></Button>
           )}
           {step < steps.length - 1 ? (
-            <Button onClick={continueStep}>
-              Continue
-              <ArrowRight aria-hidden />
+            <Button onClick={continueStep}><LocalizedText text={"Continue"} /><ArrowRight aria-hidden />
             </Button>
           ) : (
             <Button onClick={finish} size="lg">
-              <Rocket aria-hidden />
-              Enter the studio
-            </Button>
+              <Rocket aria-hidden /><LocalizedText text={"Enter the studio"} /></Button>
           )}
         </div>
       </div>

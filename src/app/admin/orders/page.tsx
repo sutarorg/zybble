@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -36,13 +37,14 @@ const DAYS: { id: string; label: string; days: number | null }[] = [
 ];
 
 function StatusBadge({ status }: { status: AdminOrder["status"] }) {
-  if (status === "paid") return <Badge variant="emerald">Paid</Badge>;
-  if (status === "pending") return <Badge variant="amber">Pending</Badge>;
-  if (status === "refunded") return <Badge variant="secondary">Refunded</Badge>;
-  return <Badge className="border-red-200 bg-red-50 text-red-600">Failed</Badge>;
+  if (status === "paid") return <Badge variant="emerald"><LocalizedText text={"Paid"} /></Badge>;
+  if (status === "pending") return <Badge variant="amber"><LocalizedText text={"Pending"} /></Badge>;
+  if (status === "refunded") return <Badge variant="secondary"><LocalizedText text={"Refunded"} /></Badge>;
+  return <Badge className="border-red-200 bg-red-50 text-red-600"><LocalizedText text={"Failed"} /></Badge>;
 }
 
 export default function AdminOrdersPage() {
+  const translateUi = useTranslate();
   const { hydrated, orders, settings } = useAdmin();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -51,7 +53,7 @@ export default function AdminOrdersPage() {
   const [selected, setSelected] = useState<AdminOrder | null>(null);
 
   /**
-   * Demo data is historical, so "last N days" is measured from the newest order
+   * preview data is historical, so "last N days" is measured from the newest order
    * in the dataset rather than from the wall clock — otherwise the filter would
    * always return an empty table.
    */
@@ -89,11 +91,11 @@ export default function AdminOrdersPage() {
 
   const exportCsv = () => {
     downloadCsv(
-      "zybble-admin-orders-demo.csv",
+      "zybble-admin-orders-preview.csv",
       ["Order", "Date", "Learner", "Course", "Creator", "Gross", "Commission", "Creator share", "Status", "Method"],
       filtered.map((o) => [o.orderRef, o.date.slice(0, 10), o.learnerName, o.courseTitle, o.creatorName, o.gross.toFixed(2), o.commission.toFixed(2), o.creatorShare.toFixed(2), o.status, o.method])
     );
-    toast.success("CSV exported (demo data)");
+    toast.success("CSV exported (sample data)");
   };
 
   if (!hydrated) return <Skeleton className="h-96 rounded-xl" />;
@@ -102,17 +104,13 @@ export default function AdminOrdersPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Marketplace</p>
-          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">Orders</h1>
-          <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground">
-            Marketplace-wide simulated orders. Commission uses the configured{" "}
-            {Math.round(settings.commissionRate * 100)}% rate from Settings.
-          </p>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Marketplace"} /></p>
+          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Orders"} /></h1>
+          <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground"><LocalizedText text={"Marketplace-wide simulated orders. Commission uses the configured"} /><LocalizedText text={" "} />
+            {Math.round(settings.commissionRate * 100)}<LocalizedText text={"% rate from Settings."} /></p>
         </div>
         <Button variant="outline" onClick={exportCsv}>
-          <Download aria-hidden />
-          Export CSV
-        </Button>
+          <Download aria-hidden /><LocalizedText text={"Export CSV"} /></Button>
       </div>
 
       {/* Totals strip */}
@@ -124,8 +122,8 @@ export default function AdminOrdersPage() {
           { label: "Creator share", value: money(totals.share) },
         ].map((t) => (
           <div key={t.label} className="rounded-xl border border-border bg-white px-5 py-4 shadow-card">
-            <p className="font-display text-[19px] font-bold tracking-tight tabular-nums">{t.value}</p>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">{t.label}</p>
+            <p className="font-display text-[19px] font-bold tracking-tight tabular-nums"><LocalizedText text={t.value} /></p>
+            <p className="mt-0.5 text-[12px] text-muted-foreground"><LocalizedText text={t.label} /></p>
           </div>
         ))}
       </div>
@@ -138,41 +136,41 @@ export default function AdminOrdersPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search order, learner, course, creator…"
-            aria-label="Search orders"
+            placeholder={translateUi("Search order, learner, course, creator…")}
+            aria-label={translateUi("Search orders")}
             className="h-9.5 w-full rounded-lg border border-input bg-white pr-3 pl-9 text-sm shadow-xs outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-36" aria-label="Filter by status"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-36" aria-label={translateUi("Filter by status")}><SelectValue /></SelectTrigger>
           <SelectContent align="end">
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="refunded">Refunded</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
+            <SelectItem value="all"><LocalizedText text={"All statuses"} /></SelectItem>
+            <SelectItem value="paid"><LocalizedText text={"Paid"} /></SelectItem>
+            <SelectItem value="pending"><LocalizedText text={"Pending"} /></SelectItem>
+            <SelectItem value="refunded"><LocalizedText text={"Refunded"} /></SelectItem>
+            <SelectItem value="failed"><LocalizedText text={"Failed"} /></SelectItem>
           </SelectContent>
         </Select>
         <Select value={days} onValueChange={setDays}>
-          <SelectTrigger className="w-36" aria-label="Filter by date range">
+          <SelectTrigger className="w-36" aria-label={translateUi("Filter by date range")}>
             <CalendarDays className="size-3.5 text-zinc-400" aria-hidden />
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
             {DAYS.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>
+              <SelectItem key={d.id} value={d.id}><LocalizedText text={d.label} /></SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
-          <SelectTrigger className="w-40" aria-label="Sort orders">
+          <SelectTrigger className="w-40" aria-label={translateUi("Sort orders")}>
             <ArrowUpDown className="size-3.5 text-zinc-400" aria-hidden />
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
-            <SelectItem value="date">Newest first</SelectItem>
-            <SelectItem value="gross">Highest gross</SelectItem>
-            <SelectItem value="course">Course A–Z</SelectItem>
+            <SelectItem value="date"><LocalizedText text={"Newest first"} /></SelectItem>
+            <SelectItem value="gross"><LocalizedText text={"Highest gross"} /></SelectItem>
+            <SelectItem value="course"><LocalizedText text={"Course A–Z"} /></SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -180,12 +178,10 @@ export default function AdminOrdersPage() {
       {filtered.length === 0 ? (
         <EmptyState
           icon={SearchX}
-          title="No orders match"
-          description="Try broadening the date range, status or search."
+          title={translateUi("No orders match")}
+          description={translateUi("Try broadening the date range, status or search.")}
           action={
-            <Button variant="outline" onClick={() => { setQuery(""); setStatus("all"); setDays("all"); }}>
-              Clear filters
-            </Button>
+            <Button variant="outline" onClick={() => { setQuery(""); setStatus("all"); setDays("all"); }}><LocalizedText text={"Clear filters"} /></Button>
           }
         />
       ) : (
@@ -194,32 +190,32 @@ export default function AdminOrdersPage() {
             <table className="w-full min-w-220 text-left">
               <thead>
                 <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                  <th className="py-3 pr-4 pl-5">Order</th>
-                  <th className="px-4 py-3">Learner</th>
-                  <th className="px-4 py-3">Course</th>
-                  <th className="px-4 py-3">Creator</th>
-                  <th className="px-4 py-3 text-right">Gross</th>
-                  <th className="px-4 py-3 text-right">Commission</th>
-                  <th className="px-4 py-3 text-right">Share</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="py-3 pr-5 pl-4 text-right"><span className="sr-only">View</span></th>
+                  <th className="py-3 pr-4 pl-5"><LocalizedText text={"Order"} /></th>
+                  <th className="px-4 py-3"><LocalizedText text={"Learner"} /></th>
+                  <th className="px-4 py-3"><LocalizedText text={"Course"} /></th>
+                  <th className="px-4 py-3"><LocalizedText text={"Creator"} /></th>
+                  <th className="px-4 py-3 text-right"><LocalizedText text={"Gross"} /></th>
+                  <th className="px-4 py-3 text-right"><LocalizedText text={"Commission"} /></th>
+                  <th className="px-4 py-3 text-right"><LocalizedText text={"Share"} /></th>
+                  <th className="px-4 py-3"><LocalizedText text={"Date"} /></th>
+                  <th className="px-4 py-3"><LocalizedText text={"Status"} /></th>
+                  <th className="py-3 pr-5 pl-4 text-right"><span className="sr-only"><LocalizedText text={"View"} /></span></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.slice(0, 24).map((o) => (
                   <tr key={o.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                    <td className="py-3 pr-4 pl-5 font-mono text-[11.5px] whitespace-nowrap text-zinc-500">{o.orderRef}</td>
-                    <td className="max-w-36 truncate px-4 py-3 text-[12.5px]">{o.learnerName}</td>
-                    <td className="max-w-48 truncate px-4 py-3 text-[12.5px] text-muted-foreground">{o.courseTitle}</td>
-                    <td className="max-w-36 truncate px-4 py-3 text-[12.5px] text-muted-foreground">{o.creatorName}</td>
-                    <td className="px-4 py-3 text-right text-[12.5px] font-semibold tabular-nums">{formatPrice(o.gross)}</td>
-                    <td className="px-4 py-3 text-right text-[12.5px] text-zinc-500 tabular-nums">−{formatPrice(o.commission)}</td>
-                    <td className="px-4 py-3 text-right text-[12.5px] text-success tabular-nums">{formatPrice(o.creatorShare)}</td>
-                    <td className="px-4 py-3 text-[12px] whitespace-nowrap text-muted-foreground">{formatDate(o.date)}</td>
+                    <td className="py-3 pr-4 pl-5 font-mono text-[11.5px] whitespace-nowrap text-zinc-500"><LocalizedText text={o.orderRef} /></td>
+                    <td className="max-w-36 truncate px-4 py-3 text-[12.5px]"><LocalizedText text={o.learnerName} /></td>
+                    <td className="max-w-48 truncate px-4 py-3 text-[12.5px] text-muted-foreground"><LocalizedText text={o.courseTitle} /></td>
+                    <td className="max-w-36 truncate px-4 py-3 text-[12.5px] text-muted-foreground"><LocalizedText text={o.creatorName} /></td>
+                    <td className="px-4 py-3 text-right text-[12.5px] font-semibold tabular-nums"><LocalizedText text={formatPrice(o.gross)} /></td>
+                    <td className="px-4 py-3 text-right text-[12.5px] text-zinc-500 tabular-nums">−<LocalizedText text={formatPrice(o.commission)} /></td>
+                    <td className="px-4 py-3 text-right text-[12.5px] text-success tabular-nums"><LocalizedText text={formatPrice(o.creatorShare)} /></td>
+                    <td className="px-4 py-3 text-[12px] whitespace-nowrap text-muted-foreground"><LocalizedText text={formatDate(o.date)} /></td>
                     <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
                     <td className="py-3 pr-5 pl-4 text-right">
-                      <Button variant="outline" size="sm" onClick={() => setSelected(o)}>View</Button>
+                      <Button variant="outline" size="sm" onClick={() => setSelected(o)}><LocalizedText text={"View"} /></Button>
                     </td>
                   </tr>
                 ))}
@@ -227,23 +223,19 @@ export default function AdminOrdersPage() {
             </table>
           </div>
           {filtered.length > 24 && (
-            <p className="border-t border-border bg-muted/40 px-5 py-2.5 text-[12px] text-zinc-400">
-              Showing 24 of {filtered.length} — export CSV for the full ledger.
-            </p>
+            <p className="border-t border-border bg-muted/40 px-5 py-2.5 text-[12px] text-zinc-400"><LocalizedText text={"Showing 24 of"} />{filtered.length}<LocalizedText text={"— export CSV for the full ledger."} /></p>
           )}
         </div>
       )}
 
       <p className="flex items-center gap-1.5 text-[12px] text-zinc-400">
-        <CreditCard className="size-3.5" aria-hidden />
-        Simulated ledger. Method names are masked demo descriptors — no real payment providers are connected.
-      </p>
+        <CreditCard className="size-3.5" aria-hidden /><LocalizedText text={"Simulated ledger. Method names are masked preview descriptors — no real payment providers are connected."} /></p>
 
       {/* Order drawer */}
       <AdminDrawer
         open={!!selected}
         onOpenChange={() => setSelected(null)}
-        title={selected ? `Order ${selected.orderRef}` : ""}
+        title={translateUi(selected ? `Order ${selected.orderRef}` : "")}
         description={selected ? `${formatDate(selected.date)} · ${selected.method} · simulated transaction` : undefined}
         footer={selected ? <StatusBadge status={selected.status} /> : undefined}
       >
@@ -258,30 +250,28 @@ export default function AdminOrdersPage() {
                 { k: "Payment method", v: selected.method },
               ].map((row) => (
                 <div key={row.k} className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">{row.k}</dt>
-                  <dd className="text-right font-medium">{row.v}</dd>
+                  <dt className="text-muted-foreground"><LocalizedText text={row.k} /></dt>
+                  <dd className="text-right font-medium"><LocalizedText text={row.v} /></dd>
                 </div>
               ))}
             </dl>
             <Separator />
             <dl className="space-y-2 text-[13.5px]">
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Gross amount</dt>
-                <dd className="tabular-nums font-medium">{formatPrice(selected.gross)}</dd>
+                <dt className="text-muted-foreground"><LocalizedText text={"Gross amount"} /></dt>
+                <dd className="tabular-nums font-medium"><LocalizedText text={formatPrice(selected.gross)} /></dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Platform commission ({Math.round(settings.commissionRate * 100)}%)</dt>
-                <dd className="tabular-nums text-zinc-500">−{formatPrice(selected.commission)}</dd>
+                <dt className="text-muted-foreground"><LocalizedText text={"Platform commission ("} />{Math.round(settings.commissionRate * 100)}%)</dt>
+                <dd className="tabular-nums text-zinc-500">−<LocalizedText text={formatPrice(selected.commission)} /></dd>
               </div>
               <div className="flex justify-between font-semibold">
-                <dt>Creator share</dt>
-                <dd className="tabular-nums text-success">{formatPrice(selected.creatorShare)}</dd>
+                <dt><LocalizedText text={"Creator share"} /></dt>
+                <dd className="tabular-nums text-success"><LocalizedText text={formatPrice(selected.creatorShare)} /></dd>
               </div>
             </dl>
             <p className="flex items-start gap-1.5 rounded-lg border border-border bg-muted/50 p-3 text-[11.5px] leading-relaxed text-muted-foreground">
-              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              Demo order from the seed ledger. Amounts are illustrative; no money ever moved.
-            </p>
+              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden /><LocalizedText text={"Sample order from the seed ledger. Amounts are illustrative; no money ever moved."} /></p>
           </div>
         )}
       </AdminDrawer>

@@ -1,3 +1,4 @@
+import { getDictionary } from "./i18n";
 /** Formatting helpers shared across the app. */
 
 export function formatPrice(amount: number): string {
@@ -9,11 +10,12 @@ export function formatPrice(amount: number): string {
 }
 
 /** 95 -> "1h 35m", 45 -> "45m", 480 -> "8h" */
-export function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
+export function formatDuration(minutes: number, language = "en"): string {
+  const d = getDictionary(language);
+  if (minutes < 60) return d.minutes(minutes);
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  return m === 0 ? d.hours(h) : `${d.hours(h)} ${d.minutes(m)}`;
 }
 
 /** 480 -> "8 hours", 95 -> "1.5 hours" (compact card label) */

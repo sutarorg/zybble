@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -45,6 +46,7 @@ export function LearnPlayer({
   courseKey: string;
   initialLessonId: string | null;
 }) {
+  const translateUi = useTranslate();
   const community = useCommunityCourses();
   const { profile: creatorProfile } = useCreator();
   const {
@@ -215,7 +217,7 @@ export function LearnPlayer({
       id: `zyb_${Math.random().toString(36).slice(2, 10)}`,
       courseId: course.id,
       userId: null,
-      email: "demo@learner.local",
+      email: "preview@learner.local",
       total: 0,
       createdAt: new Date().toISOString(),
       status: "paid",
@@ -251,17 +253,14 @@ export function LearnPlayer({
         </header>
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-4 py-16 text-center">
           <GraduationCap className="size-9 text-zinc-300" aria-hidden />
-          <h1 className="font-display mt-4 text-2xl font-bold tracking-tight">This course has no lessons yet</h1>
-          <p className="mt-2 max-w-sm text-[14.5px] leading-relaxed text-muted-foreground">
-            The curriculum for “{course.title}” is still being built. Check back soon — or pick
-            another course meanwhile.
-          </p>
+          <h1 className="font-display mt-4 text-2xl font-bold tracking-tight"><LocalizedText text={"This course has no lessons yet"} /></h1>
+          <p className="mt-2 max-w-sm text-[14.5px] leading-relaxed text-muted-foreground"><LocalizedText text={"The curriculum for “"} /><LocalizedText text={course.title} /><LocalizedText text={"” is still being built. Check back soon — or pick another course meanwhile."} /></p>
           <div className="mt-6 flex gap-2">
             <Button asChild>
-              <Link href="/my-learning">My Learning</Link>
+              <Link href="/my-learning"><LocalizedText text={"My Learning"} /></Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/">Explore courses</Link>
+              <Link href="/"><LocalizedText text={"Explore courses"} /></Link>
             </Button>
           </div>
         </main>
@@ -284,20 +283,14 @@ export function LearnPlayer({
               <span className="flex size-12 items-center justify-center rounded-xl bg-accent text-primary">
                 <Lock className="size-5.5" aria-hidden />
               </span>
-              <h1 className="font-display mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
-                Enroll to start learning
-              </h1>
+              <h1 className="font-display mt-4 text-2xl font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Enroll to start learning"} /></h1>
               <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-muted-foreground">
-                “{course.title}” unlocks the lesson player, notes, resources and progress tracking —
-                all simulated on this device.
-              </p>
+                “<LocalizedText text={course.title} /><LocalizedText text={"” unlocks the lesson player, notes, resources and progress tracking — all simulated on this device."} /></p>
               {course.price === 0 && (
                 <Button size="lg" className="mt-5" onClick={enrollFree}>
-                  <GraduationCap aria-hidden />
-                  Enroll for free — start now
-                </Button>
+                  <GraduationCap aria-hidden /><LocalizedText text={"Enroll for free — start now"} /></Button>
               )}
-              <p className="mt-4 text-[13px] text-zinc-400">Demo environment — no real enrollment happens.</p>
+              <p className="mt-4 text-[13px] text-zinc-400"><LocalizedText text={"Preview environment — no real enrollment happens."} /></p>
             </div>
             {course.price > 0 && <EnrollCard course={course} />}
           </div>
@@ -328,17 +321,17 @@ export function LearnPlayer({
   const downloadResource = (title: string) => {
     const blob = new Blob(
       [
-        `Zybble — Demo resource\n\nCourse: ${course.title}\nResource: ${title}\n\nThis is a demo file generated in your browser. In production, the instructor's file would download here.\n`,
+        `Zybble — preview resource\n\nCourse: ${course.title}\nResource: ${title}\n\nThis is a preview file generated in your browser. In production, the instructor's file would download here.\n`,
       ],
       { type: "text/plain" }
     );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-demo.txt`;
+    a.download = `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-preview.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Demo file downloaded");
+    toast.success("File downloaded");
   };
 
   const curriculumPanel = (
@@ -360,15 +353,15 @@ export function LearnPlayer({
       {/* Header */}
       <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-white/90 px-3 backdrop-blur sm:gap-3 sm:px-4">
         <Button asChild variant="ghost" size="sm" className="-ml-1 shrink-0">
-          <Link href="/my-learning" aria-label="Back to My Learning">
+          <Link href="/my-learning" aria-label={translateUi("Back to My Learning")}>
             <ArrowLeft aria-hidden />
-            <span className="hidden sm:inline" aria-hidden>My Learning</span>
+            <span className="hidden sm:inline" aria-hidden><LocalizedText text={"My Learning"} /></span>
           </Link>
         </Button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-semibold">{course.title}</p>
+          <p className="truncate text-[13.5px] font-semibold"><LocalizedText text={course.title} /></p>
           <p className="truncate text-[11px] text-muted-foreground">
-            {instructor?.name} · {percentOf(progressOf(course, enrollment))}
+            {instructor?.name} · <LocalizedText text={percentOf(progressOf(course, enrollment))} />
           </p>
         </div>
         {/* progress */}
@@ -383,10 +376,10 @@ export function LearnPlayer({
           size="sm"
           className="lg:hidden"
           onClick={() => setPanelOpen(true)}
-          aria-label="Open course curriculum"
+          aria-label={translateUi("Open course curriculum")}
         >
           <PanelRight aria-hidden />
-          <span className="hidden sm:inline" aria-hidden>Curriculum</span>
+          <span className="hidden sm:inline" aria-hidden><LocalizedText text={"Curriculum"} /></span>
         </Button>
       </header>
 
@@ -397,7 +390,7 @@ export function LearnPlayer({
             <SimulatedPlayer
               key={current.lesson.id}
               thumbnail={course.thumbnail}
-              title={current.lesson.title}
+              title={translateUi(current.lesson.title)}
               durationMinutes={current.lesson.durationMinutes}
               caption={`Lesson ${current.number} — ${current.lesson.title}`}
               playing={playing}
@@ -414,14 +407,13 @@ export function LearnPlayer({
             {/* Lesson meta + actions */}
             <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11.5px] font-bold tracking-[0.1em] text-primary uppercase">
-                  Lesson {current.number} · {current.section.title}
+                <p className="text-[11.5px] font-bold tracking-[0.1em] text-primary uppercase"><LocalizedText text={"Lesson"} /><LocalizedText text={current.number} /> · <LocalizedText text={current.section.title} />
                 </p>
                 <h1 className="font-display mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">
-                  {current.lesson.title}
+                  <LocalizedText text={current.lesson.title} />
                 </h1>
                 <p className="mt-1 text-[13px] text-muted-foreground">
-                  {formatDuration(current.lesson.durationMinutes)}
+                  <LocalizedText text={formatDuration(current.lesson.durationMinutes)} />
                   {current.lesson.type !== "video" && ` · ${capitalize(current.lesson.type)} lesson`}
                   {current.lesson.freePreview && " · Free preview"}
                 </p>
@@ -439,9 +431,7 @@ export function LearnPlayer({
             {/* Prev / next */}
             <div className="mt-4 flex items-center justify-between gap-2">
               <Button variant="outline" size="sm" disabled={!prev} onClick={() => prev && setCurrentId(prev.lesson.id)}>
-                <ArrowLeft aria-hidden />
-                Previous
-              </Button>
+                <ArrowLeft aria-hidden /><LocalizedText text={"Previous"} /></Button>
               <Button
                 variant={next ? "default" : "outline"}
                 size="sm"
@@ -461,35 +451,34 @@ export function LearnPlayer({
             {/* Tabs */}
             <Tabs value={tab} onValueChange={setTab} className="mt-6">
               <TabsList>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="resources">
-                  Resources{resourceEntries.length > 0 && (
+                <TabsTrigger value="overview"><LocalizedText text={"Overview"} /></TabsTrigger>
+                <TabsTrigger value="resources"><LocalizedText text={"Resources"} />{resourceEntries.length > 0 && (
                     <span className="rounded bg-zinc-100 px-1 text-[10px] font-semibold text-zinc-500 group-data-[state=active]:bg-accent">
                       {resourceEntries.length}
                     </span>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="notes">Notes</TabsTrigger>
+                <TabsTrigger value="notes"><LocalizedText text={"Notes"} /></TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="max-w-3xl">
                 {current.lesson.description ? (
-                  <p className="text-[14px] leading-relaxed text-muted-foreground">{current.lesson.description}</p>
+                  <p className="text-[14px] leading-relaxed text-muted-foreground"><LocalizedText text={current.lesson.description} /></p>
                 ) : (
                   <p className="text-[14px] leading-relaxed text-muted-foreground">
-                    {capitalize(current.lesson.type)} lesson in section “{current.section.title}”.{" "}
-                    {course.whatYouLearn[0]
+                    <LocalizedText text={capitalize(current.lesson.type)} /><LocalizedText text={"lesson in section “"} /><LocalizedText text={current.section.title} />”.<LocalizedText text={" "} />
+                    {<LocalizedText text={course.whatYouLearn[0]
                       ? `By the end of this course you will: ${course.whatYouLearn[0].charAt(0).toLowerCase()}${course.whatYouLearn[0].slice(1)}.`
-                      : "Follow along, take notes, and mark the lesson complete when you're done."}
+                      : "Follow along, take notes, and mark the lesson complete when you're done."} />}
                   </p>
                 )}
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-border bg-muted/40 p-4">
-                    <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase">In this section</p>
-                    <p className="mt-1.5 text-[13px] font-semibold">{current.section.title}</p>
+                    <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase"><LocalizedText text={"In this section"} /></p>
+                    <p className="mt-1.5 text-[13px] font-semibold"><LocalizedText text={current.section.title} /></p>
                     <p className="mt-1 text-[12.5px] text-muted-foreground">
-                      {current.section.lessons.length} lessons ·{" "}
-                      {formatDuration(current.section.lessons.reduce((a, l) => a + l.durationMinutes, 0))}
+                      {current.section.lessons.length}<LocalizedText text={"lessons ·"} /><LocalizedText text={" "} />
+                      <LocalizedText text={formatDuration(current.section.lessons.reduce((a, l) => a + l.durationMinutes, 0))} />
                     </p>
                   </div>
                   {next && (
@@ -498,11 +487,11 @@ export function LearnPlayer({
                       onClick={() => setCurrentId(next.lesson.id)}
                       className="cursor-pointer rounded-xl border border-border bg-white p-4 text-left shadow-card transition-all hover:border-violet-200 hover:shadow-card-hover"
                     >
-                      <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase">Up next</p>
+                      <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase"><LocalizedText text={"Up next"} /></p>
                       <p className="mt-1.5 truncate text-[13px] font-semibold text-primary">
-                        {next.number} — {next.lesson.title}
+                        <LocalizedText text={next.number} /> — <LocalizedText text={next.lesson.title} />
                       </p>
-                      <p className="mt-1 text-[12.5px] text-muted-foreground">{formatDuration(next.lesson.durationMinutes)}</p>
+                      <p className="mt-1 text-[12.5px] text-muted-foreground"><LocalizedText text={formatDuration(next.lesson.durationMinutes)} /></p>
                     </button>
                   )}
                 </div>
@@ -512,10 +501,8 @@ export function LearnPlayer({
                 {resourceEntries.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-muted/40 px-6 py-10 text-center">
                     <Package className="size-6 text-zinc-300" aria-hidden />
-                    <p className="text-[13.5px] font-medium">No downloadable resources in this course</p>
-                    <p className="max-w-sm text-[12.5px] text-muted-foreground">
-                      When the instructor attaches templates or files, they appear here.
-                    </p>
+                    <p className="text-[13.5px] font-medium"><LocalizedText text={"No downloadable resources in this course"} /></p>
+                    <p className="max-w-sm text-[12.5px] text-muted-foreground"><LocalizedText text={"When the instructor attaches templates or files, they appear here."} /></p>
                   </div>
                 ) : (
                   <ul className="space-y-2">
@@ -525,15 +512,13 @@ export function LearnPlayer({
                           <FileDown className="size-4" aria-hidden />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13.5px] font-medium">{r.title}</p>
+                          <p className="truncate text-[13.5px] font-medium"><LocalizedText text={r.title} /></p>
                           <p className="text-[11.5px] text-zinc-400">
-                            {r.size} · demo file{r.lesson ? ` · from lesson ${r.lesson.title}` : ""}
+                            <LocalizedText text={r.size} /><LocalizedText text={"· preview file"} /><LocalizedText text={r.lesson ? ` · from lesson ${r.lesson.title}` : ""} />
                           </p>
                         </div>
                         <Button variant="outline" size="sm" onClick={() => downloadResource(r.title)}>
-                          <Download aria-hidden />
-                          Download
-                        </Button>
+                          <Download aria-hidden /><LocalizedText text={"Download"} /></Button>
                       </li>
                     ))}
                   </ul>
@@ -544,9 +529,7 @@ export function LearnPlayer({
                 <div className="rounded-xl border border-border bg-white p-4">
                   <div className="flex items-center justify-between">
                     <label htmlFor="lesson-notes" className="flex items-center gap-2 text-[13px] font-semibold">
-                      <FileText className="size-4 text-zinc-400" aria-hidden />
-                      Your notes for this lesson
-                    </label>
+                      <FileText className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Your notes for this lesson"} /></label>
                     <span className="text-[11.5px] text-muted-foreground">
                       {noteSaved ? "Saved" : "Autosaves as you type"}
                     </span>
@@ -555,12 +538,10 @@ export function LearnPlayer({
                     id="lesson-notes"
                     value={noteDraft}
                     onChange={(e) => persistNote(e.target.value)}
-                    placeholder="Key insights, timestamps, questions to revisit…"
+                    placeholder={translateUi("Key insights, timestamps, questions to revisit…")}
                     className="mt-3 min-h-40 resize-y bg-muted/30"
                   />
-                  <p className="mt-2 text-[11.5px] text-zinc-400">
-                    Notes are tied to lesson {current.number} and saved on this device only.
-                  </p>
+                  <p className="mt-2 text-[11.5px] text-zinc-400"><LocalizedText text={"Notes are tied to lesson"} /><LocalizedText text={current.number} /><LocalizedText text={"and saved on this device only."} /></p>
                 </div>
               </TabsContent>
             </Tabs>
@@ -577,7 +558,7 @@ export function LearnPlayer({
       <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
         <SheetContent side="right" className="w-88 max-w-[92vw] p-0">
           <VisuallyHidden.Root>
-            <SheetTitle>Course curriculum</SheetTitle>
+            <SheetTitle><LocalizedText text={"Course curriculum"} /></SheetTitle>
           </VisuallyHidden.Root>
           <div className="h-full">{curriculumPanel}</div>
         </SheetContent>
@@ -589,10 +570,7 @@ export function LearnPlayer({
         open={completedOpen}
         onOpenChange={setCompletedOpen}
         description={
-          <>
-            You finished every lesson in “{course.title}”. Your certificate is issued in the name on
-            your account and saved on this device.
-          </>
+          <><LocalizedText text={"You finished every lesson in “"} /><LocalizedText text={course.title} /><LocalizedText text={"”. Your certificate is issued in the name on your account and saved on this device."} /></>
         }
       />
     </div>
