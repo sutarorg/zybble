@@ -15,6 +15,7 @@ import {
   seedPayouts,
   uid,
 } from "@/lib/creator";
+import { uploadProfilePicture } from "@/lib/upload";
 import type {
   CourseDraft,
   CourseStatus,
@@ -40,6 +41,7 @@ interface CreatorContextValue {
   /* profile */
   profile: CreatorProfile;
   saveProfile: (patch: Partial<CreatorProfile>) => void;
+  uploadCreatorAvatar: (file: File) => Promise<{ success: boolean; error?: string; avatarUrl?: string }>;
   /* courses */
   courses: CreatorCourse[];
   getCourse: (id: string) => CreatorCourse | undefined;
@@ -338,6 +340,25 @@ export function CreatorProvider({ children }: { children: React.ReactNode }) {
     [profile.set]
   );
 
+  /* --------------------------- profile picture upload ------------------------ */
+
+  const uploadCreatorAvatar = useCallback(
+    async (file: File) => {
+      try {
+        const result = await uploadProfilePicture(file);
+        if (result.success && result.fileUrl) {
+          // Update creator profile with new avatar
+          saveProfile({ avatar: result.fileUrl });
+          return { success: true, avatarUrl: result.fileUrl };
+        }
+        return { success: false, error: result.error };
+      } catch (error) {
+        return { success: false, error: "Failed to upload avatar" };
+      }
+    },
+    [saveProfile]
+  );
+
   const addReply = useCallback(
     (reviewId: string, text: string) => replies.set((prev) => ({ ...prev, [reviewId]: text })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -374,6 +395,7 @@ export function CreatorProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       profile: profile.value,
       saveProfile,
+      uploadCreatorAvatar,
       courses: courses.value,
       getCourse,
       addCourse,
@@ -406,7 +428,7 @@ export function CreatorProvider({ children }: { children: React.ReactNode }) {
       readNotifs, finances, transactions, communityCourses, creatorNotifications,
       getCourse, addCourse, updateCourse, applyDraft, deleteCourse, duplicateCourse,
       submitForReview, withdrawSubmission, saveDraft, savePayoutSettings, requestPayout,
-      saveProfile, addReply, markAllCreatorNotifsRead, resetCreatorData, unlistPublished, relistPublished,
+      saveProfile, uploadCreatorAvatar, addReply, markAllCreatorNotifsRead, resetCreatorData, unlistPublished, relistPublished,
     ]
   );
 

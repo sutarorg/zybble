@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   description:
     "Zybble is the global marketplace for practical AI courses: automation, development, generative AI, creation, marketing, data science, business and productivity.",
   keywords: ["AI courses", "learn AI", "online learning", "automation", "ChatGPT", "machine learning"],
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export const viewport: Viewport = {

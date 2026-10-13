@@ -14,6 +14,7 @@ import type {
   RecentCourseView,
   User,
 } from "@/types";
+import { uploadProfilePicture, MAX_FILE_SIZE } from "@/lib/upload";
 
 const KEYS = {
   user: "zybble.user.v1",
@@ -54,6 +55,8 @@ interface AppContextValue {
   user: User | null;
   signIn: (user: User) => void;
   signOut: () => void;
+  /* profile picture */
+  uploadAvatar: (file: File) => Promise<{ success: boolean; error?: string; avatarUrl?: string }>;
   /* wishlist (shared with public) */
   wishlist: string[];
   toggleWishlist: (courseId: string) => boolean;
@@ -328,12 +331,37 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enrollments.clear, orders.clear, notes.clear, certificates.clear, recentViews.clear, activity.clear, learnerPrefs.clear, wishlist.clear]);
 
+  /* --------------------------- profile picture upload ------------------------ */
+
+  const uploadAvatar = useCallback(
+    async (file: File) => {
+      try {
+        const result = await uploadProfilePicture(file);
+        if (result.success && result.fileUrl) {
+          // Update user with new avatar
+          user.set((prev) =>
+            prev
+              ? { ...prev, avatar: result.fileUrl }
+              : null
+          );
+          return { success: true, avatarUrl: result.fileUrl };
+        }
+        return { success: false, error: result.error };
+      } catch (error) {
+        return { success: false, error: "Failed to upload avatar" };
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user.set]
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       hydrated,
       user: user.hydrated ? user.value : null,
       signIn: (u) => user.set(u),
       signOut: () => user.clear(),
+      uploadAvatar,
       wishlist: wishlist.hydrated ? wishlist.value : [],
       toggleWishlist,
       isWishlisted,
@@ -365,7 +393,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       user, wishlist, enrollments, orders, readNotifs, language, notes, certificates, recentViews, activity, learnerPrefs,
       toggleWishlist, isWishlisted, completeOrder, isEnrolled, toggleLessonComplete, setLastLesson,
       setNote, getCertificate, issueCertificate, revokeCertificate, recordCourseView, markAllNotificationsRead,
-      setLearnerPrefs, resetLearnerData,
+      setLearnerPrefs, resetLearnerData, uploadAvatar,
     ]
   );
 

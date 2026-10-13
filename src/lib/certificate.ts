@@ -25,6 +25,7 @@ const VIOLET = "#6d28d9";
 const VIOLET_LIGHT = "#c4b5fd";
 const GOLD = "#c9a227";
 const GOLD_LIGHT = "#e7cf7a";
+const PRIMARY = "#6366f1";
 
 const DISPLAY = '"Space Grotesk", "Segoe UI", system-ui, sans-serif';
 const BODY = 'Inter, "Segoe UI", system-ui, sans-serif';
@@ -174,7 +175,7 @@ function drawFrame(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(0, 0, CERT_WIDTH, CERT_HEIGHT);
 
   // Outer / inner double rule.
-  ctx.strokeStyle = VIOLET;
+  ctx.strokeStyle = PRIMARY;
   ctx.globalAlpha = 0.9;
   ctx.lineWidth = 6;
   roundRect(ctx, 46, 46, CERT_WIDTH - 92, CERT_HEIGHT - 92, 18);
@@ -342,7 +343,7 @@ export function paintCertificate(
 
   /* Eyebrow */
   setFont(ctx, 700, 30, DISPLAY);
-  ctx.fillStyle = VIOLET;
+  ctx.fillStyle = PRIMARY;
   drawTracked(ctx, "CERTIFICATE OF COMPLETION", cx, 214, 12);
 
   /* Divider with a lozenge */
@@ -408,6 +409,24 @@ export function paintCertificate(
     ctx.fillStyle = INK_MUTED;
     drawTracked(ctx, bits.join("  ·  "), cx, metaBase, 1);
   }
+
+  /* Zybble Logo at top */
+  setFont(ctx, 700, 24, DISPLAY);
+  ctx.fillStyle = PRIMARY;
+  ctx.textAlign = "center";
+  ctx.fillText("Zybble", cx, 100);
+  
+  // Zybble logo icon
+  ctx.save();
+  ctx.translate(cx - 40, 70);
+  ctx.strokeStyle = PRIMARY;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(15, 20);
+  ctx.lineTo(30, 0);
+  ctx.stroke();
+  ctx.restore();
 
   /* Footer: instructor (left) · seal (centre) · date (right) */
   const ruleY = 856;
