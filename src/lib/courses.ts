@@ -95,7 +95,6 @@ export const DEFAULT_FILTERS: CourseFilters = {
   duration: "all",
   language: "all",
   resources: false,
-  aiTutor: false,
 };
 
 /* -------------------------------------------------------------------------- */
@@ -138,7 +137,6 @@ export function filterCourses(filters: CourseFilters, pool: Course[] = COURSES):
       return false;
     if (filters.language !== "all" && course.language !== filters.language) return false;
     if (filters.resources && course.downloadableResources === 0) return false;
-    if (filters.aiTutor && !course.hasAiTutor) return false;
     return true;
   });
 }
@@ -183,8 +181,7 @@ export function hasActiveQuery(q: string, category: string | null, filters: Cour
     filters.level !== "all" ||
     filters.duration !== "all" ||
     filters.language !== "all" ||
-    filters.resources ||
-    filters.aiTutor
+    filters.resources
   );
 }
 
@@ -195,6 +192,5 @@ export function activeFilterCount(filters: CourseFilters): number {
   if (filters.duration !== "all") n++;
   if (filters.language !== "all") n++;
   if (filters.resources) n++;
-  if (filters.aiTutor) n++;
   return n;
 }

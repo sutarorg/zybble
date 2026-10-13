@@ -18,7 +18,7 @@ export function InfoPage({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-auto max-w-340 px-4 py-8 sm:px-6 sm:py-12 lg:px-8", className)}>
+    <div className={cn("page-container py-8 sm:py-12", className)}>
       <header className="max-w-3xl">
         <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">{label}</p>
         <h1 className="font-display mt-2 text-[28px] leading-tight font-bold tracking-tight sm:text-4xl">

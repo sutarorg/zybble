@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bot, CirclePlay, Clock3, Signal, Star } from "lucide-react";
+import { CirclePlay, Clock3, Signal, Star } from "lucide-react";
 import type { Course } from "@/types";
 import { getCourseInstructor, courseCategory, LEVEL_LABELS } from "@/lib/courses";
 import { formatCompact, formatCount, formatDuration } from "@/lib/format";
@@ -117,15 +117,6 @@ export function CourseCard({
                     ${course.compareAtPrice}
                   </span>
                 )}
-              </span>
-            )}
-            {course.hasAiTutor && (
-              <span
-                title="AI Tutor included"
-                className="flex items-center gap-1 text-[11px] font-medium text-accent-foreground"
-              >
-                <Bot className="size-3.5" aria-hidden />
-                AI Tutor
               </span>
             )}
           </div>

@@ -11,7 +11,7 @@ export default function TermsPage() {
     <InfoPage
       label="Legal"
       title="Terms of Service"
-      description="These terms govern your access to and use of Zybble, including courses, the AI Tutor and related services."
+      description="These terms govern your access to and use of Zybble, including courses, certificates and related services."
       updated="January 15, 2026"
     >
       <LegalNote>
@@ -70,7 +70,7 @@ export default function TermsPage() {
           <LegalList
             items={[
               "Scrape, crawl or bulk-download platform content or user data.",
-              "Use the AI Tutor for unlawful, harmful or abusive purposes.",
+              "Forge, resell or misrepresent a Zybble certificate of completion.",
               "Interfere with the platform's security, availability or integrity.",
               "Post false reviews or manipulate ratings.",
               "Infringe intellectual-property rights of Zybble, instructors or third parties.",

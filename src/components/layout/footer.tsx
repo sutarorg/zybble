@@ -29,7 +29,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
 export function Footer() {
   return (
     <footer className="mt-16 border-t border-border bg-white">
-      <div className="mx-auto max-w-340 px-4 py-10 sm:px-6 lg:px-8">
+      <div className="page-container py-10">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2.5">
@@ -38,7 +38,7 @@ export function Footer() {
             </div>
             <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-muted-foreground">
               The global marketplace for practical AI skills. Learn from practitioners,
-              build real projects, and get help from your AI Tutor.
+              build real projects, and earn a certificate when you finish.
             </p>
           </div>
           {COLUMNS.map((col) => (

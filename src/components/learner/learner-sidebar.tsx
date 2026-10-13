@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Award,
   Bookmark,
   Compass,
   Flame,
@@ -61,7 +62,7 @@ function NavItem({
 
 export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { user, signOut, wishlist, enrollments, learnerPrefs } = useApp();
+  const { user, signOut, wishlist, enrollments, learnerPrefs, certificates } = useApp();
 
   const items = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Overview", active: pathname === "/dashboard" },
@@ -91,6 +92,18 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
         ) : undefined,
     },
     { href: "/orders", icon: Receipt, label: "Orders", active: pathname.startsWith("/orders") },
+    {
+      href: "/certificates",
+      icon: Award,
+      label: "Certificates",
+      active: pathname.startsWith("/certificates"),
+      trailing:
+        certificates.length > 0 ? (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-emerald-100 px-1 text-[10.5px] font-semibold text-emerald-700">
+            {certificates.length}
+          </span>
+        ) : undefined,
+    },
     { href: "/messages", icon: MessageSquare, label: "Messages", active: pathname.startsWith("/messages") },
     { href: "/settings", icon: Settings, label: "Settings", active: pathname.startsWith("/settings") },
   ];

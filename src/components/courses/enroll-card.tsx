@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import {
   Award,
   Bookmark,
-  Bot,
   CirclePlay,
   Clock3,
   FileDown,
@@ -38,7 +37,6 @@ export function EnrollCard({ course }: { course: Course }) {
     ...(course.downloadableResources > 0
       ? [{ icon: FileDown, label: `${course.downloadableResources} downloadable resources` }]
       : []),
-    ...(course.hasAiTutor ? [{ icon: Bot, label: "AI Tutor included — ask anything" }] : []),
     { icon: Languages, label: `Captions: ${course.captions.slice(0, 3).join(", ")}${course.captions.length > 3 ? ` +${course.captions.length - 3}` : ""}` },
     { icon: Award, label: "Certificate of completion" },
     { icon: InfinityIcon, label: "Lifetime access" },

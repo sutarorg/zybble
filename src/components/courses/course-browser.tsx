@@ -30,7 +30,6 @@ const FILTER_LABELS: { key: keyof CourseFilters; label: string }[] = [
 
 function filterChipLabel(key: keyof CourseFilters, filters: CourseFilters): string | null {
   if (key === "resources") return filters.resources ? "Downloadable resources" : null;
-  if (key === "aiTutor") return filters.aiTutor ? "AI Tutor included" : null;
   const value = filters[key];
   if (value === "all") return null;
   const pretty = String(value).replace(/^\w/, (c) => c.toUpperCase()).replace(/-/g, " ");
@@ -166,7 +165,7 @@ export function CourseBrowser({
                   onClick={() =>
                     setFilters((prev) => ({
                       ...prev,
-                      [chip.key]: chip.key === "resources" || chip.key === "aiTutor" ? false : "all",
+                      [chip.key]: chip.key === "resources" ? false : "all",
                     }))
                   }
                   className="flex cursor-pointer items-center gap-1 rounded-full border border-violet-200 bg-accent py-1 pr-2 pl-2.5 text-[12px] font-medium text-accent-foreground transition-colors hover:bg-violet-100 focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"

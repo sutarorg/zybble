@@ -1,6 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
-import { Bot, GraduationCap, Star, Users } from "lucide-react";
+import { Award, GraduationCap, Star, Users } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { RatingStars } from "@/components/ui/rating-stars";
 
@@ -81,12 +81,12 @@ export function AuthShell({
             </div>
             <div className="flex items-center gap-3.5 rounded-xl border border-violet-200/70 bg-white/80 p-4 shadow-card backdrop-blur">
               <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Bot className="size-4.5" aria-hidden />
+                <Award className="size-4.5" aria-hidden />
               </span>
               <div>
-                <p className="text-[13.5px] font-semibold">AI Tutor included</p>
+                <p className="text-[13.5px] font-semibold">Certificate of completion</p>
                 <p className="text-[12.5px] text-muted-foreground">
-                  Stuck at 2am? Get unstuck in seconds.
+                  Finish a course and download your certificate.
                 </p>
               </div>
             </div>

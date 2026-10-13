@@ -75,7 +75,6 @@ export interface Course {
   durationMinutes: number;
   lessonsCount: number;
   badge?: CourseBadge;
-  hasAiTutor: boolean;
   downloadableResources: number; // count, 0 = none
   lastUpdated: string; // ISO date
   createdAt: string; // ISO date
@@ -135,23 +134,23 @@ export interface LessonNote {
   updatedAt: string; // ISO
 }
 
-export interface TutorCitation {
-  /** e.g. "Section 2 · Lesson 2.3 — Structured output and tool calling" */
-  label: string;
-  lessonId?: string;
-}
-
-export interface TutorMessage {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  at: string; // ISO
-  citations?: TutorCitation[];
-}
-
 export interface RecentCourseView {
   courseId: string;
   viewedAt: string; // ISO
+}
+
+/** A completion certificate issued to the learner, persisted on this device. */
+export interface Certificate {
+  /** Short, shareable verification code, e.g. "ZYB-7QK2-4M1P". */
+  id: string;
+  courseId: string;
+  courseSlug: string;
+  courseTitle: string;
+  studentName: string;
+  instructorName: string;
+  lessonsCount: number;
+  durationMinutes: number;
+  issuedAt: string; // ISO
 }
 
 export interface ActivityItem {
@@ -208,7 +207,6 @@ export interface CourseFilters {
   duration: DurationFilter;
   language: LanguageFilter;
   resources: boolean;
-  aiTutor: boolean;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -264,7 +262,6 @@ export interface CourseDraft {
   isFree: boolean;
   price: number;
   compareAtPrice: number | null;
-  hasAiTutor: boolean;
   sections: CurriculumSection[];
   draftResources: CreatorResource[];
 }

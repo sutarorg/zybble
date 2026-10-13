@@ -17,7 +17,7 @@ export function WishlistClient() {
   const courses = pool.filter((c) => wishlist.includes(c.id));
 
   return (
-    <div className="mx-auto max-w-340 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
+    <div className="page-container py-7 sm:py-9">
       <header>
         <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Saved</p>
         <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]">
