@@ -154,7 +154,7 @@ function AdminAvatarMenu() {
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/explore">Back to storefront</Link>
+          <Link href="/">Back to storefront</Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

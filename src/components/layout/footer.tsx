@@ -1,32 +1,38 @@
+"use client";
+
 import Link from "next/link";
 import { ZybbleMark } from "@/components/layout/logo";
 import { CATEGORIES } from "@/data/mock-data";
-
-const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
-  {
-    title: "Categories",
-    links: CATEGORIES.slice(0, 4).map((c) => ({ label: c.name, href: `/categories/${c.slug}` })),
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "About Zybble", href: "/about" },
-      { label: "Help Center", href: "/help" },
-      { label: "My Learning", href: "/my-learning" },
-      { label: "Wishlist", href: "/wishlist" },
-    ],
-  },
-  {
-    title: "Legal",
-    links: [
-      { label: "Terms of Service", href: "/terms" },
-      { label: "Privacy Policy", href: "/privacy" },
-      { label: "Refund Policy", href: "/refund-policy" },
-    ],
-  },
-];
+import { getDictionary } from "@/lib/i18n";
+import { useApp } from "@/components/providers/app-providers";
 
 export function Footer() {
+  const { language } = useApp();
+  const dict = getDictionary(language);
+
+  const columns: { title: string; links: { label: string; href: string }[] }[] = [
+    {
+      title: dict.categories,
+      links: CATEGORIES.slice(0, 4).map((c) => ({ label: c.name, href: `/categories/${c.slug}` })),
+    },
+    {
+      title: dict.footerCompany,
+      links: [
+        { label: dict.footerAbout, href: "/about" },
+        { label: dict.footerHelp, href: "/help" },
+        { label: dict.myLearning, href: "/my-learning" },
+        { label: dict.wishlist, href: "/wishlist" },
+      ],
+    },
+    {
+      title: dict.footerLegal,
+      links: [
+        { label: dict.footerTerms, href: "/terms" },
+        { label: dict.footerPrivacy, href: "/privacy" },
+      ],
+    },
+  ];
+
   return (
     <footer className="mt-16 border-t border-border bg-white">
       <div className="page-container py-10">
@@ -37,11 +43,10 @@ export function Footer() {
               <span className="font-display text-lg font-bold tracking-tight">Zybble</span>
             </div>
             <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-muted-foreground">
-              The global marketplace for practical AI skills. Learn from practitioners,
-              build real projects, and earn a certificate when you finish.
+              {dict.footerTagline}
             </p>
           </div>
-          {COLUMNS.map((col) => (
+          {columns.map((col) => (
             <nav key={col.title} aria-label={col.title}>
               <p className="text-[11.5px] font-semibold tracking-wider text-zinc-400 uppercase">
                 {col.title}

@@ -60,7 +60,6 @@ export default function TermsPage() {
               "Prices are displayed in USD unless stated otherwise and include applicable taxes.",
               "Promotional prices are time-limited and apply at the time of purchase only.",
               "You authorize us to charge your selected payment method for each order.",
-              "Refunds are governed by our Refund Policy.",
             ]}
           />
         </LegalSection>

@@ -5,6 +5,7 @@ import { Menu, Search } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { SearchBox } from "@/components/layout/search-box";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
+import { LanguageMenu } from "@/components/layout/language-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { LearnerSidebarContent } from "@/components/learner/learner-sidebar";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -61,6 +62,7 @@ export function LearnerHeader() {
         </Sheet>
 
         <div className="ml-auto flex items-center gap-0.5 sm:ml-0 sm:gap-1">
+          <LanguageMenu />
           <NotificationsMenu />
           <div className="mx-1.5 hidden h-5 w-px bg-border sm:block" aria-hidden />
           <UserMenu />

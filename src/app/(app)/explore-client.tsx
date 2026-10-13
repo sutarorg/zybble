@@ -10,6 +10,8 @@ import { CategoryChips } from "@/components/courses/category-chips";
 import { CourseBrowser } from "@/components/courses/course-browser";
 import { CourseCarousel } from "@/components/courses/course-carousel";
 import { useCommunityCourses } from "@/components/providers/creator-provider";
+import { useApp } from "@/components/providers/app-providers";
+import { getDictionary } from "@/lib/i18n";
 
 interface Preset {
   key: string;
@@ -20,6 +22,8 @@ interface Preset {
 
 export function ExploreClient({ q }: { q: string }) {
   const router = useRouter();
+  const { language } = useApp();
+  const dict = getDictionary(language);
   const community = useCommunityCourses();
   const [category, setCategory] = useState<string | null>(null);
   const [preset, setPreset] = useState<Preset | null>(null);
@@ -30,7 +34,7 @@ export function ExploreClient({ q }: { q: string }) {
   const reset = () => {
     setCategory(null);
     setPreset(null);
-    if (q) router.replace("/explore");
+    if (q) router.replace("/");
   };
 
   // Static catalog + courses published locally from the creator studio.
@@ -45,14 +49,13 @@ export function ExploreClient({ q }: { q: string }) {
       {/* Page header */}
       <header>
         <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">
-          Explore courses
+          {dict.exploreEyebrow}
         </p>
         <h1 className="font-display mt-2 text-[26px] leading-tight font-bold tracking-tight sm:text-[34px]">
-          Build in-demand skills with AI courses.
+          {dict.exploreTitle}
         </h1>
         <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground">
-          Practical, project-based courses taught by people who ship. Learn a tool in a weekend
-          or master a discipline over months — and earn a certificate when you finish.
+          {dict.exploreSubtitle}
         </p>
       </header>
 
@@ -70,31 +73,31 @@ export function ExploreClient({ q }: { q: string }) {
         <>
           <div className="mt-12 space-y-12">
             <CourseCarousel
-              title="Popular Courses"
-              description="The courses learners keep coming back for"
+              title={dict.popularCourses}
+              description={dict.popularCoursesDesc}
               courses={popular}
-              onViewAll={() => setPreset({ key: "popular", label: "Popular courses", sort: "popular" })}
+              onViewAll={() => setPreset({ key: "popular", label: dict.popularCourses, sort: "popular" })}
             />
             <CourseCarousel
-              title="New Courses"
-              description="Fresh from our instructor community"
+              title={dict.newCourses}
+              description={dict.newCoursesDesc}
               courses={newest}
-              onViewAll={() => setPreset({ key: "newest", label: "New courses", sort: "newest" })}
+              onViewAll={() => setPreset({ key: "newest", label: dict.newCourses, sort: "newest" })}
             />
             <CourseCarousel
-              title="Top Rated"
-              description="Highest learner satisfaction on Zybble"
+              title={dict.topRated}
+              description={dict.topRatedDesc}
               courses={topRated}
-              onViewAll={() => setPreset({ key: "rating", label: "Top rated courses", sort: "rating" })}
+              onViewAll={() => setPreset({ key: "rating", label: dict.topRated, sort: "rating" })}
             />
             <CourseCarousel
-              title="Free Courses"
-              description="Start learning today — no card required"
+              title={dict.freeCourses}
+              description={dict.freeCoursesDesc}
               courses={free}
               onViewAll={() =>
                 setPreset({
                   key: "free",
-                  label: "Free courses",
+                  label: dict.freeCourses,
                   sort: "rating",
                   filters: { price: "free" },
                 })
@@ -106,10 +109,10 @@ export function ExploreClient({ q }: { q: string }) {
         <div className="mt-7">
           <h2 className="font-display text-xl font-semibold tracking-tight">
             {q.trim()
-              ? "Search results"
+              ? dict.searchResults
               : activeCategory
                 ? activeCategory.name
-                : (preset?.label ?? "All courses")}
+                : (preset?.label ?? dict.allCourses)}
           </h2>
           {activeCategory && !q.trim() && (
             <p className="mt-1 text-[13.5px] text-muted-foreground">{activeCategory.description}</p>

@@ -4,7 +4,8 @@ A demo AI-course marketplace built with Next.js. Zybble showcases four complete 
 
 | Shell | Base path | What it demonstrates |
 | --- | --- | --- |
-| Public | `/`, `/explore`, `/courses/[slug]`, `/instructors/[username]`, `/certificates`, `/help`, `/about`, … | Landing page, catalog browsing, search, filters, course detail, instructor profiles, earned certificates |
+| Public | `/` (catalog, formerly `/explore`), `/courses/[slug]`, `/instructors/[username]`, `/help`, `/about`, … | Catalog browsing, search, filters, course detail, instructor profiles |
+| Learner certificates | `/certificates` (inside the learner shell) | Earned certificates, opened with the learner sidebar in place |
 | Learner | `/dashboard`, `/my-learning`, `/orders`, `/wishlist`, `/messages`, `/settings`, `/learn/[courseId]` | Enrolled courses, progress, simulated lesson player with notes, resources and completion certificates |
 | Creator | `/creator/*` | Course creation wizard, curriculum editor, pricing, publish flow, analytics, earnings, payouts |
 | Admin | `/admin/*` | Moderation queue, users, orders, payouts, categories, reports, settings |
@@ -23,7 +24,7 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-`/` and `/home` serve the marketing landing page (hero + search, continue-learning rail, category grid, featured carousels and a how-it-works section); `/explore` is the full catalog. To move between shells, use the account switcher in the header (the demo has fixed learner/creator/admin personas).
+`/` is the full catalog (the former Explore page; `/explore` redirects to `/` and there is no `/home` page). To move between shells, use the account switcher in the header (the demo has fixed learner/creator/admin personas).
 
 ### Certificates
 
@@ -32,7 +33,7 @@ Finishing every lesson in a course issues a certificate. The parchment artwork i
 course title, instructor name, issue date and verification code onto a 1920×1080 (16:9) canvas at
 runtime. The same painter drives both the on-screen preview and the **Download PNG** button, so what
 you see is exactly what you download. Certificates are stored in `localStorage` and listed at
-`/certificates`, where any of them can be re-opened and re-downloaded.
+`/certificates` (inside the learner shell), where any of them can be re-opened and re-downloaded.
 
 ## Scripts
 
@@ -64,7 +65,7 @@ No environment variables are required to run the UI. The only optional one is:
 ```
 src/
   app/
-    (app)/         public marketing + catalog routes (`/` landing, `/explore`, `/certificates`)
+    (app)/         public catalog routes (`/` is the catalog; `/explore` redirects to `/`)
     (auth)/        login / signup routes
     (learner)/     learner dashboard, my learning, orders, messages, settings
     creator/       creator studio routes

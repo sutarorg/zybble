@@ -1,17 +1,15 @@
-import type { Metadata } from "next";
-import { ExploreClient } from "./explore-client";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Explore AI Courses",
-  description:
-    "Browse practical AI courses in automation, development, generative AI, creation, marketing, data science, business and productivity.",
-};
-
-export default async function ExplorePage({
+/**
+ * The catalog now lives at `/` (the former Explore page). `/explore` is kept
+ * only as a permanent alias so old bookmarks and external links land on the
+ * canonical sitemap entry instead of 404ing.
+ */
+export default async function ExploreRedirect({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  return <ExploreClient q={typeof q === "string" ? q : ""} />;
+  redirect(typeof q === "string" && q ? `/?q=${encodeURIComponent(q)}` : "/");
 }

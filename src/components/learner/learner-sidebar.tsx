@@ -5,21 +5,19 @@ import { usePathname } from "next/navigation";
 import {
   Award,
   Bookmark,
-  Compass,
   Flame,
   GraduationCap,
   LayoutDashboard,
   LogOut,
-  MessageSquare,
   Receipt,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getDictionary } from "@/lib/i18n";
 import { Logo } from "@/components/layout/logo";
 import { useApp } from "@/components/providers/app-providers";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 
 function NavItem({
   href,
@@ -62,14 +60,15 @@ function NavItem({
 
 export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { user, signOut, wishlist, enrollments, learnerPrefs, certificates } = useApp();
+  const { user, signOut, wishlist, enrollments, learnerPrefs, certificates, language } = useApp();
+  const dict = getDictionary(language);
 
   const items = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Overview", active: pathname === "/dashboard" },
+    { href: "/dashboard", icon: LayoutDashboard, label: dict.overview, active: pathname === "/dashboard" },
     {
       href: "/my-learning",
       icon: GraduationCap,
-      label: "My Learning",
+      label: dict.myLearning,
       active: pathname.startsWith("/my-learning") || pathname.startsWith("/learn"),
       trailing:
         enrollments.length > 0 ? (
@@ -78,11 +77,10 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
           </span>
         ) : undefined,
     },
-    { href: "/explore", icon: Compass, label: "Explore Courses", active: false },
     {
       href: "/wishlist",
       icon: Bookmark,
-      label: "Wishlist",
+      label: dict.wishlist,
       active: pathname.startsWith("/wishlist"),
       trailing:
         wishlist.length > 0 ? (
@@ -91,11 +89,11 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
           </span>
         ) : undefined,
     },
-    { href: "/orders", icon: Receipt, label: "Orders", active: pathname.startsWith("/orders") },
+    { href: "/orders", icon: Receipt, label: dict.orders, active: pathname.startsWith("/orders") },
     {
       href: "/certificates",
       icon: Award,
-      label: "Certificates",
+      label: dict.certificates,
       active: pathname.startsWith("/certificates"),
       trailing:
         certificates.length > 0 ? (
@@ -104,8 +102,7 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
           </span>
         ) : undefined,
     },
-    { href: "/messages", icon: MessageSquare, label: "Messages", active: pathname.startsWith("/messages") },
-    { href: "/settings", icon: Settings, label: "Settings", active: pathname.startsWith("/settings") },
+    { href: "/settings", icon: Settings, label: dict.settings, active: pathname.startsWith("/settings") },
   ];
 
   return (
@@ -156,37 +153,29 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold">{user.name}</p>
               <Link href="/settings" className="text-[11.5px] font-medium text-primary hover:underline">
-                View settings
+                {dict.viewSettings}
               </Link>
             </div>
             <button
               type="button"
               onClick={signOut}
-              title="Sign out"
+              title={dict.signOut}
               className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
             >
               <LogOut className="size-4" />
-              <span className="sr-only">Sign out</span>
+              <span className="sr-only">{dict.signOut}</span>
             </button>
           </div>
         ) : (
           <div className="flex flex-col gap-2 p-1">
             <Button asChild size="sm" className="w-full">
-              <Link href="/signup">Create free account</Link>
+              <Link href="/signup">{dict.createFreeAccount}</Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="w-full">
-              <Link href="/login">Sign in</Link>
+              <Link href="/login">{dict.signIn}</Link>
             </Button>
           </div>
         )}
-        <Separator className="my-2" />
-        <Link
-          href="/explore"
-          className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
-        >
-          <Compass className="size-4 text-zinc-400" aria-hidden />
-          Back to Explore
-        </Link>
       </div>
     </div>
   );

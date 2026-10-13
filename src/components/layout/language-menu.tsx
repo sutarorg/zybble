@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LANGUAGES } from "@/data/mock-data";
 import { useApp } from "@/components/providers/app-providers";
+import { getDictionary } from "@/lib/i18n";
 
 export function LanguageMenu() {
   const { language, setLanguage } = useApp();
+  const dict = getDictionary(language);
   const current = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
 
   return (
@@ -29,14 +31,14 @@ export function LanguageMenu() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel>Interface language</DropdownMenuLabel>
+        <DropdownMenuLabel>{dict.interfaceLanguage}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {LANGUAGES.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
             onSelect={() => {
               setLanguage(lang.code);
-              toast.success(`Language preference saved: ${lang.label} (demo)`);
+              toast.success(getDictionary(lang.code).languageChanged(lang.label));
             }}
             className="justify-between"
           >

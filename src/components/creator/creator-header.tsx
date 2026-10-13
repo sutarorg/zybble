@@ -162,7 +162,7 @@ function CreatorAvatarMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/explore">Back to learner experience</Link>
+          <Link href="/">Back to learner experience</Link>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => toast.info("This demo signs you in as the instructor permanently.")}>
           Switch account (demo)

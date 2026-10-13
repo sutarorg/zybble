@@ -40,7 +40,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const finish = (displayName: string, displayEmail: string) => {
     signIn({ id: `usr_${Date.now()}`, name: displayName, email: displayEmail, initials: initialsOf(displayName) });
     toast.success(isSignup ? `Welcome to Zybble, ${displayName.split(" ")[0]}!` : "Welcome back!");
-    router.push("/explore");
+    router.push("/");
   };
 
   const submit = (e: React.FormEvent) => {

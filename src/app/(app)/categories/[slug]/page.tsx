@@ -42,7 +42,7 @@ export default async function CategoryPage({
 
   return (
     <div className="page-container py-6 sm:py-8">
-      <Breadcrumb items={[{ label: "Explore", href: "/explore" }, { label: category.name }]} />
+      <Breadcrumb items={[{ label: "Explore", href: "/" }, { label: category.name }]} />
 
       <header className="mt-6">
         <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">

@@ -12,7 +12,6 @@ import {
   GraduationCap,
   Infinity as InfinityIcon,
   Languages,
-  ShieldCheck,
 } from "lucide-react";
 import type { Course } from "@/types";
 import { formatHours } from "@/lib/format";
@@ -111,16 +110,6 @@ export function EnrollCard({ course }: { course: Course }) {
           </li>
         ))}
       </ul>
-
-      <Separator className="my-5" />
-
-      <Link
-        href="/refund-policy"
-        className="flex items-center gap-2 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
-        30-day money-back guarantee
-      </Link>
     </div>
   );
 }

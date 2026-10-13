@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
-import { HomeClient } from "./home-client";
+import { ExploreClient } from "./explore-client";
 
 export const metadata: Metadata = {
-  title: "Zybble — Learn AI Skills That Matter",
+  title: "Explore AI Courses",
   description:
-    "Zybble is the global marketplace for practical AI courses: automation, development, generative AI, creation, marketing, data science, business and productivity. Finish a course and earn a certificate.",
+    "Browse practical AI courses in automation, development, generative AI, creation, marketing, data science, business and productivity.",
 };
 
-export default function HomePage() {
-  return <HomeClient />;
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  return <ExploreClient q={typeof q === "string" ? q : ""} />;
 }

@@ -237,7 +237,7 @@ export default function CreatorReviewsPage() {
 
       <p className="text-center text-[12px] text-zinc-400">
         Learners also see these reviews on the{" "}
-        <Link href="/explore" className="font-medium text-primary hover:underline">
+        <Link href="/" className="font-medium text-primary hover:underline">
           public course pages
         </Link>
         .

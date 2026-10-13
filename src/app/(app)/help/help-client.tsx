@@ -23,7 +23,7 @@ interface Faq {
 
 const FAQ_GROUPS = [
   { id: "courses", label: "Courses & learning", icon: GraduationCap },
-  { id: "billing", label: "Billing & refunds", icon: CreditCard },
+  { id: "billing", label: "Billing", icon: CreditCard },
   { id: "account", label: "Account", icon: Settings },
 ];
 
@@ -33,7 +33,6 @@ const FAQS: Faq[] = [
   { group: "courses", q: "Are courses updated?", a: "Continuously. AI tools change fast, so instructors refresh lessons monthly. The 'last updated' date on every course page shows the latest revision." },
   { group: "courses", q: "Can I download lessons for offline viewing?", a: "Lessons marked with a download icon include offline resources like templates, checklists and code. Video downloads depend on each instructor's settings." },
   { group: "billing", q: "What payment methods do you accept?", a: "In this demo, checkout is fully simulated — no real payment is processed. The production platform would support major cards, PayPal and regional methods." },
-  { group: "billing", q: "How does the 30-day guarantee work?", a: "If a course isn't right for you, request a refund within 30 days of purchase for a full, no-questions-asked refund. See the Refund Policy for details." },
   { group: "billing", q: "Why did my payment fail?", a: "In the demo, the test card 4000 0000 0000 0002 always simulates a decline so you can preview the failure flow. Any other formatted card number succeeds." },
   { group: "account", q: "Where do I find my certificates?", a: "Open Certificates in the sidebar. Every finished course is listed there with a download button — and you can regenerate the PNG as often as you like." },
   { group: "account", q: "Is the certificate verified?", a: "Each certificate carries a unique certificate ID and the issue date. In production, that code would resolve to a public verification page." },

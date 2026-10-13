@@ -179,7 +179,7 @@ export function CreatorSidebarContent({ onNavigate }: { onNavigate?: () => void 
         </div>
         <Separator className="my-2" />
         <Link
-          href="/explore"
+          href="/"
           className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
         >
           <Compass className="size-4 text-zinc-400" aria-hidden />

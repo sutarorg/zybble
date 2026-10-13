@@ -310,10 +310,6 @@ export function CheckoutClient({ course }: { course: Course }) {
                     </div>
                   </dl>
 
-                  <p className="mt-4 flex items-center gap-2 text-[12px] text-muted-foreground">
-                    <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
-                    30-day money-back guarantee
-                  </p>
                   <p className="mt-2 flex items-center gap-2 text-[12px] text-muted-foreground">
                     <Banknote className="size-4 shrink-0 text-zinc-400" aria-hidden />
                     Taxes included. Charged in USD (demo).

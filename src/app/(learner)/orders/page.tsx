@@ -60,7 +60,7 @@ export default function OrdersPage() {
             description="When you enroll in a paid (or free) course through the demo checkout, the mock receipt lands here."
             action={
               <Button asChild>
-                <Link href="/explore">
+                <Link href="/">
                   <Compass aria-hidden />
                   Explore courses
                 </Link>

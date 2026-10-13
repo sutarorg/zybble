@@ -26,7 +26,7 @@ export function AuthShell({
         <div className="flex items-center justify-between">
           <Logo />
           <Link
-            href="/explore"
+            href="/"
             className="rounded-lg px-2 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             Skip to Explore
