@@ -281,7 +281,7 @@ export default function LearnerSettingsPage() {
         <h2 className="font-display text-[15.5px] font-semibold text-destructive">Danger zone</h2>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-sm text-[13px] text-muted-foreground">
-            Clears your enrollments, progress, orders, notes, tutor chats, wishlist and preferences.
+            Clears your enrollments, progress, orders, notes, certificates, wishlist and preferences.
             Creator studio data is untouched.
           </p>
           <Button

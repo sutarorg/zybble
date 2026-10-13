@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bot, FileDown, SlidersHorizontal, X } from "lucide-react";
+import { FileDown, SlidersHorizontal, X } from "lucide-react";
 import type { Course, CourseFilters } from "@/types";
 import { DEFAULT_FILTERS, activeFilterCount } from "@/lib/courses";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -118,7 +118,6 @@ export function FilterPanel({
     dur: (pred: (m: number) => boolean) => pool.filter((c) => pred(c.durationMinutes)).length,
     lang: (lg: string) => pool.filter((c) => c.language === lg).length,
     resources: pool.filter((c) => c.downloadableResources > 0).length,
-    aiTutor: pool.filter((c) => c.hasAiTutor).length,
   };
   const active = activeFilterCount(value);
 
@@ -187,13 +186,6 @@ export function FilterPanel({
           count={count.resources}
           checked={value.resources}
           onChange={(v) => set("resources", v)}
-        />
-        <CheckboxRow
-          icon={Bot}
-          label="AI Tutor included"
-          count={count.aiTutor}
-          checked={value.aiTutor}
-          onChange={(v) => set("aiTutor", v)}
         />
       </FilterGroup>
     </div>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bot, Hammer, Medal } from "lucide-react";
+import { ArrowRight, Award, Hammer, Medal } from "lucide-react";
 import { CATEGORIES } from "@/data/mock-data";
 import { marketplaceStats } from "@/lib/courses";
 import { formatCompact } from "@/lib/format";
@@ -25,9 +25,9 @@ const VALUES = [
     text: "Our instructors ship for a living: founders, engineers, filmmakers and operators. Courses show real workflows, real numbers and honest trade-offs.",
   },
   {
-    icon: Bot,
-    title: "Assisted by AI",
-    text: "Every eligible course includes an AI Tutor trained on the curriculum. It answers questions, reviews your work and keeps you unstuck, 24/7.",
+    icon: Award,
+    title: "Certified at the finish line",
+    text: "Complete a course and Zybble issues a certificate with your name, the course title, your instructor and a verification code — downloadable as a PNG, any time.",
   },
 ];
 

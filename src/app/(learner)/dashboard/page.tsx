@@ -111,7 +111,7 @@ export default function DashboardPage() {
 
   if (!hydrated) {
     return (
-      <div className="mx-auto max-w-340 px-4 py-7 sm:px-6 lg:px-8" aria-busy>
+      <div className="page-container py-7" aria-busy>
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-3 h-9 w-64" />
         <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -125,7 +125,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-340 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
+    <div className="page-container py-7 sm:py-9">
       {/* Greeting */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>

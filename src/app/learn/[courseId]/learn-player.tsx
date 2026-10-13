@@ -8,9 +8,6 @@ import { toast } from "sonner";
 import {
   ArrowLeft,
   ArrowRight,
-  Award,
-  Bot,
-  CheckCircle2,
   CircleCheck,
   Download,
   FileDown,
@@ -20,26 +17,20 @@ import {
   GraduationCap,
   Lock,
 } from "lucide-react";
-import type { Course, CreatorResource } from "@/types";
+import type { Certificate, Course, CreatorResource, Enrollment } from "@/types";
 import type { FlatLesson } from "@/lib/learn";
 import { useApp } from "@/components/providers/app-providers";
-import { useCommunityCourses } from "@/components/providers/creator-provider";
+import { useCreator, useCommunityCourses } from "@/components/providers/creator-provider";
 import { flattenLessons, instructorOf, nextLessonOf, prevLessonOf, progressOf, resolveCourse } from "@/lib/learn";
 import { SimulatedPlayer } from "@/components/learn/video-player";
 import { CurriculumPanel } from "@/components/learn/curriculum-panel";
-import { TutorPanel } from "@/components/learn/tutor-panel";
+import { CertificateDialog } from "@/components/certificate/certificate-dialog";
 import { EnrollCard } from "@/components/courses/enroll-card";
 import { Logo } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { formatDuration } from "@/lib/format";
@@ -55,6 +46,7 @@ export function LearnPlayer({
   initialLessonId: string | null;
 }) {
   const community = useCommunityCourses();
+  const { profile: creatorProfile } = useCreator();
   const {
     hydrated,
     enrollments,
@@ -65,6 +57,9 @@ export function LearnPlayer({
     setNote,
     recordCourseView,
     completeOrder,
+    user,
+    issueCertificate,
+    revokeCertificate,
   } = useApp();
 
   const course = useMemo(
@@ -102,9 +97,9 @@ export function LearnPlayer({
   /* ui state */
   const [playing, setPlaying] = useState(false);
   const [tab, setTab] = useState("overview");
-  const [tutorOpen, setTutorOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [certificate, setCertificate] = useState<Certificate | null>(null);
   /* Note draft: trusted only while it belongs to the lesson being viewed. */
   const [noteState, setNoteState] = useState<{ lessonId: string; text: string } | null>(null);
   const [noteSaved, setNoteSaved] = useState(false);
@@ -152,35 +147,65 @@ export function LearnPlayer({
       if (!course || !current) return;
       const id = lessonId ?? current.lesson.id;
       const nowCompleted = toggleLessonComplete(course.id, id);
-      if (silent) return;
-      if (nowCompleted) {
-        const updated = progressOf(course, {
-          ...(enrollment ?? { courseId: course.id, orderId: "", enrolledAt: "", lastLessonId: null }),
-          completedLessons: [
-            ...(enrollment?.completedLessons ?? []),
-            ...(id === current.lesson.id && enrollment?.completedLessons.includes(id) ? [] : [id]),
-          ],
+      if (nowCompleted === null) return;
+
+      /**
+       * Enrollment state updates asynchronously, so fold this toggle into a
+       * local copy before deciding whether the whole course is now finished.
+       */
+      const base: Enrollment =
+        enrollment ?? {
+          courseId: course.id,
+          orderId: "",
+          enrolledAt: "",
+          lastLessonId: null,
           progress: 0,
+          completedLessons: [],
+        };
+      const completedLessons =
+        nowCompleted && !base.completedLessons?.includes(id)
+          ? [...(base.completedLessons ?? []), id]
+          : (base.completedLessons ?? []).filter((l) => l !== id);
+      const updated = progressOf(course, { ...base, completedLessons, progress: 0 });
+
+      if (updated.isCompleted) {
+        // Certificate is issued whether or not the toggle came from a silent
+        // call (curriculum panel), so the learner never misses an earned award.
+        const issued = issueCertificate({
+          courseId: course.id,
+          courseSlug: course.slug,
+          courseTitle: course.title,
+          studentName: user?.name?.trim() || "Zybble Learner",
+          instructorName: community.some((c) => c.id === course.id)
+            ? creatorProfile.displayName
+            : instructorOf(course)?.name ?? "Zybble Instructor",
+          lessonsCount: updated.totalLessons,
+          durationMinutes: course.durationMinutes,
         });
-        if (updated.isCompleted) {
-          setCompletedOpen(true);
-          toast.success(`You completed “${course.title}” — amazing work!`);
-        } else {
-          const next = nextLessonOf(course, current);
-          toast.success("Lesson marked complete", {
-            action: next
-              ? {
-                  label: "Next lesson",
-                  onClick: () => setCurrentId(next.lesson.id),
-                }
-              : undefined,
-          });
-        }
+        setCertificate(issued);
+        setCompletedOpen(true);
+        toast.success(`You completed “${course.title}” — your certificate is ready!`);
+        return;
+      }
+
+      revokeCertificate(course.id);
+      if (silent) return;
+
+      if (nowCompleted) {
+        const next = nextLessonOf(course, current);
+        toast.success("Lesson marked complete", {
+          action: next
+            ? {
+                label: "Next lesson",
+                onClick: () => setCurrentId(next.lesson.id),
+              }
+            : undefined,
+        });
       } else {
         toast("Lesson marked incomplete");
       }
     },
-    [course, current, enrollment, toggleLessonComplete, setCurrentId]
+    [course, current, enrollment, toggleLessonComplete, setCurrentId, user?.name, issueCertificate, revokeCertificate, community, creatorProfile.displayName]
   );
 
   /* free-course instant enroll */
@@ -353,16 +378,6 @@ export function LearnPlayer({
           </div>
           <span className="text-[11.5px] font-semibold text-muted-foreground tabular-nums">{percent}%</span>
         </div>
-        <Button
-          variant={tutorOpen ? "default" : "outline"}
-          size="sm"
-          onClick={() => setTutorOpen((v) => !v)}
-          aria-pressed={tutorOpen}
-          aria-label="AI Tutor"
-        >
-          <Bot aria-hidden />
-          <span className="hidden sm:inline" aria-hidden>AI Tutor</span>
-        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -568,55 +583,18 @@ export function LearnPlayer({
         </SheetContent>
       </Sheet>
 
-      {/* AI Tutor slide-over */}
-      <div
-        className={cn(
-          "fixed inset-y-0 right-0 z-50 w-88 max-w-[92vw] border-l border-border bg-white shadow-pop transition-transform duration-300",
-          tutorOpen ? "translate-x-0" : "translate-x-full"
-        )}
-        aria-hidden={!tutorOpen}
-        role="complementary"
-        aria-label="AI Tutor"
-      >
-        {tutorOpen && (
-          <TutorPanel
-            course={course}
-            currentLesson={current}
-            onClose={() => setTutorOpen(false)}
-            onCitationClick={(lessonId) => {
-              setCurrentId(lessonId);
-              if (window.innerWidth < 1024) setTutorOpen(false);
-            }}
-          />
-        )}
-      </div>
-
-      {/* Completion dialog */}
-      <Dialog open={completedOpen} onOpenChange={setCompletedOpen}>
-        <DialogContent className="max-w-md text-center" aria-describedby={undefined}>
-          <span className="relative mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-100">
-            <span className="absolute inset-0 animate-ping rounded-full bg-emerald-200/60" aria-hidden />
-            <Award className="relative size-8 text-emerald-600" aria-hidden />
-          </span>
-          <DialogTitle className="font-display mt-3 text-xl">Course completed!</DialogTitle>
-          <DialogDescription className="mt-1">
-            You finished every lesson in “{course.title}”. Your certificate is ready in this demo —
-            and the course is now in the Completed tab of My Learning.
-          </DialogDescription>
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-            <Button asChild className="flex-1" size="lg">
-              <Link href="/my-learning">
-                <GraduationCap aria-hidden />
-                My Learning
-              </Link>
-            </Button>
-            <Button variant="outline" className="flex-1" size="lg" onClick={() => setCompletedOpen(false)}>
-              <CheckCircle2 aria-hidden />
-              Keep reviewing
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Completion certificate */}
+      <CertificateDialog
+        certificate={certificate}
+        open={completedOpen}
+        onOpenChange={setCompletedOpen}
+        description={
+          <>
+            You finished every lesson in “{course.title}”. Your certificate is issued in the name on
+            your account and saved on this device.
+          </>
+        }
+      />
     </div>
   );
 }

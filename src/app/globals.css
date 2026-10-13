@@ -98,6 +98,20 @@ body {
   scroll-padding-top: 5rem;
 }
 
+/* Shared page gutter used by every shell page (plain CSS so it is always emitted). */
+.page-container {
+  width: 100%;
+  max-width: 85rem; /* 1360px */
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 40rem) {
+  .page-container {
+    padding-inline: 1.5rem;
+  }
+}
+
 /* Long unbroken strings (emails, ids, URLs, currency) must wrap, not overflow. */
 @utility break-anywhere {
   overflow-wrap: anywhere;
@@ -121,6 +135,24 @@ body {
 /* iOS-style momentum scrolling inside overflow panels */
 @utility overscroll-contain-x {
   overscroll-behavior-x: contain;
+}
+
+/*
+ * The public and learner shells render a fixed 256px sidebar from `lg` up, so
+ * the gutter widens at that breakpoint: content keeps a clear gap from the rail
+ * instead of butting up against it, and every card, carousel and heading sits
+ * on one shared left edge.
+ */
+@media (min-width: 64rem) {
+  .page-container {
+    padding-inline: 2.5rem;
+  }
+}
+
+@media (min-width: 96rem) {
+  .page-container {
+    padding-inline: 3rem;
+  }
 }
 
 /* Motion preferences: neutralise decorative animation, keep state changes visible. */

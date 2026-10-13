@@ -18,7 +18,7 @@ export function Header() {
 
   return (
     <header className="pt-safe sticky top-0 z-30 border-b border-border bg-white/85 backdrop-blur-md">
-      <div className="flex h-16 items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
+      <div className="flex h-16 items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:px-10">
         {/* Mobile nav trigger */}
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <IconButton

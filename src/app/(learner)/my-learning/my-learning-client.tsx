@@ -138,10 +138,12 @@ function LearningCard({
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
           {p.isCompleted ? (
             <>
-              <Badge variant="emerald" className="gap-1">
-                <BadgeCheck aria-hidden />
-                Certificate ready
-              </Badge>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/certificates">
+                  <BadgeCheck aria-hidden />
+                  View certificate
+                </Link>
+              </Button>
               <Button asChild variant="outline" size="sm">
                 <Link href={`/learn/${course.id}`}>Review course</Link>
               </Button>
@@ -219,7 +221,7 @@ export function MyLearningClient() {
   ];
 
   return (
-    <div className="mx-auto max-w-340 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
+    <div className="page-container py-7 sm:py-9">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">My Learning</p>

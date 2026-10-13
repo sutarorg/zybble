@@ -7,11 +7,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useLocalStorage } from "@/lib/hooks";
 import type {
   ActivityItem,
+  Certificate,
   Enrollment,
   LessonNote,
   Order,
   RecentCourseView,
-  TutorMessage,
   User,
 } from "@/types";
 
@@ -23,7 +23,7 @@ const KEYS = {
   readNotifications: "zybble.read-notifications.v1",
   language: "zybble.language.v1",
   notes: "zybble.learner.notes.v1",
-  tutorChats: "zybble.learner.tutor-chats.v1",
+  certificates: "zybble.learner.certificates.v1",
   recentViews: "zybble.learner.recent-views.v1",
   activity: "zybble.learner.activity.v1",
   learnerPrefs: "zybble.learner.prefs.v1",
@@ -68,10 +68,11 @@ interface AppContextValue {
   /* notes */
   notes: LessonNote[];
   setNote: (courseId: string, lessonId: string, text: string) => void;
-  /* AI tutor chats (per course) */
-  tutorChats: Record<string, TutorMessage[]>;
-  appendTutorMessages: (courseId: string, messages: TutorMessage[]) => void;
-  clearTutorChat: (courseId: string) => void;
+  /* completion certificates */
+  certificates: Certificate[];
+  getCertificate: (courseId: string) => Certificate | undefined;
+  issueCertificate: (input: Omit<Certificate, "id" | "issuedAt">) => Certificate;
+  revokeCertificate: (courseId: string) => void;
   /* recently viewed */
   recentViews: RecentCourseView[];
   recordCourseView: (courseId: string) => void;
@@ -98,7 +99,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const readNotifs = useLocalStorage<string[]>(KEYS.readNotifications, []);
   const language = useLocalStorage<string>(KEYS.language, "en");
   const notes = useLocalStorage<LessonNote[]>(KEYS.notes, []);
-  const tutorChats = useLocalStorage<Record<string, TutorMessage[]>>(KEYS.tutorChats, {});
+  const certificates = useLocalStorage<Certificate[]>(KEYS.certificates, []);
   const recentViews = useLocalStorage<RecentCourseView[]>(KEYS.recentViews, []);
   const activity = useLocalStorage<ActivityItem[]>(KEYS.activity, []);
   const learnerPrefs = useLocalStorage<LearnerPrefs>(KEYS.learnerPrefs, DEFAULT_LEARNER_PREFS);
@@ -110,6 +111,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     orders.hydrated &&
     readNotifs.hydrated &&
     notes.hydrated &&
+    certificates.hydrated &&
     recentViews.hydrated;
 
   const pushActivity = useCallback(
@@ -241,25 +243,44 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     [notes.set]
   );
 
-  /* -------------------------------- tutor chat ------------------------------- */
+  /* ---------------------------- completion certificates ---------------------- */
 
-  const appendTutorMessages = useCallback(
-    (courseId: string, messages: TutorMessage[]) => {
-      tutorChats.set((prev) => ({
-        ...prev,
-        [courseId]: [...(prev[courseId] ?? []), ...messages].slice(-40),
-      }));
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tutorChats.set]
+  const getCertificate = useCallback(
+    (courseId: string) => certificates.value.find((c) => c.courseId === courseId),
+    [certificates.value]
   );
 
-  const clearTutorChat = useCallback(
-    (courseId: string) => {
-      tutorChats.set((prev) => ({ ...prev, [courseId]: [] }));
+  /** Issue a certificate for a finished course. Re-issuing is a no-op. */
+  const issueCertificate = useCallback(
+    (input: Omit<Certificate, "id" | "issuedAt">) => {
+      const existing = certificates.value.find((c) => c.courseId === input.courseId);
+      if (existing) return existing;
+      const certificate: Certificate = {
+        ...input,
+        id: `ZYB-${crypto.randomUUID().toUpperCase()}`,
+        issuedAt: new Date().toISOString(),
+      };
+      certificates.set((prev) => {
+        const existing = prev.find((c) => c.courseId === input.courseId);
+        return existing ? prev : [...prev, certificate];
+      });
+      pushActivity({
+        kind: "complete",
+        courseId: input.courseId,
+        text: `Earned certificate ${certificate.id}`,
+      });
+      return certificate;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tutorChats.set]
+    [certificates.set, certificates.value, pushActivity]
+  );
+
+  const revokeCertificate = useCallback(
+    (courseId: string) => {
+      certificates.set((prev) => prev.filter((c) => c.courseId !== courseId));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [certificates.set]
   );
 
   /* ------------------------------ recently viewed ---------------------------- */
@@ -292,13 +313,13 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     enrollments.clear();
     orders.clear();
     notes.clear();
-    tutorChats.clear();
+    certificates.clear();
     recentViews.clear();
     activity.clear();
     learnerPrefs.clear();
     wishlist.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enrollments.clear, orders.clear, notes.clear, tutorChats.clear, recentViews.clear, activity.clear, learnerPrefs.clear, wishlist.clear]);
+  }, [enrollments.clear, orders.clear, notes.clear, certificates.clear, recentViews.clear, activity.clear, learnerPrefs.clear, wishlist.clear]);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -317,9 +338,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       setLastLesson,
       notes: notes.hydrated ? notes.value : [],
       setNote,
-      tutorChats: tutorChats.hydrated ? tutorChats.value : {},
-      appendTutorMessages,
-      clearTutorChat,
+      certificates: certificates.hydrated ? certificates.value : [],
+      getCertificate,
+      issueCertificate,
+      revokeCertificate,
       recentViews: recentViews.hydrated ? recentViews.value : [],
       recordCourseView,
       activity: activity.hydrated ? activity.value : [],
@@ -333,9 +355,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     }),
     [
       hydrated,
-      user, wishlist, enrollments, orders, readNotifs, language, notes, tutorChats, recentViews, activity, learnerPrefs,
+      user, wishlist, enrollments, orders, readNotifs, language, notes, certificates, recentViews, activity, learnerPrefs,
       toggleWishlist, isWishlisted, completeOrder, isEnrolled, toggleLessonComplete, setLastLesson,
-      setNote, appendTutorMessages, clearTutorChat, recordCourseView, markAllNotificationsRead,
+      setNote, getCertificate, issueCertificate, revokeCertificate, recordCourseView, markAllNotificationsRead,
       setLearnerPrefs, resetLearnerData,
     ]
   );

@@ -24,21 +24,19 @@ interface Faq {
 const FAQ_GROUPS = [
   { id: "courses", label: "Courses & learning", icon: GraduationCap },
   { id: "billing", label: "Billing & refunds", icon: CreditCard },
-  { id: "tutor", label: "AI Tutor", icon: Bot },
   { id: "account", label: "Account", icon: Settings },
 ];
 
 const FAQS: Faq[] = [
-  { group: "courses", q: "How do Zybble courses work?", a: "Courses are self-paced and project-based. You get lifetime access to all video lessons, downloadable resources, quizzes and — on eligible courses — the AI Tutor. Progress syncs on your device in this demo." },
-  { group: "courses", q: "Do I get a certificate?", a: "Yes. Completing a course unlocks a certificate with total hours, completion date and a shareable verification link. (Certificate generation is illustrative in this demo.)" },
+  { group: "courses", q: "How do Zybble courses work?", a: "Courses are self-paced and project-based. You get lifetime access to all video lessons, downloadable resources and quizzes. Progress syncs on your device in this demo." },
+  { group: "courses", q: "Do I get a certificate?", a: "Yes. The moment you mark the last lesson complete, Zybble issues a personalised certificate with the course title, your name, your instructor and a certificate ID. Preview it in the completion dialog, download it as a PNG, and re-open it any time from Certificates." },
   { group: "courses", q: "Are courses updated?", a: "Continuously. AI tools change fast, so instructors refresh lessons monthly. The 'last updated' date on every course page shows the latest revision." },
   { group: "courses", q: "Can I download lessons for offline viewing?", a: "Lessons marked with a download icon include offline resources like templates, checklists and code. Video downloads depend on each instructor's settings." },
   { group: "billing", q: "What payment methods do you accept?", a: "In this demo, checkout is fully simulated — no real payment is processed. The production platform would support major cards, PayPal and regional methods." },
   { group: "billing", q: "How does the 30-day guarantee work?", a: "If a course isn't right for you, request a refund within 30 days of purchase for a full, no-questions-asked refund. See the Refund Policy for details." },
   { group: "billing", q: "Why did my payment fail?", a: "In the demo, the test card 4000 0000 0000 0002 always simulates a decline so you can preview the failure flow. Any other formatted card number succeeds." },
-  { group: "tutor", q: "What is the AI Tutor?", a: "A personal tutor that knows the exact curriculum of your course. Ask 'why does this code fail?' or 'explain lesson 3.2 differently' and it answers in context, instantly, in 30+ languages." },
-  { group: "tutor", q: "Which courses include the AI Tutor?", a: "Every course card and page shows an 'AI Tutor' badge when included. You can also filter by it in Explore. Try it free in Prompt Engineering Foundations." },
-  { group: "tutor", q: "Does the AI Tutor replace instructors?", a: "No — it handles instant questions and practice, while instructors lead course Q&A, live sessions and curriculum updates. Think of it as a TA who never sleeps." },
+  { group: "account", q: "Where do I find my certificates?", a: "Open Certificates in the sidebar. Every finished course is listed there with a download button — and you can regenerate the PNG as often as you like." },
+  { group: "account", q: "Is the certificate verified?", a: "Each certificate carries a unique certificate ID and the issue date. In production, that code would resolve to a public verification page." },
   { group: "account", q: "Where is my data stored?", a: "In this frontend demo, everything (sign-in, wishlist, enrollments, progress) lives in your browser's localStorage. Clearing site data resets the demo." },
   { group: "account", q: "How do I change the interface language?", a: "Use the globe icon in the header. Your preference is saved on this device. Course captions are listed on each course page." },
 ];
@@ -58,7 +56,7 @@ export function HelpClient() {
     <InfoPage
       label="Help Center"
       title="How can we help?"
-      description="Search common questions about courses, billing, certificates and your AI Tutor."
+      description="Search common questions about courses, billing, certificates and your account."
     >
       {/* Search */}
       <div className="relative mt-8 max-w-xl">
@@ -72,39 +70,6 @@ export function HelpClient() {
           className="h-12 w-full rounded-xl border border-input bg-white pr-4 pl-11 text-[14.5px] shadow-card outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 [&::-webkit-search-cancel-button]:hidden"
         />
       </div>
-
-      {/* AI Tutor anchor (linked from sidebar/banner) */}
-      <section id="ai-tutor" className="mt-10 scroll-mt-24 rounded-2xl border border-violet-200/70 bg-accent p-6 sm:p-8">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-md shadow-violet-600/20">
-            <Bot className="size-6" aria-hidden />
-          </span>
-          <div>
-            <h2 className="font-display text-lg font-semibold tracking-tight text-violet-950">
-              The Zybble AI Tutor
-            </h2>
-            <p className="mt-1 max-w-2xl text-[14px] leading-relaxed text-violet-950/60">
-              A context-aware tutor included with eligible courses. It knows every lesson, quiz and
-              resource — ask questions, request examples, or practice with it any time.
-            </p>
-          </div>
-          <Button asChild className="sm:ml-auto" variant="outline" >
-            <Link href="/courses/prompt-engineering-foundations">Try it in a free course</Link>
-          </Button>
-        </div>
-        <ul className="mt-6 grid gap-3 sm:grid-cols-3">
-          {[
-            { title: "Answers in context", text: "Responses reference the exact lesson you're on." },
-            { title: "Practice mode", text: "It quizzes you and explains what you missed." },
-            { title: "30+ languages", text: "Learn in the language you think in." },
-          ].map((f) => (
-            <li key={f.title} className="rounded-xl border border-violet-200/70 bg-white/80 p-4">
-              <p className="text-[13.5px] font-semibold">{f.title}</p>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{f.text}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       {/* FAQs */}
       <div className="mt-12 max-w-3xl">

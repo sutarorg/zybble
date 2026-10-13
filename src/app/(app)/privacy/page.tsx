@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           <LegalList
             items={[
               "Account data: name, email, password (hashed) and profile preferences.",
-              "Learning data: enrollments, lesson progress, quiz results and AI Tutor conversations.",
+              "Learning data: enrollments, lesson progress, quiz results and issued certificates.",
               "Payment data: processed by our payment provider; we store only the last four digits and billing country.",
               "Usage data: pages visited, search queries and feature interactions (with consent).",
             ]}
@@ -36,18 +36,19 @@ export default function PrivacyPage() {
             items={[
               "Provide and personalize your learning experience, including recommendations.",
               "Process orders, issue receipts and handle refunds.",
-              "Power the AI Tutor: your questions are sent to our AI providers solely to generate answers.",
               "Communicate product updates, price drops and learning reminders (opt-out any time).",
               "Detect abuse, secure the platform and comply with legal obligations.",
             ]}
           />
         </LegalSection>
 
-        <LegalSection index={3} title="AI Tutor and your conversations">
+        <LegalSection index={3} title="Certificates">
           <p>
-            AI Tutor conversations are used to answer you in context and to improve answer quality
-            in aggregate. They are never sold and never used to train public models. You can delete
-            a conversation at any time from its menu; deletion is permanent within 30 days.
+            When you complete a course we generate a certificate containing your name, the course
+            title, the instructor&apos;s name, the issue date and a verification code. In this demo
+            the certificate is rendered in your browser and stored only on your device; a
+            production build would also keep a server-side record so the code can be verified
+            publicly.
           </p>
         </LegalSection>
 

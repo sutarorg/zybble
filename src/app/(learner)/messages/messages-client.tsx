@@ -203,7 +203,7 @@ export function MessagesClient() {
   );
 
   return (
-    <div className="mx-auto max-w-340 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
+    <div className="page-container py-7 sm:py-9">
       <header className="mb-6 md:hidden">
         <h1 className="font-display text-[26px] font-bold tracking-tight">Messages</h1>
         <p className="mt-1 text-[13.5px] text-muted-foreground">

@@ -391,7 +391,6 @@ function PreviewStep({
               ? "Free"
               : `${formatPrice(draft.price)}${draft.compareAtPrice ? ` (compare at ${formatPrice(draft.compareAtPrice)})` : ""} — you keep ${moneyExact(Math.round(draft.price * (1 - PLATFORM_COMMISSION) * 100) / 100)}`,
           },
-          { label: "AI Tutor", value: draft.hasAiTutor ? "Included" : "Not included" },
         ].map((row) => (
           <div key={row.label} className="flex flex-col gap-0.5 rounded-lg border border-border bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <dt className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">{row.label}</dt>

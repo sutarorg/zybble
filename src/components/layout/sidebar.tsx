@@ -2,20 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Bookmark,
-  Compass,
-  GraduationCap,
-  Home,
-  LogOut,
-  MessageSquare,
-} from "lucide-react";
+import { Award, Compass, Home, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORIES } from "@/data/mock-data";
 import { categoryIcon } from "@/lib/icons";
 import { useApp } from "@/components/providers/app-providers";
 import { Logo } from "@/components/layout/logo";
-import { AiTutorMiniPanel } from "@/components/layout/ai-tutor-promo";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -61,10 +53,10 @@ function NavItem({
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { user, signOut, wishlist } = useApp();
+  const { user, signOut, certificates } = useApp();
 
   const mainNav = [
-    { href: "/", icon: Home, label: "Home", active: pathname === "/" },
+    { href: "/", icon: Home, label: "Home", active: pathname === "/" || pathname === "/home" },
     {
       href: "/explore",
       icon: Compass,
@@ -72,28 +64,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       active: pathname.startsWith("/explore"),
     },
     {
-      href: "/my-learning",
-      icon: GraduationCap,
-      label: "My Learning",
-      active: pathname.startsWith("/my-learning"),
-    },
-    {
-      href: "/wishlist",
-      icon: Bookmark,
-      label: "Wishlist",
-      active: pathname.startsWith("/wishlist"),
+      href: "/certificates",
+      icon: Award,
+      label: "Certificates",
+      active: pathname.startsWith("/certificates"),
       trailing:
-        wishlist.length > 0 ? (
+        certificates.length > 0 ? (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-violet-100 px-1 text-[10.5px] font-semibold text-violet-700">
-            {wishlist.length}
+            {certificates.length}
           </span>
         ) : undefined,
-    },
-    {
-      href: "/messages",
-      icon: MessageSquare,
-      label: "Messages",
-      active: pathname.startsWith("/messages"),
     },
   ];
 
@@ -131,8 +111,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             );
           })}
         </nav>
-
-        <AiTutorMiniPanel />
       </div>
 
       <div className="border-t border-border p-3">

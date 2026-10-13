@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Check, GripHorizontal, ImageIcon, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Check, GripHorizontal, ImageIcon, Plus, Trash2, X } from "lucide-react";
 import type { CourseDraft } from "@/types";
 import { CATEGORIES, COURSES } from "@/data/mock-data";
 import { LEVEL_LABELS } from "@/lib/courses";
@@ -10,7 +10,6 @@ import { PLATFORM_COMMISSION, moneyExact } from "@/lib/creator";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { categoryIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
@@ -391,14 +390,6 @@ export function PricingForm({ draft, onChange, errors }: { draft: CourseDraft; o
         </>
       )}
 
-      <label className="flex w-fit cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1 text-[13.5px] has-checked:font-medium">
-        <Checkbox
-          checked={draft.hasAiTutor}
-          onCheckedChange={(v) => onChange({ hasAiTutor: v === true })}
-        />
-        <Sparkles className="size-4 text-primary" aria-hidden />
-        Include the Zybble AI Tutor for this course
-      </label>
     </div>
   );
 }

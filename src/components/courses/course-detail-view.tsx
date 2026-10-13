@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Bot, Check, FileDown, Globe2, Languages, RefreshCcw, Signal, Sparkles, Users } from "lucide-react";
+import { Check, FileDown, Globe2, Languages, RefreshCcw, Signal, Sparkles, Users } from "lucide-react";
 import { useApp } from "@/components/providers/app-providers";
 import { useAdmin } from "@/components/providers/admin-provider";
 import type { Course, Instructor, Review } from "@/types";
@@ -95,12 +95,6 @@ export function CourseDetailView({
             {course.badge === "bestseller" && <Badge variant="amber">Bestseller</Badge>}
             {course.badge === "popular" && <Badge variant="violet">Popular</Badge>}
             {course.badge === "new" && <Badge variant="emerald">New</Badge>}
-            {course.hasAiTutor && (
-              <Badge variant="outline" className="gap-1 text-accent-foreground">
-                <Bot aria-hidden />
-                AI Tutor included
-              </Badge>
-            )}
           </div>
 
           <h1 className="font-display mt-3 text-2xl leading-tight font-bold tracking-tight sm:text-[32px]">

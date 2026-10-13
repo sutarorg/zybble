@@ -62,7 +62,7 @@ export function CourseCarousel({
       <ul
         ref={railRef}
         aria-label={title}
-        className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-contain-x px-4 pb-2 scrollbar-hide sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+        className="-mr-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-contain-x pr-4 pb-2 scrollbar-hide sm:-mr-6 sm:pr-6 lg:-mr-10 lg:pr-10"
       >
         {loading
           ? Array.from({ length: 5 }).map((_, i) => (

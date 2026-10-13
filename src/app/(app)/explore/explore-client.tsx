@@ -9,7 +9,6 @@ import { getCategoryBySlug, sortCourses } from "@/lib/courses";
 import { CategoryChips } from "@/components/courses/category-chips";
 import { CourseBrowser } from "@/components/courses/course-browser";
 import { CourseCarousel } from "@/components/courses/course-carousel";
-import { AiTutorBanner } from "@/components/layout/ai-tutor-promo";
 import { useCommunityCourses } from "@/components/providers/creator-provider";
 
 interface Preset {
@@ -42,7 +41,7 @@ export function ExploreClient({ q }: { q: string }) {
   const free = React.useMemo(() => pool.filter((c) => c.price === 0), [pool]);
 
   return (
-    <div className="mx-auto max-w-340 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
+    <div className="page-container py-7 sm:py-9">
       {/* Page header */}
       <header>
         <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">
@@ -53,7 +52,7 @@ export function ExploreClient({ q }: { q: string }) {
         </h1>
         <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground">
           Practical, project-based courses taught by people who ship. Learn a tool in a weekend
-          or master a discipline over months — your AI Tutor is with you either way.
+          or master a discipline over months — and earn a certificate when you finish.
         </p>
       </header>
 
@@ -69,8 +68,6 @@ export function ExploreClient({ q }: { q: string }) {
 
       {curated ? (
         <>
-          <AiTutorBanner />
-
           <div className="mt-12 space-y-12">
             <CourseCarousel
               title="Popular Courses"

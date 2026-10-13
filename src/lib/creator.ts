@@ -380,7 +380,6 @@ export function emptyCourseDraft(): CourseDraft {
     isFree: false,
     price: 49.99,
     compareAtPrice: null,
-    hasAiTutor: true,
     sections: [],
     draftResources: [],
   };
@@ -401,7 +400,6 @@ export function draftFromCourse(course: CreatorCourse): CourseDraft {
     isFree: course.price === 0,
     price: course.price === 0 ? 49.99 : course.price,
     compareAtPrice: course.compareAtPrice ?? null,
-    hasAiTutor: course.hasAiTutor,
     sections: course.curriculum.map((s) => ({
       ...s,
       lessons: s.lessons.map((l) => ({ ...l })),
@@ -427,7 +425,6 @@ export function applyDraftToCourse(course: CreatorCourse, draft: CourseDraft): C
     whatYouLearn: draft.outcomes.map((o) => o.trim()).filter(Boolean),
     requirements: draft.requirements.map((r) => r.trim()).filter(Boolean),
     audience: draft.audience.map((a) => a.trim()).filter(Boolean),
-    hasAiTutor: draft.hasAiTutor,
     curriculum: draft.sections,
     lessonsCount: draft.sections.reduce((n, s) => n + s.lessons.length, 0),
     durationMinutes: draft.sections.reduce(
@@ -458,7 +455,6 @@ export function newCourseFromDraft(draft: CourseDraft): CreatorCourse {
     captions: [draft.language],
     durationMinutes: 0,
     lessonsCount: 0,
-    hasAiTutor: draft.hasAiTutor,
     downloadableResources: draft.draftResources.length,
     lastUpdated: new Date().toISOString(),
     createdAt: new Date().toISOString(),

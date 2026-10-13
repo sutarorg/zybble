@@ -41,7 +41,7 @@ export default async function CategoryPage({
   const students = pool.reduce((a, c) => a + c.studentsCount, 0);
 
   return (
-    <div className="mx-auto max-w-340 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="page-container py-6 sm:py-8">
       <Breadcrumb items={[{ label: "Explore", href: "/explore" }, { label: category.name }]} />
 
       <header className="mt-6">
