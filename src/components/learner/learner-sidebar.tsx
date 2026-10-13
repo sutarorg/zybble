@@ -62,6 +62,7 @@ function NavItem({
 
 export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, signOut, wishlist, enrollments, learnerPrefs, certificates, language } = useApp();
   const dict = getDictionary(language);
 

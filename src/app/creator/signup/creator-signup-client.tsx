@@ -83,7 +83,6 @@ export function CreatorSignupClient() {
       // Save creator profile
       saveProfile({
         displayName: formData.name,
-        email: formData.email,
         headline: "Instructor",
         bio: "",
         initials: newUser.initials,
