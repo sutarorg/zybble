@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import { Info, Star, Users, Wallet, ClipboardCheck } from "lucide-react";
@@ -25,13 +26,14 @@ const RANGES: { id: AnalyticsRange; label: string }[] = [
 type Metric = "revenue" | "enrollments";
 
 export default function AnalyticsPage() {
+  const translateUi = useTranslate();
   const { hydrated, courses, finances } = useCreator();
   const [range, setRange] = useState<AnalyticsRange>("30d");
   const [metric, setMetric] = useState<Metric>("revenue");
 
   const series = useMemo(
-    () => analyticsSeries(range, ANALYTICS_BASE.revenue30d, ANALYTICS_BASE.enrollments30d),
-    [range]
+    () => analyticsSeries(range, finances.lifetimeGross, courses.reduce((sum, c) => sum + c.studentsCount, 0)),
+    [range, finances.lifetimeGross, courses]
   );
   const chartData = useMemo(
     () => series.map((p) => ({ label: p.label, value: metric === "revenue" ? p.revenue : p.enrollments })),
@@ -75,11 +77,9 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Creator Studio</p>
-          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">Analytics</h1>
-          <p className="mt-1.5 text-[14px] text-muted-foreground">
-            Performance across your courses. All figures are illustrative demo data.
-          </p>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Creator Studio"} /></p>
+          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Analytics"} /></h1>
+          <p className="mt-1.5 text-[14px] text-muted-foreground"><LocalizedText text={"Performance across your courses. All figures are illustrative this period."} /></p>
         </div>
         <div className="flex gap-1 rounded-lg bg-muted p-1">
           {RANGES.map((r) => (
@@ -93,17 +93,17 @@ export default function AnalyticsPage() {
                 range === r.id ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {r.label}
+              <LocalizedText text={r.label} />
             </button>
           ))}
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Users} label="Students (all time)" value={formatCompact(published.reduce((a, c) => a + c.studentsCount, 0))} delta="12%" />
-        <StatCard icon={Wallet} label="Net earnings (all time)" value={money(finances.lifetimeNet)} delta="8.4%" hint="after 10% commission" />
-        <StatCard icon={Star} label="Average rating" value={avgRating} hint={`${myReviews.length} reviews shown`} />
-        <StatCard icon={ClipboardCheck} label="Pending review" value={String(courses.filter((c) => c.status === "pending").length)} hint="courses in queue" />
+        <StatCard icon={Users} label={translateUi("Students (all time)")} value={formatCompact(published.reduce((a, c) => a + c.studentsCount, 0))} />
+        <StatCard icon={Wallet} label={translateUi("Net earnings (all time)")} value={money(finances.lifetimeNet)} hint="after 10% commission" />
+        <StatCard icon={Star} label={translateUi("Average rating")} value={avgRating} hint={`${myReviews.length} reviews shown`} />
+        <StatCard icon={ClipboardCheck} label={translateUi("Pending review")} value={String(courses.filter((c) => c.status === "pending").length)} hint="courses in queue" />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -112,14 +112,12 @@ export default function AnalyticsPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-[15.5px] font-semibold">
-                {metric === "revenue" ? "Revenue" : "Enrollments"} — {RANGES.find((r) => r.id === range)!.label.toLowerCase()}
+                {metric === "revenue" ? "Revenue" : "Enrollments"} — <LocalizedText text={RANGES.find((r) => r.id === range)!.label.toLowerCase()} />
               </h2>
               <p className="mt-0.5 text-[12.5px] text-muted-foreground">
                 <span className="font-display text-[17px] font-bold text-foreground tabular-nums">
-                  {metric === "revenue" ? money(rangeTotal) : formatCompact(rangeTotal)}
-                </span>{" "}
-                total in range
-              </p>
+                  <LocalizedText text={metric === "revenue" ? money(rangeTotal) : formatCompact(rangeTotal)} />
+                </span><LocalizedText text={" "} /><LocalizedText text={"total in range"} /></p>
             </div>
             <div className="flex gap-1 rounded-lg bg-muted p-1">
               {(["revenue", "enrollments"] as const).map((m) => (
@@ -147,19 +145,16 @@ export default function AnalyticsPage() {
 
         {/* Revenue by course */}
         <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-          <h2 className="font-display text-[15.5px] font-semibold">Revenue by course</h2>
-          <p className="mb-4 text-[12px] text-muted-foreground">Lifetime gross · illustrative</p>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Revenue by course"} /></h2>
+          <p className="mb-4 text-[12px] text-muted-foreground"><LocalizedText text={"Lifetime gross · illustrative"} /></p>
           {revenueByCourse.length === 0 ? (
-            <p className="py-8 text-center text-[13px] text-zinc-400">No published paid courses yet.</p>
+            <p className="py-8 text-center text-[13px] text-zinc-400"><LocalizedText text={"No published paid courses yet."} /></p>
           ) : (
             <BarList data={revenueByCourse} formatValue={(v) => money(v)} />
           )}
           <div className="mt-5 rounded-lg border border-violet-200 bg-accent p-3 text-[12px] leading-relaxed text-violet-950/70">
-            <p className="font-semibold">Commission reminder</p>
-            <p className="mt-0.5">
-              Zybble keeps {Math.round(PLATFORM_COMMISSION * 100)}% of each sale; your share is the
-              remaining {100 - Math.round(PLATFORM_COMMISSION * 100)}% before fees and taxes.
-            </p>
+            <p className="font-semibold"><LocalizedText text={"Commission reminder"} /></p>
+            <p className="mt-0.5"><LocalizedText text={"Zybble keeps"} />{Math.round(PLATFORM_COMMISSION * 100)}<LocalizedText text={"% of each sale; your share is the remaining"} />{100 - Math.round(PLATFORM_COMMISSION * 100)}<LocalizedText text={"% before fees and taxes."} /></p>
           </div>
         </section>
       </div>
@@ -167,18 +162,18 @@ export default function AnalyticsPage() {
       {/* Course table */}
       <section className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
         <div className="border-b border-border px-5 py-4">
-          <h2 className="font-display text-[15.5px] font-semibold">Course performance</h2>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Course performance"} /></h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-160 text-left">
             <thead>
               <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                <th className="py-3 pr-4 pl-5">Course</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Students</th>
-                <th className="px-4 py-3 text-right">Gross revenue</th>
-                <th className="px-4 py-3 text-right">Your share</th>
-                <th className="py-3 pr-5 pl-4 text-right">Rating</th>
+                <th className="py-3 pr-4 pl-5"><LocalizedText text={"Course"} /></th>
+                <th className="px-4 py-3"><LocalizedText text={"Status"} /></th>
+                <th className="px-4 py-3 text-right"><LocalizedText text={"Students"} /></th>
+                <th className="px-4 py-3 text-right"><LocalizedText text={"Gross revenue"} /></th>
+                <th className="px-4 py-3 text-right"><LocalizedText text={"Your share"} /></th>
+                <th className="py-3 pr-5 pl-4 text-right"><LocalizedText text={"Rating"} /></th>
               </tr>
             </thead>
             <tbody>
@@ -188,22 +183,22 @@ export default function AnalyticsPage() {
                   <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/40">
                     <td className="max-w-72 py-3 pr-4 pl-5">
                       <Link href={`/creator/courses/${c.id}/edit`} className="block truncate text-[13px] font-medium hover:text-primary">
-                        {c.title}
+                        <LocalizedText text={c.title} />
                       </Link>
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={c.status} />
                     </td>
-                    <td className="px-4 py-3 text-right text-[13px] tabular-nums">{formatCompact(c.studentsCount)}</td>
-                    <td className="px-4 py-3 text-right text-[13px] font-medium tabular-nums">{money(c.demoRevenue)}</td>
+                    <td className="px-4 py-3 text-right text-[13px] tabular-nums"><LocalizedText text={formatCompact(c.studentsCount)} /></td>
+                    <td className="px-4 py-3 text-right text-[13px] font-medium tabular-nums"><LocalizedText text={money(c.demoRevenue)} /></td>
                     <td className="px-4 py-3 text-right text-[13px] tabular-nums text-success">
-                      {money(c.demoRevenue * (1 - PLATFORM_COMMISSION))}
+                      <LocalizedText text={money(c.demoRevenue * (1 - PLATFORM_COMMISSION))} />
                     </td>
                     <td className="py-3 pr-5 pl-4 text-right text-[13px]">
                       {c.ratingsCount > 0 ? (
                         <span className="inline-flex items-center gap-1 tabular-nums">
                           <Star className="size-3.5 fill-star text-star" aria-hidden />
-                          {c.rating.toFixed(1)}
+                          <LocalizedText text={c.rating.toFixed(1)} />
                         </span>
                       ) : (
                         <span className="text-zinc-300">—</span>
@@ -217,9 +212,7 @@ export default function AnalyticsPage() {
       </section>
 
       <p className="flex items-center gap-1.5 text-[12px] text-zinc-400">
-        <Info className="size-3.5" aria-hidden />
-        Analytics on this page are generated demo data rendered locally — they do not reflect real learners.
-      </p>
+        <Info className="size-3.5" aria-hidden /><LocalizedText text={"Analytics on this page are generated this period rendered locally — they do not reflect real learners."} /></p>
     </div>
   );
 }

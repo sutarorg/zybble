@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { use, useState } from "react";
 import Link from "next/link";
@@ -36,6 +37,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export default function CourseReviewPage({ params }: { params: Promise<{ id: string }> }) {
+  const translateUi = useTranslate();
   const { id } = use(params);
   const { hydrated } = useAdmin();
   const {
@@ -114,34 +116,30 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
       <div>
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link href="/admin/courses">
-            <ArrowLeft aria-hidden />
-            Moderation queue
-          </Link>
+            <ArrowLeft aria-hidden /><LocalizedText text={"Moderation queue"} /></Link>
         </Button>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
             <div className="relative hidden aspect-video w-32 shrink-0 overflow-hidden rounded-lg border border-border sm:block">
-              <Image src={course.thumbnail} alt="" fill sizes="128px" className="object-cover" />
+              <Image src={course.thumbnail} alt={translateUi("")} fill sizes="128px" className="object-cover" />
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={course.status} />
-                {category && <Badge variant="secondary">{category.name}</Badge>}
-                <Badge variant="secondary">{LEVEL_LABELS[course.level]}</Badge>
+                {category && <Badge variant="secondary"><LocalizedText text={category.name} /></Badge>}
+                <Badge variant="secondary"><LocalizedText text={LEVEL_LABELS[course.level]} /></Badge>
               </div>
               <h1 className="font-display mt-2 truncate text-[22px] font-bold tracking-tight sm:text-2xl">
-                {course.title}
+                <LocalizedText text={course.title} />
               </h1>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
-                {course.price === 0 ? "Free" : formatPrice(course.price)} · updated {formatDate(course.lastUpdated)}
+                <LocalizedText text={course.price === 0 ? "Free" : formatPrice(course.price)} /><LocalizedText text={"· updated"} /><LocalizedText text={formatDate(course.lastUpdated)} />
               </p>
             </div>
           </div>
           <Button asChild variant="outline" size="sm">
             <Link href={`/courses/${course.slug}`}>
-              <Eye aria-hidden />
-              Public preview
-            </Link>
+              <Eye aria-hidden /><LocalizedText text={"Public preview"} /></Link>
           </Button>
         </div>
       </div>
@@ -151,23 +149,23 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
         <div className="min-w-0 space-y-4">
           {/* Description */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold">Overview</h2>
-            <p className="mt-1 text-[13.5px] text-muted-foreground">{course.subtitle}</p>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Overview"} /></h2>
+            <p className="mt-1 text-[13.5px] text-muted-foreground"><LocalizedText text={course.subtitle} /></p>
             <div className="mt-3 space-y-2.5 text-[13.5px] leading-relaxed text-foreground/85">
               {course.longDescription.map((p, i) => (
-                <p key={i}>{p}</p>
+                <p key={i}><LocalizedText text={p} /></p>
               ))}
             </div>
           </section>
 
           {/* Outcomes */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold">Learning outcomes</h2>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Learning outcomes"} /></h2>
             <ul className="mt-3 grid gap-2 sm:grid-cols-2">
               {course.whatYouLearn.map((o) => (
                 <li key={o} className="flex items-start gap-2 text-[13px]">
                   <Check className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                  {o}
+                  <LocalizedText text={o} />
                 </li>
               ))}
             </ul>
@@ -176,20 +174,15 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
           {/* Curriculum */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-[15.5px] font-semibold">Curriculum</h2>
+              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Curriculum"} /></h2>
               <span className="text-[12px] text-muted-foreground">
-                {course.curriculum.length} sections · {course.lessonsCount} lessons ·{" "}
-                {course.downloadableResources} resources
-              </span>
+                {course.curriculum.length}<LocalizedText text={"sections ·"} />{course.lessonsCount}<LocalizedText text={"lessons ·"} /><LocalizedText text={" "} />
+                {course.downloadableResources}<LocalizedText text={"resources"} /></span>
             </div>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              Expand sections to preview lesson structure (free-preview lessons are tagged).
-            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground"><LocalizedText text={"Expand sections to preview lesson structure (free-preview lessons are tagged)."} /></p>
             <div className="mt-4">
               {course.curriculum.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center text-[13px] text-muted-foreground">
-                  No curriculum yet — this course cannot be approved in its current state.
-                </p>
+                <p className="rounded-lg border border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center text-[13px] text-muted-foreground"><LocalizedText text={"No curriculum yet — this course cannot be approved in its current state."} /></p>
               ) : (
                 <Curriculum course={course} />
               )}
@@ -198,7 +191,7 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
 
           {/* Review history */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold">Review history</h2>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Review history"} /></h2>
             <div className="mt-4">
               <ReviewTimeline events={course.reviewHistory} />
             </div>
@@ -209,14 +202,11 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
         <div className="space-y-4">
           {/* Decisions */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold">Moderation decision</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Decisions update the shared mock store. The creator sees them instantly in their
-              studio on this device.
-            </p>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Moderation decision"} /></h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground"><LocalizedText text={"Decisions update the shared mock store. The creator sees them instantly in their studio on this device."} /></p>
             <div className="mt-4 space-y-2">
               <ActionButton
-                label="Approve & publish"
+                label={translateUi("Approve & publish")}
                 icon={ClipboardCheck}
                 className="w-full"
                 disabled={!canDecide || okCount < checks.length - 1}
@@ -228,7 +218,7 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
               />
               {course.status === "published" && (
                 <ActionButton
-                  label="Return to queue"
+                  label={translateUi("Return to queue")}
                   icon={RotateCcw}
                   variant="outline"
                   className="w-full"
@@ -245,19 +235,15 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
             {canRequestChanges && (
               <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3.5">
                 <label className="flex items-center gap-1.5 text-[13px] font-semibold" htmlFor="changes-note">
-                  <MessageSquareWarning className="size-4 text-sky-600" aria-hidden />
-                  Request changes
-                </label>
+                  <MessageSquareWarning className="size-4 text-sky-600" aria-hidden /><LocalizedText text={"Request changes"} /></label>
                 <Textarea
                   id="changes-note"
                   value={changesNote}
                   onChange={(e) => setChangesNote(e.target.value)}
-                  placeholder="e.g. Please add alt-text guidance to lesson 2.1 and a privacy note about screenshots…"
+                  placeholder={translateUi("e.g. Please add alt-text guidance to lesson 2.1 and a privacy note about screenshots…")}
                   className="mt-2 min-h-20 bg-white text-[13px]"
                 />
-                <Button size="sm" className="mt-2 w-full" variant="outline" onClick={submitChanges}>
-                  Send change request (note required)
-                </Button>
+                <Button size="sm" className="mt-2 w-full" variant="outline" onClick={submitChanges}><LocalizedText text={"Send change request (note required)"} /></Button>
               </div>
             )}
 
@@ -265,18 +251,16 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
             {(course.status === "pending" || course.status === "changes_requested") && (
               <div className="mt-3 rounded-xl border border-red-200 bg-red-50/60 p-3.5">
                 <label className="flex items-center gap-1.5 text-[13px] font-semibold text-destructive" htmlFor="reject-note">
-                  <Ban className="size-4" aria-hidden />
-                  Reject submission
-                </label>
+                  <Ban className="size-4" aria-hidden /><LocalizedText text={"Reject submission"} /></label>
                 <Textarea
                   id="reject-note"
                   value={rejectNote}
                   onChange={(e) => setRejectNote(e.target.value)}
-                  placeholder="Required: explain why the course cannot be published…"
+                  placeholder={translateUi("Required: explain why the course cannot be published…")}
                   className="mt-2 min-h-20 bg-white text-[13px]"
                 />
                 <ActionButton
-                  label="Reject with note"
+                  label={translateUi("Reject with note")}
                   icon={Ban}
                   variant="destructive"
                   size="sm"
@@ -294,7 +278,7 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
 
           {/* Checklist */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold">Quality checklist</h2>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Quality checklist"} /></h2>
             <ul className="mt-3 space-y-2.5">
               {checks.map((c) => (
                 <li key={c.label} className="flex items-start gap-2.5">
@@ -306,43 +290,42 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
                     <span className="mt-0.5 size-4.5 shrink-0 rounded-full border-2 border-amber-400" aria-hidden />
                   )}
                   <div>
-                    <p className={cn("text-[13px] font-medium", !c.ok && "text-amber-700")}>{c.label}</p>
-                    <p className="text-[11.5px] text-zinc-400">{c.detail}</p>
+                    <p className={cn("text-[13px] font-medium", !c.ok && "text-amber-700")}><LocalizedText text={c.label} /></p>
+                    <p className="text-[11.5px] text-zinc-400"><LocalizedText text={c.detail} /></p>
                   </div>
                 </li>
               ))}
             </ul>
             <p className="mt-3 text-[12px] text-zinc-400">
-              {okCount}/{checks.length} checks pass — approvals require at most one outstanding item.
-            </p>
+              {okCount}/{checks.length}<LocalizedText text={"checks pass — approvals require at most one outstanding item."} /></p>
           </section>
 
           {/* Creator */}
           {instructor && (
             <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-              <h2 className="font-display text-[15.5px] font-semibold">Creator</h2>
+              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Creator"} /></h2>
               <div className="mt-3 flex items-center gap-3">
                 <Avatar className="size-11">
                   <AvatarFallback className={cn("text-[12px]", instructor.avatarColor)}>
-                    {instructor.initials}
+                    <LocalizedText text={instructor.initials} />
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
                   <Link href={`/instructors/${instructor.username}`} className="block truncate text-[14px] font-semibold hover:text-primary">
-                    {instructor.name}
+                    <LocalizedText text={instructor.name} />
                   </Link>
-                  <p className="truncate text-[12px] text-muted-foreground">{instructor.headline}</p>
+                  <p className="truncate text-[12px] text-muted-foreground"><LocalizedText text={instructor.headline} /></p>
                 </div>
               </div>
               {stats && (
                 <dl className="mt-4 grid grid-cols-2 gap-2 text-center">
                   <div className="rounded-lg border border-border p-2.5">
                     <dd className="font-display text-[15px] font-bold tabular-nums">{stats.courses}</dd>
-                    <dt className="text-[10.5px] text-muted-foreground">Courses</dt>
+                    <dt className="text-[10.5px] text-muted-foreground"><LocalizedText text={"Courses"} /></dt>
                   </div>
                   <div className="rounded-lg border border-border p-2.5">
-                    <dd className="font-display text-[15px] font-bold tabular-nums">{stats.rating.toFixed(1)}</dd>
-                    <dt className="text-[10.5px] text-muted-foreground">Rating</dt>
+                    <dd className="font-display text-[15px] font-bold tabular-nums"><LocalizedText text={stats.rating.toFixed(1)} /></dd>
+                    <dt className="text-[10.5px] text-muted-foreground"><LocalizedText text={"Rating"} /></dt>
                   </div>
                 </dl>
               )}
@@ -351,20 +334,18 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
 
           {/* Internal notes */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold">Internal notes</h2>
+            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Internal notes"} /></h2>
             <p className="mt-1 flex items-start gap-1 text-[11.5px] text-zinc-400">
-              <Info className="mt-0.5 size-3 shrink-0" aria-hidden />
-              Visible to admins only (local demo).
-            </p>
+              <Info className="mt-0.5 size-3 shrink-0" aria-hidden /><LocalizedText text={"Visible to admins only (local preview)."} /></p>
             <div className="mt-3 space-y-2.5">
               {notes.length === 0 ? (
-                <p className="text-[12.5px] text-zinc-400">No notes yet for this course.</p>
+                <p className="text-[12.5px] text-zinc-400"><LocalizedText text={"No notes yet for this course."} /></p>
               ) : (
                 notes.slice(0, 4).map((n, i) => (
                   <div key={`${n.at}-${i}`} className="rounded-lg border border-border bg-muted/40 p-2.5">
-                    <p className="text-[12.5px] leading-relaxed">{n.text}</p>
+                    <p className="text-[12.5px] leading-relaxed"><LocalizedText text={n.text} /></p>
                     <p className="mt-1 text-[10.5px] text-zinc-400">
-                      {n.author} · {formatDate(n.at)}
+                      <LocalizedText text={n.author} /> · <LocalizedText text={formatDate(n.at)} />
                     </p>
                   </div>
                 ))
@@ -374,14 +355,12 @@ export default function CourseReviewPage({ params }: { params: Promise<{ id: str
               <Textarea
                 value={noteDraft}
                 onChange={(e) => setNoteDraft(e.target.value)}
-                placeholder="Add an internal note…"
+                placeholder={translateUi("Add an internal note…")}
                 className="min-h-16 text-[13px]"
-                aria-label="Internal moderation note"
+                aria-label={translateUi("Internal moderation note")}
               />
               <Button size="sm" variant="outline" className="mt-2 w-full" onClick={saveNote}>
-                <Send aria-hidden />
-                Save note
-              </Button>
+                <Send aria-hidden /><LocalizedText text={"Save note"} /></Button>
             </div>
           </section>
         </div>

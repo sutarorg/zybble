@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import Image from "next/image";
 import { Check, GripHorizontal, ImageIcon, Plus, Trash2, X } from "lucide-react";
@@ -20,7 +21,7 @@ export function FieldError({ id, message }: { id?: string; message?: string }) {
   if (!message) return null;
   return (
     <p id={id} className="text-[12px] font-medium text-destructive">
-      {message}
+      <LocalizedText text={message} />
     </p>
   );
 }
@@ -28,13 +29,14 @@ export function FieldError({ id, message }: { id?: string; message?: string }) {
 /* ------------------------------- Basics ----------------------------------- */
 
 export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; onChange: DraftSetter; errors: Errors }) {
+  const translateUi = useTranslate();
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="f-title">Course title *</Label>
+        <Label htmlFor="f-title"><LocalizedText text={"Course title *"} /></Label>
         <Input
           id="f-title"
-          placeholder="e.g. Advanced Prompt Systems"
+          placeholder={translateUi("e.g. Advanced Prompt Systems")}
           value={draft.title}
           maxLength={80}
           onChange={(e) => onChange({ title: e.target.value })}
@@ -47,10 +49,10 @@ export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; on
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="f-subtitle">Subtitle *</Label>
+        <Label htmlFor="f-subtitle"><LocalizedText text={"Subtitle *"} /></Label>
         <Input
           id="f-subtitle"
-          placeholder="One compelling sentence learners see on the course card"
+          placeholder={translateUi("One compelling sentence learners see on the course card")}
           value={draft.subtitle}
           maxLength={140}
           onChange={(e) => onChange({ subtitle: e.target.value })}
@@ -60,10 +62,10 @@ export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; on
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="f-description">Description *</Label>
+        <Label htmlFor="f-description"><LocalizedText text={"Description *"} /></Label>
         <Textarea
           id="f-description"
-          placeholder="What will learners build, and why is this course different? (min. 40 characters)"
+          placeholder={translateUi("What will learners build, and why is this course different? (min. 40 characters)")}
           value={draft.description}
           onChange={(e) => onChange({ description: e.target.value })}
           className="min-h-28"
@@ -74,15 +76,15 @@ export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; on
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
-          <Label>Category *</Label>
+          <Label><LocalizedText text={"Category *"} /></Label>
           <Select value={draft.category || undefined} onValueChange={(v) => onChange({ category: v as CourseDraft["category"] })}>
             <SelectTrigger aria-invalid={!!errors.category}>
-              <SelectValue placeholder="Choose…" />
+              <SelectValue placeholder={translateUi("Choose…")} />
             </SelectTrigger>
             <SelectContent>
               {CATEGORIES.map((c) => (
                 <SelectItem key={c.slug} value={c.slug}>
-                  {c.name}
+                  <LocalizedText text={c.name} />
                 </SelectItem>
               ))}
             </SelectContent>
@@ -90,7 +92,7 @@ export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; on
           <FieldError message={errors.category} />
         </div>
         <div className="space-y-1.5">
-          <Label>Level</Label>
+          <Label><LocalizedText text={"Level"} /></Label>
           <Select value={draft.level} onValueChange={(v) => onChange({ level: v as CourseDraft["level"] })}>
             <SelectTrigger>
               <SelectValue />
@@ -98,14 +100,14 @@ export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; on
             <SelectContent>
               {Object.entries(LEVEL_LABELS).map(([k, label]) => (
                 <SelectItem key={k} value={k}>
-                  {label}
+                  <LocalizedText text={label} />
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Language</Label>
+          <Label><LocalizedText text={"Language"} /></Label>
           <Select value={draft.language} onValueChange={(v) => onChange({ language: v as CourseDraft["language"] })}>
             <SelectTrigger>
               <SelectValue />
@@ -113,7 +115,7 @@ export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; on
             <SelectContent>
               {["English", "Spanish", "Portuguese"].map((l) => (
                 <SelectItem key={l} value={l}>
-                  {l}
+                  <LocalizedText text={l} />
                 </SelectItem>
               ))}
             </SelectContent>
@@ -143,6 +145,7 @@ function StringListEditor({
   addLabel: string;
   error?: string;
 }) {
+  const translateUi = useTranslate();
   const update = (i: number, value: string) =>
     onChange(items.map((item, idx) => (idx === i ? value : item)));
   const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
@@ -150,8 +153,8 @@ function StringListEditor({
   return (
     <fieldset className="space-y-2">
       <legend className="text-[13px] font-medium text-foreground">
-        {label}
-        {hint && <span className="ml-2 font-normal text-zinc-400">{hint}</span>}
+        <LocalizedText text={label} />
+        {hint && <span className="ml-2 font-normal text-zinc-400"><LocalizedText text={hint} /></span>}
       </legend>
       <div className="space-y-2">
         {items.map((item, i) => (
@@ -159,14 +162,14 @@ function StringListEditor({
             <GripHorizontal className="size-4 shrink-0 text-zinc-300" aria-hidden />
             <Input
               value={item}
-              placeholder={`${placeholder} ${items.length > 1 ? i + 1 : ""}`.trim()}
+              placeholder={translateUi(`${placeholder} ${items.length > 1 ? i + 1 : ""}`.trim())}
               onChange={(e) => update(i, e.target.value)}
             />
             <button
               type="button"
               onClick={() => remove(i)}
               disabled={items.length <= 1}
-              aria-label="Remove item"
+              aria-label={translateUi("Remove item")}
               className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-red-50 hover:text-destructive disabled:opacity-30"
             >
               <Trash2 className="size-4" aria-hidden />
@@ -180,7 +183,7 @@ function StringListEditor({
         className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-medium text-primary transition-colors hover:bg-accent"
       >
         <Plus className="size-3.5" aria-hidden />
-        {addLabel}
+        <LocalizedText text={addLabel} />
       </button>
       <FieldError message={error} />
     </fieldset>
@@ -188,29 +191,30 @@ function StringListEditor({
 }
 
 export function OutcomesForm({ draft, onChange, errors }: { draft: CourseDraft; onChange: DraftSetter; errors: Errors }) {
+  const translateUi = useTranslate();
   return (
     <div className="space-y-6">
       <StringListEditor
-        label="Learning outcomes *"
+        label={translateUi("Learning outcomes *")}
         hint="What will learners be able to DO? (min. 2)"
         items={draft.outcomes}
         onChange={(outcomes) => onChange({ outcomes })}
-        placeholder="e.g. Build and deploy a working automation"
+        placeholder={translateUi("e.g. Build and deploy a working automation")}
         addLabel="Add outcome"
         error={errors.outcomes}
       />
       <StringListEditor
-        label="Prerequisites"
+        label={translateUi("Prerequisites")}
         items={draft.requirements}
         onChange={(requirements) => onChange({ requirements })}
-        placeholder="e.g. No coding experience needed"
+        placeholder={translateUi("e.g. No coding experience needed")}
         addLabel="Add requirement"
       />
       <StringListEditor
-        label="Target audience"
+        label={translateUi("Target audience")}
         items={draft.audience}
         onChange={(audience) => onChange({ audience })}
-        placeholder="e.g. Founders automating their first workflows"
+        placeholder={translateUi("e.g. Founders automating their first workflows")}
         addLabel="Add audience"
       />
     </div>
@@ -222,18 +226,19 @@ export function OutcomesForm({ draft, onChange, errors }: { draft: CourseDraft; 
 const GALLERY = Array.from(new Set(COURSES.map((c) => c.thumbnail)));
 
 export function ThumbnailPicker({ draft, onChange, errors }: { draft: CourseDraft; onChange: DraftSetter; errors: Errors }) {
+  const translateUi = useTranslate();
   return (
     <div className="space-y-4">
       {/* Live 16:9 preview — exactly how it appears on course cards */}
       <div className="space-y-1.5">
-        <Label>Card preview (16:9)</Label>
+        <Label><LocalizedText text={"Card preview (16:9)"} /></Label>
         <div className="relative aspect-video w-full max-w-md overflow-hidden rounded-xl border border-border bg-muted">
           {draft.thumbnail ? (
-            <Image src={draft.thumbnail} alt="Course thumbnail preview" fill sizes="448px" className="object-cover" />
+            <Image src={draft.thumbnail} alt={translateUi("Course thumbnail preview")} fill sizes="448px" className="object-cover" />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-400">
               <ImageIcon className="size-6" aria-hidden />
-              <p className="text-[12.5px]">Choose an image below</p>
+              <p className="text-[12.5px]"><LocalizedText text={"Choose an image below"} /></p>
             </div>
           )}
         </div>
@@ -241,7 +246,7 @@ export function ThumbnailPicker({ draft, onChange, errors }: { draft: CourseDraf
       </div>
 
       <div className="space-y-1.5">
-        <Label>Choose from the Zybble gallery</Label>
+        <Label><LocalizedText text={"Choose from the Zybble gallery"} /></Label>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {GALLERY.map((src) => {
             const selected = draft.thumbnail === src;
@@ -256,7 +261,7 @@ export function ThumbnailPicker({ draft, onChange, errors }: { draft: CourseDraf
                   selected ? "border-primary shadow-md" : "border-transparent hover:border-zinc-300"
                 )}
               >
-                <Image src={src} alt="" fill sizes="160px" className="object-cover" />
+                <Image src={src} alt={translateUi("")} fill sizes="160px" className="object-cover" />
                 {selected && (
                   <span className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-white shadow">
                     <Check className="size-3" strokeWidth={3} aria-hidden />
@@ -269,11 +274,8 @@ export function ThumbnailPicker({ draft, onChange, errors }: { draft: CourseDraf
       </div>
 
       <div className="rounded-lg border border-border bg-muted/60 p-3 text-[12px] leading-relaxed text-muted-foreground">
-        <p className="font-medium text-foreground">About custom uploads</p>
-        <p className="mt-0.5">
-          Custom thumbnail upload isn&apos;t connected in this demo — pick any gallery image.
-          Production courses require 1280×720 (16:9) artwork.
-        </p>
+        <p className="font-medium text-foreground"><LocalizedText text={"About custom uploads"} /></p>
+        <p className="mt-0.5"><LocalizedText text={"Custom thumbnail upload isn't connected in this preview — pick any gallery image. Production courses require 1280×720 (16:9) artwork."} /></p>
       </div>
     </div>
   );
@@ -282,6 +284,7 @@ export function ThumbnailPicker({ draft, onChange, errors }: { draft: CourseDraf
 /* ------------------------------- Pricing ----------------------------------- */
 
 export function PricingForm({ draft, onChange, errors }: { draft: CourseDraft; onChange: DraftSetter; errors: Errors }) {
+  const translateUi = useTranslate();
   const commission = Math.round(draft.price * PLATFORM_COMMISSION * 100) / 100;
   const net = Math.round((draft.price - commission) * 100) / 100;
 
@@ -327,7 +330,7 @@ export function PricingForm({ draft, onChange, errors }: { draft: CourseDraft; o
         <>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="f-price">Price (USD) *</Label>
+              <Label htmlFor="f-price"><LocalizedText text={"Price (USD) *"} /></Label>
               <div className="relative">
                 <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-zinc-400">$</span>
                 <Input
@@ -344,8 +347,7 @@ export function PricingForm({ draft, onChange, errors }: { draft: CourseDraft; o
               <FieldError message={errors.price} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="f-compare">
-                Compare-at price <span className="font-normal text-zinc-400">(optional)</span>
+              <Label htmlFor="f-compare"><LocalizedText text={"Compare-at price"} /><span className="font-normal text-zinc-400"><LocalizedText text={"(optional)"} /></span>
               </Label>
               <div className="relative">
                 <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-zinc-400">$</span>
@@ -354,7 +356,7 @@ export function PricingForm({ draft, onChange, errors }: { draft: CourseDraft; o
                   type="number"
                   min={0}
                   step={1}
-                  placeholder="—"
+                  placeholder={translateUi("—")}
                   value={draft.compareAtPrice ?? ""}
                   onChange={(e) =>
                     onChange({ compareAtPrice: e.target.value === "" ? null : Number(e.target.value) })
@@ -368,24 +370,22 @@ export function PricingForm({ draft, onChange, errors }: { draft: CourseDraft; o
           </div>
 
           <div className="rounded-xl border border-border bg-muted/50 p-4">
-            <p className="text-[13px] font-semibold">Per-sale breakdown (illustrative)</p>
+            <p className="text-[13px] font-semibold"><LocalizedText text={"Per-sale breakdown (illustrative)"} /></p>
             <dl className="mt-3 space-y-1.5 text-[13px]">
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Learner pays</dt>
-                <dd className="font-medium tabular-nums">{moneyExact(draft.price || 0)}</dd>
+                <dt className="text-muted-foreground"><LocalizedText text={"Learner pays"} /></dt>
+                <dd className="font-medium tabular-nums"><LocalizedText text={moneyExact(draft.price || 0)} /></dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Zybble commission (10%)</dt>
-                <dd className="tabular-nums text-zinc-500">−{moneyExact(commission)}</dd>
+                <dt className="text-muted-foreground"><LocalizedText text={"Zybble commission (10%)"} /></dt>
+                <dd className="tabular-nums text-zinc-500">−<LocalizedText text={moneyExact(commission)} /></dd>
               </div>
               <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
-                <dt>Your share</dt>
-                <dd className="tabular-nums text-success">{moneyExact(net)}</dd>
+                <dt><LocalizedText text={"Your share"} /></dt>
+                <dd className="tabular-nums text-success"><LocalizedText text={moneyExact(net)} /></dd>
               </div>
             </dl>
-            <p className="mt-2.5 text-[11.5px] leading-relaxed text-zinc-400">
-              Before payment fees, taxes, refunds or other adjustments. Figures are illustrative demo data.
-            </p>
+            <p className="mt-2.5 text-[11.5px] leading-relaxed text-zinc-400"><LocalizedText text={"Before payment fees, taxes, refunds or other adjustments. Figures are illustrative sample data."} /></p>
           </div>
         </>
       )}

@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import { CircleCheck, CircleDashed, CircleX, MessageSquareWarning, Send } from "lucide-react";
 import type { CourseReviewEvent, CourseStatus } from "@/types";
 import { STATUS_META } from "@/lib/creator";
@@ -43,15 +44,15 @@ export function ReviewTimeline({ events }: { events: CourseReviewEvent[] }) {
             </span>
             <div className="min-w-0 pb-1">
               <p className="text-[13.5px] font-semibold">
-                {meta.label}
+                <LocalizedText text={meta.label} />
                 <span className="ml-2 text-[11.5px] font-normal text-zinc-400">
-                  {event.actor === "creator" ? "by you" : "by review team (simulated)"} ·{" "}
-                  {timeAgo(event.at)}
+                  {event.actor === "creator" ? "by you" : "by review team (simulated)"} ·<LocalizedText text={" "} />
+                  <LocalizedText text={timeAgo(event.at)} />
                 </span>
               </p>
               {event.note && (
                 <p className="mt-1 rounded-lg border border-border bg-muted/50 px-3 py-2 text-[12.5px] leading-relaxed text-muted-foreground">
-                  {event.note}
+                  <LocalizedText text={event.note} />
                 </p>
               )}
             </div>

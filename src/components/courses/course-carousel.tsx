@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -23,6 +24,7 @@ export function CourseCarousel({
   loading?: boolean;
   className?: string;
 }) {
+  const translateUi = useTranslate();
   const railRef = useRef<HTMLUListElement>(null);
 
   const scrollBy = (dir: 1 | -1) => {
@@ -39,7 +41,7 @@ export function CourseCarousel({
     <div className="hidden items-center gap-1 md:flex">
       <button
         type="button"
-        aria-label={`Scroll ${title} back`}
+        aria-label={translateUi(`Scroll ${title} back`)}
         onClick={() => scrollBy(-1)}
         className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
       >
@@ -47,7 +49,7 @@ export function CourseCarousel({
       </button>
       <button
         type="button"
-        aria-label={`Scroll ${title} forward`}
+        aria-label={translateUi(`Scroll ${title} forward`)}
         onClick={() => scrollBy(1)}
         className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
       >
@@ -58,10 +60,10 @@ export function CourseCarousel({
 
   return (
     <section className={className}>
-      <SectionHeader title={title} description={description} onViewAll={onViewAll} actions={arrows} />
+      <SectionHeader title={translateUi(title)} description={description} onViewAll={onViewAll} actions={arrows} />
       <ul
         ref={railRef}
-        aria-label={title}
+        aria-label={translateUi(title)}
         className="-mr-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-contain-x pr-4 pb-2 scrollbar-hide sm:-mr-6 sm:pr-6 lg:-mr-10 lg:pr-10"
       >
         {loading

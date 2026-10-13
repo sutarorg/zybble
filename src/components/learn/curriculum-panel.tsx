@@ -1,7 +1,8 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Check, ChevronDown, CirclePlay, FileDown, FileText, ListChecks } from "lucide-react";
 import type { Course, Enrollment } from "@/types";
 import type { FlatLesson } from "@/lib/learn";
@@ -31,6 +32,7 @@ export function CurriculumPanel({
   onToggleComplete: (lessonId: string) => void;
   className?: string;
 }) {
+  const translateUi = useTranslate();
   const progress = progressOf(course, enrollment);
   const completed = new Set(enrollment?.completedLessons ?? []);
   // Migration for legacy progress display
@@ -54,24 +56,20 @@ export function CurriculumPanel({
       return next;
     });
 
-  // Auto-open the section containing the current lesson when it changes
-  useEffect(() => {
-    const idx = course.curriculum.findIndex((s) => s.lessons.some((l) => l.id === currentLessonId));
-    if (idx >= 0) {
-      setOpen((prev) => {
-        const next = new Set(prev);
-        next.add(course.curriculum[idx].id);
-        return next;
-      });
-    }
-  }, [currentLessonId, course.curriculum]);
+  // Derive expansion on lesson changes instead of a cascading effect update.
+  const [trackedLesson, setTrackedLesson] = useState(currentLessonId);
+  if (trackedLesson !== currentLessonId) {
+    setTrackedLesson(currentLessonId);
+    const section = course.curriculum.find((s) => s.lessons.some((l) => l.id === currentLessonId));
+    if (section) setOpen((prev) => new Set([...prev, section.id]));
+  }
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
       {/* Progress summary */}
       <div className="border-b border-border px-4 py-3.5">
         <div className="flex items-center justify-between text-[12px]">
-          <span className="font-semibold">Course content</span>
+          <span className="font-semibold"><LocalizedText text={"Course content"} /></span>
           <span className="text-muted-foreground tabular-nums">
             {progress.completedCount}/{progress.totalLessons} · {progress.percent}%
           </span>
@@ -98,13 +96,12 @@ export function CurriculumPanel({
                 className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60"
               >
                 <span className="w-6 shrink-0 text-[11px] font-bold text-zinc-400 tabular-nums">
-                  {String(si + 1).padStart(2, "0")}
+                  <LocalizedText text={String(si + 1).padStart(2, "0")} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-semibold">{section.title}</span>
+                  <span className="block truncate text-[13px] font-semibold"><LocalizedText text={section.title} /></span>
                   <span className="mt-0.5 block text-[11px] text-zinc-400">
-                    {done}/{section.lessons.length} complete
-                  </span>
+                    {done}/{section.lessons.length}<LocalizedText text={"complete"} /></span>
                 </span>
                 <ChevronDown className={cn("size-4 shrink-0 text-zinc-400 transition-transform", isOpen && "rotate-180")} aria-hidden />
               </button>
@@ -158,7 +155,7 @@ export function CurriculumPanel({
                             type="button"
                             role="checkbox"
                             aria-checked={isDone}
-                            aria-label={`Mark “${lesson.title}” as ${isDone ? "incomplete" : "complete"}`}
+                            aria-label={translateUi(`Mark “${lesson.title}” as ${isDone ? "incomplete" : "complete"}`)}
                             onClick={(e) => {
                               e.stopPropagation();
                               onToggleComplete(lesson.id);
@@ -174,12 +171,12 @@ export function CurriculumPanel({
                           </button>
                           <span className="min-w-0 flex-1">
                             <span className={cn("block truncate text-[13px]", isCurrent ? "font-semibold text-primary" : "font-medium", isDone && !isCurrent && "text-muted-foreground")}>
-                              {lesson.title}
+                              <LocalizedText text={lesson.title} />
                             </span>
                             <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-zinc-400">
                               <Icon className="size-3" aria-hidden />
-                              {formatDuration(lesson.durationMinutes)}
-                              {lesson.freePreview && <span className="text-accent-foreground">· Preview</span>}
+                              <LocalizedText text={formatDuration(lesson.durationMinutes)} />
+                              {lesson.freePreview && <span className="text-accent-foreground"><LocalizedText text={"· Preview"} /></span>}
                             </span>
                           </span>
                           {isCurrent && <span className="mt-1 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />}

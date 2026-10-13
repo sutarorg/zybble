@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -44,6 +45,7 @@ export function SimulatedPlayer({
   onPlayingChange: (playing: boolean) => void;
   onEnded: () => void;
 }) {
+  const translateUi = useTranslate();
   const total = Math.max(60, durationMinutes * 60);
   /* Timeline state carries the lesson it belongs to, so a new lesson starts at 0:00. */
   const [timeline, setTimeline] = useState<{ title: string; time: number }>({ title, time: 0 });
@@ -118,7 +120,7 @@ export function SimulatedPlayer({
     >
       <Image
         src={thumbnail}
-        alt=""
+        alt={translateUi("")}
         fill
         sizes="(max-width: 1024px) 100vw, 900px"
         className={cn("object-cover transition-opacity duration-300", playing ? "opacity-60" : "opacity-45")}
@@ -127,14 +129,12 @@ export function SimulatedPlayer({
       <span className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-zinc-950/30" aria-hidden />
 
       {/* Simulated badge */}
-      <span className="absolute top-3 left-3 rounded-md bg-white/10 px-2 py-1 text-[10px] font-semibold tracking-wider text-white/80 uppercase backdrop-blur">
-        Simulated player — no real video
-      </span>
+      <span className="absolute top-3 left-3 rounded-md bg-white/10 px-2 py-1 text-[10px] font-semibold tracking-wider text-white/80 uppercase backdrop-blur"><LocalizedText text={"Simulated player — no real video"} /></span>
 
       {/* Caption bar */}
       {showCaptions && playing && (
         <span className="absolute bottom-16 left-1/2 max-w-[80%] -translate-x-1/2 rounded-md bg-zinc-950/80 px-3 py-1.5 text-center text-[13px] font-medium text-white backdrop-blur">
-          {caption}
+          <LocalizedText text={caption} />
         </span>
       )}
 
@@ -160,7 +160,7 @@ export function SimulatedPlayer({
         {/* Timeline */}
         <div
           role="slider"
-          aria-label="Seek"
+          aria-label={translateUi("Seek")}
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={Math.round(time)}
@@ -212,13 +212,13 @@ export function SimulatedPlayer({
                 setVolume(Number(e.target.value));
                 setMuted(Number(e.target.value) === 0);
               }}
-              aria-label="Volume"
+              aria-label={translateUi("Volume")}
               className="h-1 w-0 cursor-pointer accent-white opacity-0 transition-all duration-200 group-hover/player:w-16 group-hover/player:opacity-100"
             />
           </div>
 
           <span className="ml-1 text-[11.5px] font-medium text-white/80 tabular-nums">
-            {fmt(time)} <span className="text-white/50">/ {fmt(total)}</span>
+            <LocalizedText text={fmt(time)} /> <span className="text-white/50">/ <LocalizedText text={fmt(total)} /></span>
           </span>
 
           <span className="ml-auto" />
@@ -228,7 +228,7 @@ export function SimulatedPlayer({
             <button
               type="button"
               onClick={() => setSpeedOpen((o) => !o)}
-              aria-label="Playback speed"
+              aria-label={translateUi("Playback speed")}
               className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-[12px] font-semibold text-white/90 transition-colors hover:bg-white/15 hover:text-white"
             >
               <Settings2 className="size-4" aria-hidden />
@@ -272,7 +272,7 @@ export function SimulatedPlayer({
           <button
             type="button"
             onClick={toggleFullscreen}
-            aria-label="Fullscreen"
+            aria-label={translateUi("Fullscreen")}
             className="cursor-pointer rounded-md p-1.5 text-white/90 transition-colors hover:bg-white/15 hover:text-white"
           >
             <Maximize className="size-4.5" />

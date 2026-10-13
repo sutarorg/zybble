@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import { CirclePlay, FileText, FileDown, ListChecks, Lock } from "lucide-react";
 import type { Course } from "@/types";
 import { formatDuration } from "@/lib/format";
@@ -20,21 +21,18 @@ const LESSON_ICON = {
 } as const;
 
 export function Curriculum({ course }: { course: Course }) {
+  const translateUi = useTranslate();
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground">
         <span>
-          <span className="font-semibold text-foreground">{course.curriculum.length}</span> sections
-        </span>
+          <span className="font-semibold text-foreground">{course.curriculum.length}</span><LocalizedText text={"sections"} /></span>
         <span aria-hidden>·</span>
         <span>
-          <span className="font-semibold text-foreground">{course.lessonsCount}</span> lessons
-        </span>
+          <span className="font-semibold text-foreground">{course.lessonsCount}</span><LocalizedText text={"lessons"} /></span>
         <span aria-hidden>·</span>
         <span>
-          <span className="font-semibold text-foreground">{formatDuration(course.durationMinutes)}</span>{" "}
-          total
-        </span>
+          <span className="font-semibold text-foreground"><LocalizedText text={formatDuration(course.durationMinutes)} /></span><LocalizedText text={" "} /><LocalizedText text={"total"} /></span>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-white">
@@ -47,12 +45,12 @@ export function Curriculum({ course }: { course: Course }) {
                   <span className="flex min-w-0 flex-col gap-0.5 text-left sm:flex-row sm:items-center sm:gap-3">
                     <span className="truncate text-[14px] font-semibold">
                       <span className="mr-2 text-zinc-400 tabular-nums">
-                        {String(i + 1).padStart(2, "0")}
+                        <LocalizedText text={String(i + 1).padStart(2, "0")} />
                       </span>
-                      {section.title}
+                      <LocalizedText text={section.title} />
                     </span>
                     <span className="text-[12px] font-normal text-zinc-400">
-                      {section.lessons.length} lessons · {formatDuration(minutes)}
+                      {section.lessons.length}<LocalizedText text={"lessons ·"} /><LocalizedText text={formatDuration(minutes)} />
                     </span>
                   </span>
                 </AccordionTrigger>
@@ -66,8 +64,8 @@ export function Curriculum({ course }: { course: Course }) {
                             type="button"
                             onClick={() =>
                               lesson.freePreview
-                                ? toast.info("Free preview — enroll to unlock the full player (demo)")
-                                : toast.info("Enroll to unlock this lesson (demo)")
+                                ? toast.info("Free preview — enroll to unlock the full player ")
+                                : toast.info("Enroll to unlock this lesson ")
                             }
                             className="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted"
                           >
@@ -76,19 +74,19 @@ export function Curriculum({ course }: { course: Course }) {
                               aria-hidden
                             />
                             <span className="min-w-0 flex-1 truncate text-[13.5px] text-foreground">
-                              {lesson.title}
+                              <LocalizedText text={lesson.title} />
                             </span>
                             {lesson.downloadable && (
-                              <FileDown className="size-3.5 shrink-0 text-zinc-300" aria-label="Downloadable resource" />
+                              <FileDown className="size-3.5 shrink-0 text-zinc-300" aria-label={translateUi("Downloadable resource")} />
                             )}
                             {lesson.freePreview && (
-                              <Badge variant="violet">Preview</Badge>
+                              <Badge variant="violet"><LocalizedText text={"Preview"} /></Badge>
                             )}
                             {lesson.type === "video" && !lesson.freePreview && (
                               <Lock className="size-3 shrink-0 text-zinc-300" aria-hidden />
                             )}
                             <span className="shrink-0 text-[12px] text-zinc-400 tabular-nums">
-                              {formatDuration(lesson.durationMinutes)}
+                              <LocalizedText text={formatDuration(lesson.durationMinutes)} />
                             </span>
                           </button>
                         </li>

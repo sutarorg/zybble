@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -45,25 +46,22 @@ export default async function CategoryPage({
       <Breadcrumb items={[{ label: "Explore", href: "/" }, { label: category.name }]} />
 
       <header className="mt-6">
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">
-          Category
-        </p>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Category"} /></p>
         <div className="mt-2 flex items-center gap-3">
           <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-primary">
             {React.createElement(Icon, { className: "size-5.5", "aria-hidden": true })}
           </span>
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-              {category.name}
+              <LocalizedText text={category.name} />
             </h1>
             <p className="text-[13px] text-muted-foreground">
-              {pool.length} {pool.length === 1 ? "course" : "courses"} ·{" "}
-              {formatCompact(students)} learners
-            </p>
+              {pool.length} {pool.length === 1 ? "course" : "courses"} ·<LocalizedText text={" "} />
+              <LocalizedText text={formatCompact(students)} /><LocalizedText text={"learners"} /></p>
           </div>
         </div>
         <p className="mt-3 max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground">
-          {category.description}
+          <LocalizedText text={category.description} />
         </p>
       </header>
 

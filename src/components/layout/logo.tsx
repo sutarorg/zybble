@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -37,9 +38,7 @@ export function Logo({
     >
       <ZybbleMark />
       {showWordmark && (
-        <span className="font-display text-[19px] font-bold tracking-tight text-foreground">
-          Zybble
-        </span>
+        <span className="font-display text-[19px] font-bold tracking-tight text-foreground"><LocalizedText text={"Zybble"} /></span>
       )}
     </Link>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -28,19 +29,20 @@ const FAQ_GROUPS = [
 ];
 
 const FAQS: Faq[] = [
-  { group: "courses", q: "How do Zybble courses work?", a: "Courses are self-paced and project-based. You get lifetime access to all video lessons, downloadable resources and quizzes. Progress syncs on your device in this demo." },
+  { group: "courses", q: "How do Zybble courses work?", a: "Courses are self-paced and project-based. You get lifetime access to all video lessons, downloadable resources and quizzes. Progress syncs on your device in this preview." },
   { group: "courses", q: "Do I get a certificate?", a: "Yes. The moment you mark the last lesson complete, Zybble issues a personalised certificate with the course title, your name, your instructor and a certificate ID. Preview it in the completion dialog, download it as a PNG, and re-open it any time from Certificates." },
   { group: "courses", q: "Are courses updated?", a: "Continuously. AI tools change fast, so instructors refresh lessons monthly. The 'last updated' date on every course page shows the latest revision." },
   { group: "courses", q: "Can I download lessons for offline viewing?", a: "Lessons marked with a download icon include offline resources like templates, checklists and code. Video downloads depend on each instructor's settings." },
-  { group: "billing", q: "What payment methods do you accept?", a: "In this demo, checkout is fully simulated — no real payment is processed. The production platform would support major cards, PayPal and regional methods." },
-  { group: "billing", q: "Why did my payment fail?", a: "In the demo, the test card 4000 0000 0000 0002 always simulates a decline so you can preview the failure flow. Any other formatted card number succeeds." },
+  { group: "billing", q: "What payment methods do you accept?", a: "In this preview, checkout is fully simulated — no real payment is processed. The production platform would support major cards, PayPal and regional methods." },
+  { group: "billing", q: "Why did my payment fail?", a: "In the preview, the test card 4000 0000 0000 0002 always simulates a decline so you can preview the failure flow. Any other formatted card number succeeds." },
   { group: "account", q: "Where do I find my certificates?", a: "Open Certificates in the sidebar. Every finished course is listed there with a download button — and you can regenerate the PNG as often as you like." },
   { group: "account", q: "Is the certificate verified?", a: "Each certificate carries a unique certificate ID and the issue date. In production, that code would resolve to a public verification page." },
-  { group: "account", q: "Where is my data stored?", a: "In this frontend demo, everything (sign-in, wishlist, enrollments, progress) lives in your browser's localStorage. Clearing site data resets the demo." },
+  { group: "account", q: "Where is my data stored?", a: "In this frontend preview, everything (sign-in, wishlist, enrollments, progress) lives in your browser's localStorage. Clearing site data resets the preview." },
   { group: "account", q: "How do I change the interface language?", a: "Use the globe icon in the header. Your preference is saved on this device. Course captions are listed on each course page." },
 ];
 
 export function HelpClient() {
+  const translateUi = useTranslate();
   const [query, setQuery] = useState("");
   const trimmed = query.trim().toLowerCase();
 
@@ -53,9 +55,9 @@ export function HelpClient() {
 
   return (
     <InfoPage
-      label="Help Center"
-      title="How can we help?"
-      description="Search common questions about courses, billing, certificates and your account."
+      label={translateUi("Help Center")}
+      title={translateUi("How can we help?")}
+      description={translateUi("Search common questions about courses, billing, certificates and your account.")}
     >
       {/* Search */}
       <div className="relative mt-8 max-w-xl">
@@ -64,8 +66,8 @@ export function HelpClient() {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search help articles…"
-          aria-label="Search help articles"
+          placeholder={translateUi("Search help articles…")}
+          aria-label={translateUi("Search help articles")}
           className="h-12 w-full rounded-xl border border-input bg-white pr-4 pl-11 text-[14.5px] shadow-card outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 [&::-webkit-search-cancel-button]:hidden"
         />
       </div>
@@ -74,19 +76,17 @@ export function HelpClient() {
       <div className="mt-12 max-w-3xl">
         {trimmed && (
           <p className="mb-4 text-[13.5px] text-muted-foreground">
-            <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
-            {filtered.length === 1 ? "answer" : "answers"} for “{query.trim()}”
+            <span className="font-semibold text-foreground">{filtered.length}</span><LocalizedText text={" "} />
+            {filtered.length === 1 ? "answer" : "answers"}<LocalizedText text={"for “"} /><LocalizedText text={query.trim()} />”
           </p>
         )}
         {filtered.length === 0 ? (
           <EmptyState
             icon={SearchX}
-            title="No answers found"
-            description="Try different wording — or message us and a human will help."
+            title={translateUi("No answers found")}
+            description={translateUi("Try different wording — or message us and a human will help.")}
             action={
-              <Button variant="outline" onClick={() => setQuery("")}>
-                Clear search
-              </Button>
+              <Button variant="outline" onClick={() => setQuery("")}><LocalizedText text={"Clear search"} /></Button>
             }
           />
         ) : (
@@ -97,15 +97,15 @@ export function HelpClient() {
               <section key={group.id} className="mb-8">
                 <h2 className="mb-3 flex items-center gap-2 text-[14px] font-semibold">
                   <group.icon className="size-4 text-primary" aria-hidden />
-                  {group.label}
+                  <LocalizedText text={group.label} />
                 </h2>
                 <div className="rounded-xl border border-border bg-white px-5">
                   <Accordion type="single" collapsible>
                     {faqs.map((faq) => (
                       <AccordionItem key={faq.q} value={faq.q}>
-                        <AccordionTrigger className="text-[14px]">{faq.q}</AccordionTrigger>
+                        <AccordionTrigger className="text-[14px]"><LocalizedText text={faq.q} /></AccordionTrigger>
                         <AccordionContent className="text-[13.5px] leading-relaxed text-muted-foreground">
-                          {faq.a}
+                          <LocalizedText text={faq.a} />
                         </AccordionContent>
                       </AccordionItem>
                     ))}
@@ -127,13 +127,11 @@ export function HelpClient() {
           <MessageSquare className="size-5" aria-hidden />
         </span>
         <div className="flex-1">
-          <h2 className="font-display text-[15.5px] font-semibold">Still stuck?</h2>
-          <p className="mt-0.5 text-[13.5px] text-muted-foreground">
-            Message our support team — we usually reply within minutes during the day.
-          </p>
+          <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Still stuck?"} /></h2>
+          <p className="mt-0.5 text-[13.5px] text-muted-foreground"><LocalizedText text={"Message our support team — we usually reply within minutes during the day."} /></p>
         </div>
         <Button asChild>
-          <Link href="/messages">Message support</Link>
+          <Link href="/messages"><LocalizedText text={"Message support"} /></Link>
         </Button>
       </section>
     </InfoPage>

@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ export function AreaChart({
   formatValue?: (v: number) => string;
   className?: string;
 }) {
+  const translateUi = useTranslate();
   const [hover, setHover] = useState<number | null>(null);
   const W = 720;
   const H = height;
@@ -60,7 +62,7 @@ export function AreaChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         role="img"
-        aria-label="Trend chart"
+        aria-label={translateUi("Trend chart")}
         onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
@@ -112,7 +114,7 @@ export function AreaChart({
         {points.map((p, i) =>
           i % labelEvery === 0 ? (
             <text key={i} x={p.x} y={H - 8} textAnchor="middle" fontSize="10.5" fill="#a1a1aa">
-              {p.label}
+              <LocalizedText text={p.label} />
             </text>
           ) : null
         )}
@@ -122,9 +124,9 @@ export function AreaChart({
       {hover !== null && points[hover] && (
         <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 rounded-lg border border-border bg-white px-3 py-1.5 text-center shadow-pop">
           <p className="font-display text-[13px] font-bold whitespace-nowrap tabular-nums">
-            {formatValue(points[hover].value)}
+            <LocalizedText text={formatValue(points[hover].value)} />
           </p>
-          <p className="text-[10.5px] whitespace-nowrap text-zinc-400">{points[hover].label}</p>
+          <p className="text-[10.5px] whitespace-nowrap text-zinc-400"><LocalizedText text={points[hover].label} /></p>
         </div>
       )}
     </div>
@@ -155,8 +157,8 @@ export function BarList({
       {data.map((d) => (
         <li key={d.id}>
           <div className="flex items-baseline justify-between gap-3">
-            <p className="truncate text-[13px] font-medium">{d.label}</p>
-            <p className="shrink-0 text-[13px] font-semibold tabular-nums">{formatValue(d.value)}</p>
+            <p className="truncate text-[13px] font-medium"><LocalizedText text={d.label} /></p>
+            <p className="shrink-0 text-[13px] font-semibold tabular-nums"><LocalizedText text={formatValue(d.value)} /></p>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
             <div
@@ -164,7 +166,7 @@ export function BarList({
               style={{ width: `${Math.max(2, (d.value / max) * 100)}%` }}
             />
           </div>
-          {d.sub && <p className="mt-1 text-[11.5px] text-zinc-400">{d.sub}</p>}
+          {d.sub && <p className="mt-1 text-[11.5px] text-zinc-400"><LocalizedText text={d.sub} /></p>}
         </li>
       ))}
     </ul>

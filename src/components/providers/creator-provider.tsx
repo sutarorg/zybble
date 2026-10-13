@@ -8,11 +8,9 @@ import {
   PLATFORM_COMMISSION,
   applyDraftToCourse,
   newCourseFromDraft,
-  seedCreatorCourses,
   seedCreatorNotifications,
   seedCreatorProfile,
   seedEarningTransactions,
-  seedPayouts,
   uid,
 } from "@/lib/creator";
 import { uploadProfilePicture } from "@/lib/upload";
@@ -92,17 +90,12 @@ interface CreatorContextValue {
 const CreatorContext = createContext<CreatorContextValue | null>(null);
 
 export function CreatorProvider({ children }: { children: React.ReactNode }) {
-  const profile = useLocalStorage<CreatorProfile>(KEYS.profile, seedCreatorProfile());
-  const courses = useLocalStorage<CreatorCourse[]>(KEYS.courses, seedCreatorCourses());
+  const profile = useLocalStorage<CreatorProfile>(KEYS.profile, { ...seedCreatorProfile(), displayName: "", headline: "", bio: "", country: "", initials: "", website: "", topics: [], onboardedAt: null });
+  const courses = useLocalStorage<CreatorCourse[]>(KEYS.courses, []);
   const draft = useLocalStorage<CourseDraft | null>(KEYS.draft, null);
   const replies = useLocalStorage<Record<string, string>>(KEYS.replies, {});
-  const payoutSettings = useLocalStorage<PayoutSettings | null>(KEYS.payoutSettings, {
-    method: "bank",
-    accountName: "Maya Lindqvist",
-    details: "SEBI bank account ••4821 (SEK)",
-    threshold: 50,
-  });
-  const payouts = useLocalStorage<PayoutRecord[]>(KEYS.payouts, seedPayouts());
+  const payoutSettings = useLocalStorage<PayoutSettings | null>(KEYS.payoutSettings, null);
+  const payouts = useLocalStorage<PayoutRecord[]>(KEYS.payouts, []);
   const readNotifs = useLocalStorage<string[]>(KEYS.readNotifications, []);
 
   const hydrated =
@@ -118,11 +111,18 @@ export function CreatorProvider({ children }: { children: React.ReactNode }) {
   const addCourse = useCallback(
     (d: CourseDraft) => {
       const course = newCourseFromDraft(d);
+      const author = profile.value;
+      course.instructorId = author.instructorId;
+      course.instructor = { id: author.instructorId, username: author.instructorId,
+        name: author.displayName, headline: author.headline, bio: author.bio,
+        initials: author.initials, avatarColor: author.avatarColor,
+        country: author.country, languages: author.languages };
+
       courses.set((prev) => [course, ...prev]);
       return course;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [courses.set]
+    [courses.set, profile.value]
   );
 
   const updateCourse = useCallback(
@@ -388,7 +388,7 @@ export function CreatorProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.clear, courses.clear, draft.clear, replies.clear, payoutSettings.clear, payouts.clear, readNotifs.clear]);
 
-  const creatorNotifications = useMemo(() => seedCreatorNotifications(), []);
+  const creatorNotifications = useMemo(() => courses.value.length ? seedCreatorNotifications() : [], [courses.value]);
 
   const value = useMemo<CreatorContextValue>(
     () => ({

@@ -88,7 +88,7 @@ export function useKeyedState<T>(key: string, initial: T) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* localStorage-backed store                                                   */
+/* Document-session store (legacy hook name retained)                                                   */
 /* -------------------------------------------------------------------------- */
 
 interface StorageStore<T> {
@@ -105,13 +105,23 @@ const stores = new Map<string, StorageStore<unknown>>();
 /** Listeners for the cross-tab `storage` event are registered once. */
 let storageListenerAttached = false;
 
+// Account/activity state is intentionally scoped to this document. A reload
+// starts a fresh learner-to-creator walkthrough; client navigation retains it.
+const sessionValues = new Map<string, string>();
+let legacyRemoved = false;
 function readRaw(key: string): string | null {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    /* storage unavailable (private mode, blocked cookies) */
-    return null;
+  if (typeof window === "undefined") return null;
+  if (!legacyRemoved) {
+    legacyRemoved = true;
+    try {
+      Object.keys(window.localStorage).filter((k) => k.startsWith("zybble.") && k !== "zybble.language.v1")
+        .forEach((k) => window.localStorage.removeItem(k));
+    } catch { /* storage may be blocked */ }
   }
+  if (key === "zybble.language.v1") {
+    try { return window.localStorage.getItem(key); } catch { return null; }
+  }
+  return sessionValues.get(key) ?? null;
 }
 
 function parseOrFallback<T>(raw: string | null, fallback: T): T {
@@ -162,8 +172,9 @@ function subscribeToStore(store: StorageStore<unknown>, listener: () => void) {
   store.listeners.add(listener);
   if (!storageListenerAttached && typeof window !== "undefined") {
     storageListenerAttached = true;
-    // Keep tabs in sync when the same demo state is open twice.
+    // Only the language preference is shared across tabs.
     window.addEventListener("storage", (event) => {
+      if (event.key && event.key !== "zybble.language.v1") return;
       const changed = event.key ? stores.get(event.key) : undefined;
       if (changed) {
         changed.cachedRaw = undefined;
@@ -182,12 +193,22 @@ function subscribeToStore(store: StorageStore<unknown>, listener: () => void) {
 }
 
 function writeRaw(key: string, value: unknown) {
-  try {
-    if (value === null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* ignore quota / unavailable storage */
+  if (value === null) sessionValues.delete(key);
+  else sessionValues.set(key, JSON.stringify(value));
+  if (key === "zybble.language.v1") {
+    try {
+      if (value === null) window.localStorage.removeItem(key);
+      else window.localStorage.setItem(key, JSON.stringify(value));
+    } catch { /* preference storage may be blocked */ }
   }
+}
+
+/** Clear a namespace and notify mounted consumers, without a page reload. */
+export function clearSessionNamespace(prefix: string) {
+  for (const key of sessionValues.keys()) if (key.startsWith(prefix)) sessionValues.delete(key);
+  stores.forEach((store) => {
+    if (store.key.startsWith(prefix)) { store.cachedRaw = undefined; emit(store); }
+  });
 }
 
 /**
@@ -203,7 +224,8 @@ function writeStore(key: string, value: unknown) {
 }
 
 /**
- * `useState`-like state persisted to localStorage.
+ * `useState`-like state shared for the lifetime of the document.
+ * Only the language preference persists to localStorage.
  *
  * Reads go through `useSyncExternalStore`: the server (and the hydration
  * render) uses `initialValue`, then React swaps in the stored value in the

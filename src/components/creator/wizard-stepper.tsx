@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import { Check } from "lucide-react";
 import { CREATOR_STEPS } from "@/lib/creator";
 import { cn } from "@/lib/utils";
@@ -15,8 +16,9 @@ export function WizardStepper({
   onJump: (step: number) => void;
   stepValid: (step: number) => boolean;
 }) {
+  const translateUi = useTranslate();
   return (
-    <nav aria-label="Course builder progress">
+    <nav aria-label={translateUi("Course builder progress")}>
       <ol className="flex flex-col gap-0.5">
         {CREATOR_STEPS.map((label, i) => {
           const done = i < current && stepValid(i);
@@ -52,8 +54,8 @@ export function WizardStepper({
                 >
                   {done ? <Check className="size-3" strokeWidth={3.5} aria-hidden /> : i + 1}
                 </span>
-                <span className="flex-1">{label}</span>
-                {done && <span className="text-[10px] font-semibold text-emerald-600 uppercase">Done</span>}
+                <span className="flex-1"><LocalizedText text={label} /></span>
+                {done && <span className="text-[10px] font-semibold text-emerald-600 uppercase"><LocalizedText text={"Done"} /></span>}
               </button>
             </li>
           );
@@ -66,8 +68,7 @@ export function WizardStepper({
             style={{ width: `${((current + 1) / CREATOR_STEPS.length) * 100}%` }}
           />
         </div>
-        <p className="mt-2 text-[11.5px] text-zinc-400">
-          Step {current + 1} of {CREATOR_STEPS.length}
+        <p className="mt-2 text-[11.5px] text-zinc-400"><LocalizedText text={"Step"} />{current + 1}<LocalizedText text={"of"} />{CREATOR_STEPS.length}
         </p>
       </div>
     </nav>

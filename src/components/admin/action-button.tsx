@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -59,22 +60,17 @@ export function ActionButton({
         onClick={() => setOpen(true)}
       >
         {Icon && <Icon aria-hidden />}
-        {label}
+        <LocalizedText text={label} />
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{confirmTitle}</DialogTitle>
-            <DialogDescription>{confirmBody}</DialogDescription>
+            <DialogTitle><LocalizedText text={confirmTitle} /></DialogTitle>
+            <DialogDescription><LocalizedText text={confirmBody} /></DialogDescription>
           </DialogHeader>
-          <p className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
-            Frontend simulation — this updates demo state in your browser only. Nothing changes on
-            a server.
-          </p>
+          <p className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground"><LocalizedText text={"Frontend simulation — this updates preview state in your browser only. Nothing changes on a server."} /></p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}><LocalizedText text={"Cancel"} /></Button>
             <Button
               variant={danger ? "destructive" : "default"}
               loading={busy}
@@ -88,7 +84,7 @@ export function ActionButton({
                 }, 500);
               }}
             >
-              {confirmLabel}
+              <LocalizedText text={confirmLabel} />
             </Button>
           </DialogFooter>
         </DialogContent>

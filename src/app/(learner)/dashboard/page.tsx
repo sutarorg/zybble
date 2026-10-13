@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo } from "react";
 import Link from "next/link";
@@ -65,6 +66,7 @@ function useAchievements(
 /* -------------------------------- dashboard -------------------------------- */
 
 export default function DashboardPage() {
+  const translateUi = useTranslate();
   const { enrollments, hydrated, user, recentViews, activity } = useApp();
   const community = useCommunityCourses();
 
@@ -129,9 +131,8 @@ export default function DashboardPage() {
       {/* Greeting */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">{today}</p>
-          <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]">
-            Welcome back{user ? `, ${firstName}` : ""}.
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={today} /></p>
+          <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]"><LocalizedText text={"Welcome back"} /><LocalizedText text={user ? `, ${firstName}` : ""} />.
           </h1>
           <p className="mt-2 text-[14.5px] text-muted-foreground">
             {pairs.length > 0
@@ -141,7 +142,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5">
           <Flame className="size-4 text-amber-600" aria-hidden />
-          <span className="text-[12.5px] font-semibold text-amber-700">4-day streak · simulated</span>
+          <span className="text-[12.5px] font-semibold text-amber-700"><LocalizedText text={"4-day streak · simulated"} /></span>
         </div>
       </header>
 
@@ -151,16 +152,11 @@ export default function DashboardPage() {
           <div className="relative overflow-hidden rounded-2xl border border-violet-200/70 bg-accent p-8 sm:p-10">
             <div className="pointer-events-none absolute -top-16 -right-10 size-56 rounded-full bg-violet-300/25 blur-2xl" aria-hidden />
             <div className="relative max-w-lg">
-              <p className="font-display text-2xl font-bold tracking-tight text-violet-950">
-                Start learning AI the practical way
-              </p>
-              <p className="mt-2 text-[14.5px] leading-relaxed text-violet-950/60">
-                Enroll in a free course in seconds — no card needed. Your dashboard fills with
-                progress, milestones and recommendations as you learn.
-              </p>
+              <p className="font-display text-2xl font-bold tracking-tight text-violet-950"><LocalizedText text={"Start learning AI the practical way"} /></p>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-violet-950/60"><LocalizedText text={"Enroll in a free course in seconds — no card needed. Your dashboard fills with progress, milestones and recommendations as you learn."} /></p>
             </div>
           </div>
-          <h2 className="font-display mt-10 mb-4 text-lg font-semibold">Recommended to start with</h2>
+          <h2 className="font-display mt-10 mb-4 text-lg font-semibold"><LocalizedText text={"Recommended to start with"} /></h2>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {recommendedCourses(new Set(), community, 4).map((c) => (
               <CourseCard key={c.id} course={c} />
@@ -173,18 +169,18 @@ export default function DashboardPage() {
           <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               icon={Target}
-              label="Overall progress"
+              label={translateUi("Overall progress")}
               value={`${totals.overallPercent}%`}
               hint={`${totals.completedCourses} of ${totals.enrolledCount} completed`}
             />
-            <StatCard icon={BookOpen} label="Enrolled courses" value={String(totals.enrolledCount)} hint="total" />
+            <StatCard icon={BookOpen} label={translateUi("Enrolled courses")} value={String(totals.enrolledCount)} hint="total" />
             <StatCard
               icon={Clock}
-              label="Hours learned"
+              label={translateUi("Hours learned")}
               value={(totals.minutesLearned / 60).toFixed(1)}
               hint="simulated playback"
             />
-            <StatCard icon={ListChecks} label="Lessons completed" value={String(totals.lessonsCompleted)} hint="all courses" />
+            <StatCard icon={ListChecks} label={translateUi("Lessons completed")} value={String(totals.lessonsCompleted)} hint="all courses" />
           </div>
 
           {/* Continue learning + activity rail */}
@@ -193,10 +189,8 @@ export default function DashboardPage() {
             {lastPair && (
               <section className="overflow-hidden rounded-xl border border-border bg-white shadow-card xl:col-span-2">
                 <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-                  <h2 className="font-display text-[15.5px] font-semibold">Continue learning</h2>
-                  <Link href="/my-learning" className="group flex items-center gap-1 text-[13px] font-medium text-primary hover:text-primary-hover">
-                    All courses
-                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Continue learning"} /></h2>
+                  <Link href="/my-learning" className="group flex items-center gap-1 text-[13px] font-medium text-primary hover:text-primary-hover"><LocalizedText text={"All courses"} /><ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
                   </Link>
                 </div>
                 {(() => {
@@ -210,7 +204,7 @@ export default function DashboardPage() {
                       >
                         <Image
                           src={lastPair.course.thumbnail}
-                          alt={lastPair.course.title}
+                          alt={translateUi(lastPair.course.title)}
                           fill
                           sizes="256px"
                           className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
@@ -231,16 +225,15 @@ export default function DashboardPage() {
                           <span className="text-[12px] text-muted-foreground">{instructor?.name}</span>
                         </div>
                         <h3 className="font-display mt-1.5 text-[17px] font-semibold tracking-tight">
-                          {lastPair.course.title}
+                          <LocalizedText text={lastPair.course.title} />
                         </h3>
                         {p.resumeLesson && (
-                          <p className="mt-1 text-[13px] text-muted-foreground">
-                            Next up: <span className="font-medium text-foreground">{p.resumeLesson.number} — {p.resumeLesson.lesson.title}</span>
+                          <p className="mt-1 text-[13px] text-muted-foreground"><LocalizedText text={"Next up:"} /><span className="font-medium text-foreground"><LocalizedText text={p.resumeLesson.number} /> — <LocalizedText text={p.resumeLesson.lesson.title} /></span>
                           </p>
                         )}
                         <div className="mt-3">
                           <div className="flex justify-between text-[11.5px] text-muted-foreground">
-                            <span>{p.completedCount} of {p.totalLessons} lessons</span>
+                            <span>{p.completedCount}<LocalizedText text={"of"} />{p.totalLessons}<LocalizedText text={"lessons"} /></span>
                             <span className="tabular-nums">{p.percent}%</span>
                           </div>
                           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
@@ -255,7 +248,7 @@ export default function DashboardPage() {
                             </Link>
                           </Button>
                           <Button asChild variant="outline">
-                            <Link href={`/courses/${lastPair.course.slug}`}>Course details</Link>
+                            <Link href={`/courses/${lastPair.course.slug}`}><LocalizedText text={"Course details"} /></Link>
                           </Button>
                         </div>
                       </div>
@@ -267,11 +260,9 @@ export default function DashboardPage() {
 
             {/* Activity timeline */}
             <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-              <h2 className="font-display text-[15.5px] font-semibold">Learning activity</h2>
+              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Learning activity"} /></h2>
               {activityFeed.length === 0 ? (
-                <p className="mt-4 text-[13px] text-muted-foreground">
-                  Your activity appears here as you enroll and complete lessons.
-                </p>
+                <p className="mt-4 text-[13px] text-muted-foreground"><LocalizedText text={"Your activity appears here as you enroll and complete lessons."} /></p>
               ) : (
                 <ul className="mt-4 space-y-3.5">
                   {activityFeed.map((a) => (
@@ -296,31 +287,29 @@ export default function DashboardPage() {
                         <p className="truncate text-[12.5px] font-medium">
                           {a.course ? (
                             <Link href={`/courses/${a.course.slug}`} className="hover:text-primary">
-                              {a.course.title}
+                              <LocalizedText text={a.course.title} />
                             </Link>
                           ) : (
                             "Course"
                           )}
                         </p>
                         <p className="text-[11.5px] text-zinc-400">
-                          {a.text} · {timeAgo(a.at)}
+                          <LocalizedText text={a.text} /> · <LocalizedText text={timeAgo(a.at)} />
                         </p>
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="mt-4 border-t border-border pt-3 text-[11px] text-zinc-400">
-                Activity is simulated locally on this device.
-              </p>
+              <p className="mt-4 border-t border-border pt-3 text-[11px] text-zinc-400"><LocalizedText text={"Activity is simulated locally on this device."} /></p>
             </section>
           </div>
 
           {/* Achievements */}
           <section className="mt-6 rounded-xl border border-border bg-white p-5 shadow-card">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-[15.5px] font-semibold">Milestones</h2>
-              <Badge variant="secondary">Simulated</Badge>
+              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Milestones"} /></h2>
+              <Badge variant="secondary"><LocalizedText text={"Simulated"} /></Badge>
             </div>
             <ul className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-6 sm:gap-3">
               {achievements.map((a) => (
@@ -340,7 +329,7 @@ export default function DashboardPage() {
                     {a.earned ? <a.icon className="size-4.5" aria-hidden /> : <Lock className="size-4" aria-hidden />}
                   </span>
                   <span className={cn("text-[11px] leading-tight font-medium", a.earned ? "text-accent-foreground" : "text-zinc-400")}>
-                    {a.label}
+                    <LocalizedText text={a.label} />
                   </span>
                 </li>
               ))}
@@ -350,7 +339,7 @@ export default function DashboardPage() {
           {/* Recommended */}
           <section className="mt-8">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold">Recommended AI courses</h2>
+              <h2 className="font-display text-lg font-semibold"><LocalizedText text={"Recommended AI courses"} /></h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {recommended.map((c) => (
@@ -362,7 +351,7 @@ export default function DashboardPage() {
           {/* Recently viewed */}
           {recentCourses.length > 0 && (
             <section className="mt-10">
-              <h2 className="font-display mb-4 text-lg font-semibold">Recently viewed</h2>
+              <h2 className="font-display mb-4 text-lg font-semibold"><LocalizedText text={"Recently viewed"} /></h2>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {recentCourses.map((c) => (
                   <CourseCard key={c.id} course={c} />

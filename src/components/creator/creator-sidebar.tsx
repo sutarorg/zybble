@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -60,13 +61,14 @@ function NavItem({
           active || accent ? "text-primary" : "text-zinc-400 group-hover:text-foreground"
         )}
       />
-      <span className="truncate">{label}</span>
+      <span className="truncate"><LocalizedText text={label} /></span>
       {trailing ? <span className="ml-auto">{trailing}</span> : null}
     </Link>
   );
 }
 
 export function CreatorSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const translateUi = useTranslate();
   const pathname = usePathname();
   const { courses, profile } = useCreator();
   const pending = courses.filter((c) => c.status === "pending" || c.status === "changes_requested").length;
@@ -124,9 +126,9 @@ export function CreatorSidebarContent({ onNavigate }: { onNavigate?: () => void 
         {groups.map((group, gi) => (
           <div key={group.label} className={cn(gi > 0 && "mt-5")}>
             <p className="px-3 pb-2 text-[10.5px] font-semibold tracking-[0.08em] text-zinc-400 uppercase">
-              {group.label}
+              <LocalizedText text={group.label} />
             </p>
-            <nav aria-label={group.label} className="flex flex-col gap-0.5">
+            <nav aria-label={translateUi(group.label)} className="flex flex-col gap-0.5">
               {group.items.map((item) => {
                 const active = item.exact ? pathname === item.href : pathname.startsWith(item.href) && !(item.href === "/creator/courses" && pathname.startsWith("/creator/courses/new"));
                 return (
@@ -134,7 +136,7 @@ export function CreatorSidebarContent({ onNavigate }: { onNavigate?: () => void 
                     key={item.href}
                     href={item.href}
                     icon={item.icon}
-                    label={item.label}
+                    label={translateUi(item.label)}
                     active={active}
                     accent={item.accent}
                     trailing={item.trailing}
@@ -146,35 +148,15 @@ export function CreatorSidebarContent({ onNavigate }: { onNavigate?: () => void 
           </div>
         ))}
 
-        {/* Demo persona note */}
-        <div className="mx-0.5 mt-6 mb-4 rounded-xl border border-violet-200/80 bg-accent p-3.5">
-          <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-foreground">
-            <Sparkles className="size-3.5" aria-hidden />
-            Instructor demo
-          </p>
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-violet-900/70">
-            You&apos;re viewing the studio as {profile.displayName.split(" ")[0]}. All changes save
-            to this browser only.
-          </p>
-        </div>
+
       </div>
 
       <div className="border-t border-border p-3">
         <Link
-          href="/creator"
-          className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
-        >
-          <Compass className="size-4 text-zinc-400" aria-hidden />
-          Go to Studio
-        </Link>
-        <Separator className="my-2" />
-        <Link
           href="/"
           className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
         >
-          <Compass className="size-4 text-zinc-400" aria-hidden />
-          Back to Explore
-          <ArrowUpRight className="ml-auto size-3.5 text-zinc-400" aria-hidden />
+          <Compass className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Back to Explore"} /><ArrowUpRight className="ml-auto size-3.5 text-zinc-400" aria-hidden />
         </Link>
       </div>
     </div>

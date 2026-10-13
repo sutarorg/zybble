@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import { useRouter } from "next/navigation";
 import { Bell, BookOpen, CheckCheck, Megaphone, MessageSquare, Sparkles } from "lucide-react";
 import {
@@ -20,6 +21,7 @@ const KIND_ICON = {
 } as const;
 
 export function NotificationsMenu() {
+  const translateUi = useTranslate();
   const router = useRouter();
   const { readNotificationIds, markAllNotificationsRead, hydrated } = useApp();
   const unread = hydrated
@@ -31,7 +33,7 @@ export function NotificationsMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`Notifications${unread.length ? `, ${unread.length} unread` : ""}`}
+          aria-label={translateUi(`Notifications${unread.length ? `, ${unread.length} unread` : ""}`)}
           className="relative flex size-9.5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
         >
           <Bell className="size-4.5" aria-hidden />
@@ -44,16 +46,14 @@ export function NotificationsMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-88 p-0">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <p className="font-display text-sm font-semibold">Notifications</p>
+          <p className="font-display text-sm font-semibold"><LocalizedText text={"Notifications"} /></p>
           <button
             type="button"
             disabled={unread.length === 0}
             onClick={() => markAllNotificationsRead(NOTIFICATIONS.map((n) => n.id))}
             className="flex cursor-pointer items-center gap-1 text-[12px] font-medium text-primary transition-colors hover:text-primary-hover disabled:cursor-not-allowed disabled:text-zinc-400"
           >
-            <CheckCheck className="size-3.5" aria-hidden />
-            Mark all read
-          </button>
+            <CheckCheck className="size-3.5" aria-hidden /><LocalizedText text={"Mark all read"} /></button>
         </div>
         <ul className="max-h-96 overflow-y-auto p-1.5 scrollbar-thin">
           {NOTIFICATIONS.map((n) => {
@@ -86,13 +86,13 @@ export function NotificationsMenu() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <span className="truncate text-[13px] font-semibold">{n.title}</span>
+                      <span className="truncate text-[13px] font-semibold"><LocalizedText text={n.title} /></span>
                       {isUnread && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
                     </span>
                     <span className="mt-0.5 line-clamp-2 block text-[12px] leading-snug text-muted-foreground">
-                      {n.body}
+                      <LocalizedText text={n.body} />
                     </span>
-                    <span className="mt-1 block text-[11px] text-zinc-400">{timeAgo(n.createdAt)}</span>
+                    <span className="mt-1 block text-[11px] text-zinc-400"><LocalizedText text={timeAgo(n.createdAt)} /></span>
                   </span>
                 </button>
               </li>

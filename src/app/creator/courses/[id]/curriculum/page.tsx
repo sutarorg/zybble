@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import { use, useState } from "react";
 import Link from "next/link";
@@ -62,30 +63,24 @@ export default function CurriculumPage({ params }: { params: Promise<{ id: strin
       <div>
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link href="/creator/courses">
-            <ArrowLeft aria-hidden />
-            My Courses
-          </Link>
+            <ArrowLeft aria-hidden /><LocalizedText text={"My Courses"} /></Link>
         </Button>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-[24px] font-bold tracking-tight">Curriculum</h1>
+            <h1 className="font-display text-[24px] font-bold tracking-tight"><LocalizedText text={"Curriculum"} /></h1>
             <div className="mt-1.5 flex items-center gap-2.5 text-[12.5px] text-muted-foreground">
-              <span className="max-w-80 truncate font-medium text-foreground">{course.title}</span>
+              <span className="max-w-80 truncate font-medium text-foreground"><LocalizedText text={course.title} /></span>
               <StatusBadge status={course.status} />
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm">
               <Link href={`/creator/courses/${id}/edit`}>
-                <Pencil aria-hidden />
-                Edit details
-              </Link>
+                <Pencil aria-hidden /><LocalizedText text={"Edit details"} /></Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={`/creator/courses/${id}/content`}>
-                <CloudUpload aria-hidden />
-                Course content
-              </Link>
+                <CloudUpload aria-hidden /><LocalizedText text={"Course content"} /></Link>
             </Button>
           </div>
         </div>
@@ -102,7 +97,7 @@ export default function CurriculumPage({ params }: { params: Promise<{ id: strin
 
       {dirty && (
         <div className="sticky bottom-4 flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3 shadow-pop">
-          <p className="text-[12.5px] font-medium text-amber-600">Unsaved curriculum changes</p>
+          <p className="text-[12.5px] font-medium text-amber-600"><LocalizedText text={"Unsaved curriculum changes"} /></p>
           <div className="flex gap-2">
             <Button
               variant="ghost"
@@ -111,12 +106,8 @@ export default function CurriculumPage({ params }: { params: Promise<{ id: strin
                 setSections(course.curriculum);
                 toast("Changes discarded");
               }}
-            >
-              Discard
-            </Button>
-            <Button size="sm" onClick={save} loading={saving}>
-              Save curriculum
-            </Button>
+            ><LocalizedText text={"Discard"} /></Button>
+            <Button size="sm" onClick={save} loading={saving}><LocalizedText text={"Save curriculum"} /></Button>
           </div>
         </div>
       )}

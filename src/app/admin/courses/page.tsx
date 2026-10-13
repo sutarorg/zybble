@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
@@ -42,6 +43,7 @@ export default function AdminCoursesPage({
 }: {
   searchParams: Promise<{ tab?: string; q?: string }>;
 }) {
+  const translateUi = useTranslate();
   const sp = use(searchParams);
   const initialTab = typeof sp.tab === "string" && TABS.includes(sp.tab as Tab) ? (sp.tab as Tab) : "all";
   const initialQ = typeof sp.q === "string" ? sp.q : "";
@@ -100,18 +102,13 @@ export default function AdminCoursesPage({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Moderation</p>
-        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">
-          Course moderation & management
-        </h1>
-        <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground">
-          Review creator submissions. Approvals publish community courses to Explore on this
-          device; decisions update the shared mock state. Drafts are never purchasable.
-        </p>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Moderation"} /></p>
+        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Course moderation & management"} /></h1>
+        <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground"><LocalizedText text={"Review creator submissions. Approvals publish community courses to Explore on this device; decisions update the shared mock state. Drafts are never purchasable."} /></p>
       </div>
 
       {/* Status tabs */}
-      <div className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide" role="tablist" aria-label="Moderation status">
+      <div className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide" role="tablist" aria-label={translateUi("Moderation status")}>
         {TABS.map((t) => {
           const meta = t === "all" ? null : STATUS_META[t];
           const active = tab === t;
@@ -127,7 +124,7 @@ export default function AdminCoursesPage({
                 active ? "border-primary bg-primary text-white shadow-sm" : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:text-foreground"
               )}
             >
-              {t === "all" ? "All" : meta!.label}
+              <LocalizedText text={t === "all" ? "All" : meta!.label} />
               <span className={cn("rounded px-1 text-[10.5px] tabular-nums", active ? "bg-white/20" : "bg-muted")}>
                 {counts[t] ?? 0}
               </span>
@@ -144,34 +141,34 @@ export default function AdminCoursesPage({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search title or creator…"
-            aria-label="Search submissions"
+            placeholder={translateUi("Search title or creator…")}
+            aria-label={translateUi("Search submissions")}
             className="h-9.5 w-full rounded-lg border border-input bg-white pr-3 pl-9 text-sm shadow-xs outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-44" aria-label="Filter by category">
-            <SelectValue placeholder="All categories" />
+          <SelectTrigger className="w-44" aria-label={translateUi("Filter by category")}>
+            <SelectValue placeholder={translateUi("All categories")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
+            <SelectItem value="all"><LocalizedText text={"All categories"} /></SelectItem>
             {CATEGORIES.map((c) => (
               <SelectItem key={c.slug} value={c.slug}>
-                {c.name}
+                <LocalizedText text={c.name} />
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
-          <SelectTrigger className="w-44" aria-label="Sort submissions">
+          <SelectTrigger className="w-44" aria-label={translateUi("Sort submissions")}>
             <SlidersHorizontal className="size-3.5 text-zinc-400" aria-hidden />
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
-            <SelectItem value="updated">Recently updated</SelectItem>
-            <SelectItem value="submitted">Oldest first (queue)</SelectItem>
-            <SelectItem value="price">Highest price</SelectItem>
-            <SelectItem value="title">Title A–Z</SelectItem>
+            <SelectItem value="updated"><LocalizedText text={"Recently updated"} /></SelectItem>
+            <SelectItem value="submitted"><LocalizedText text={"Oldest first (queue)"} /></SelectItem>
+            <SelectItem value="price"><LocalizedText text={"Highest price"} /></SelectItem>
+            <SelectItem value="title"><LocalizedText text={"Title A–Z"} /></SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -197,9 +194,7 @@ export default function AdminCoursesPage({
                   setQuery("");
                   setCategory("all");
                 }}
-              >
-                Clear filters
-              </Button>
+              ><LocalizedText text={"Clear filters"} /></Button>
             ) : undefined
           }
         />
@@ -210,12 +205,12 @@ export default function AdminCoursesPage({
               <table className="w-full min-w-200 text-left">
                 <thead>
                   <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                    <th className="py-3 pr-4 pl-5">Course</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Price</th>
-                    <th className="px-4 py-3">Submitted</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="py-3 pr-5 pl-4 text-right">Actions</th>
+                    <th className="py-3 pr-4 pl-5"><LocalizedText text={"Course"} /></th>
+                    <th className="px-4 py-3"><LocalizedText text={"Category"} /></th>
+                    <th className="px-4 py-3"><LocalizedText text={"Price"} /></th>
+                    <th className="px-4 py-3"><LocalizedText text={"Submitted"} /></th>
+                    <th className="px-4 py-3"><LocalizedText text={"Status"} /></th>
+                    <th className="py-3 pr-5 pl-4 text-right"><LocalizedText text={"Actions"} /></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -230,11 +225,11 @@ export default function AdminCoursesPage({
                               href={`/admin/courses/${course.id}`}
                               className="relative block aspect-video w-24 shrink-0 overflow-hidden rounded-md border border-border bg-muted"
                             >
-                              <Image src={course.thumbnail} alt="" fill sizes="96px" className="object-cover" />
+                              <Image src={course.thumbnail} alt={translateUi("")} fill sizes="96px" className="object-cover" />
                             </Link>
                             <div className="min-w-0">
                               <Link href={`/admin/courses/${course.id}`} className="block truncate text-[13px] font-semibold hover:text-primary">
-                                {course.title}
+                                <LocalizedText text={course.title} />
                               </Link>
                               <p className="truncate text-[11.5px] text-muted-foreground">{instructor?.name}</p>
                             </div>
@@ -244,10 +239,10 @@ export default function AdminCoursesPage({
                           {CATEGORIES.find((c) => c.slug === course.category)?.name}
                         </td>
                         <td className="px-4 py-3 text-[12.5px] whitespace-nowrap tabular-nums">
-                          {course.price === 0 ? <span className="font-semibold text-success">Free</span> : formatPrice(course.price)}
+                          {course.price === 0 ? <span className="font-semibold text-success"><LocalizedText text={"Free"} /></span> : formatPrice(course.price)}
                         </td>
                         <td className="px-4 py-3 text-[12px] whitespace-nowrap text-muted-foreground">
-                          {formatDate(course.lastUpdated)}
+                          <LocalizedText text={formatDate(course.lastUpdated)} />
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={course.status} />
@@ -257,7 +252,7 @@ export default function AdminCoursesPage({
                             {course.status === "pending" && (
                               <>
                                 <ActionButton
-                                  label="Approve"
+                                  label={translateUi("Approve")}
                                   icon={ClipboardCheck}
                                   size="sm"
                                   confirmTitle={`Approve “${course.title}”?`}
@@ -267,7 +262,7 @@ export default function AdminCoursesPage({
                                   toastText={`“${course.title}” published (simulated)`}
                                 />
                                 <ActionButton
-                                  label="Reject"
+                                  label={translateUi("Reject")}
                                   icon={Ban}
                                   variant="outline"
                                   size="sm"
@@ -282,7 +277,7 @@ export default function AdminCoursesPage({
                             )}
                             {(course.status === "published" || course.status === "rejected" || course.status === "changes_requested") && course.id !== "crs_chatgpt" && course.id !== "crs_prompt" && (
                               <ActionButton
-                                label="Queue"
+                                label={translateUi("Queue")}
                                 icon={RotateCcw}
                                 variant="ghost"
                                 size="sm"
@@ -295,9 +290,7 @@ export default function AdminCoursesPage({
                             )}
                             <Button asChild variant="outline" size="sm">
                               <Link href={`/admin/courses/${course.id}`}>
-                                <Eye aria-hidden />
-                                Review
-                              </Link>
+                                <Eye aria-hidden /><LocalizedText text={"Review"} /></Link>
                             </Button>
                           </div>
                         </td>
@@ -309,8 +302,7 @@ export default function AdminCoursesPage({
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[12.5px] text-muted-foreground">
-              Page {current} of {totalPages} · {filtered.length} {filtered.length === 1 ? "course" : "courses"}
+            <p className="text-[12.5px] text-muted-foreground"><LocalizedText text={"Page"} />{current}<LocalizedText text={"of"} />{totalPages} · {filtered.length} {filtered.length === 1 ? "course" : "courses"}
             </p>
             <Pagination page={current} totalPages={totalPages} onChange={setPage} />
           </div>

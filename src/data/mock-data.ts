@@ -924,10 +924,3 @@ export const LANGUAGES = [
   { code: "de", label: "German", native: "Deutsch" },
   { code: "ja", label: "Japanese", native: "日本語" },
 ];
-
-export const DEMO_USER = {
-  id: "usr_demo",
-  name: "Alex Carter",
-  email: "alex@zybble.demo",
-  initials: "AC",
-};

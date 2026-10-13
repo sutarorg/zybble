@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,6 +22,7 @@ interface Preset {
 }
 
 export function ExploreClient({ q }: { q: string }) {
+  const translateUi = useTranslate();
   const router = useRouter();
   const { language } = useApp();
   const dict = getDictionary(language);
@@ -49,13 +51,13 @@ export function ExploreClient({ q }: { q: string }) {
       {/* Page header */}
       <header>
         <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">
-          {dict.exploreEyebrow}
+          <LocalizedText text={dict.exploreEyebrow} />
         </p>
         <h1 className="font-display mt-2 text-[26px] leading-tight font-bold tracking-tight sm:text-[34px]">
-          {dict.exploreTitle}
+          <LocalizedText text={dict.exploreTitle} />
         </h1>
         <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground">
-          {dict.exploreSubtitle}
+          <LocalizedText text={dict.exploreSubtitle} />
         </p>
       </header>
 
@@ -73,26 +75,26 @@ export function ExploreClient({ q }: { q: string }) {
         <>
           <div className="mt-12 space-y-12">
             <CourseCarousel
-              title={dict.popularCourses}
-              description={dict.popularCoursesDesc}
+              title={translateUi(dict.popularCourses)}
+              description={translateUi(dict.popularCoursesDesc)}
               courses={popular}
               onViewAll={() => setPreset({ key: "popular", label: dict.popularCourses, sort: "popular" })}
             />
             <CourseCarousel
-              title={dict.newCourses}
-              description={dict.newCoursesDesc}
+              title={translateUi(dict.newCourses)}
+              description={translateUi(dict.newCoursesDesc)}
               courses={newest}
               onViewAll={() => setPreset({ key: "newest", label: dict.newCourses, sort: "newest" })}
             />
             <CourseCarousel
-              title={dict.topRated}
-              description={dict.topRatedDesc}
+              title={translateUi(dict.topRated)}
+              description={translateUi(dict.topRatedDesc)}
               courses={topRated}
               onViewAll={() => setPreset({ key: "rating", label: dict.topRated, sort: "rating" })}
             />
             <CourseCarousel
-              title={dict.freeCourses}
-              description={dict.freeCoursesDesc}
+              title={translateUi(dict.freeCourses)}
+              description={translateUi(dict.freeCoursesDesc)}
               courses={free}
               onViewAll={() =>
                 setPreset({
@@ -108,14 +110,14 @@ export function ExploreClient({ q }: { q: string }) {
       ) : (
         <div className="mt-7">
           <h2 className="font-display text-xl font-semibold tracking-tight">
-            {q.trim()
+            {<LocalizedText text={q.trim()
               ? dict.searchResults
               : activeCategory
                 ? activeCategory.name
-                : (preset?.label ?? dict.allCourses)}
+                : (preset?.label ?? dict.allCourses)} />}
           </h2>
           {activeCategory && !q.trim() && (
-            <p className="mt-1 text-[13.5px] text-muted-foreground">{activeCategory.description}</p>
+            <p className="mt-1 text-[13.5px] text-muted-foreground"><LocalizedText text={activeCategory.description} /></p>
           )}
           <CourseBrowser
             key={`${preset?.key}|${category}`}

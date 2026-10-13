@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -35,9 +36,7 @@ export function CheckoutSuccessClient({
       <header className="border-b border-border bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Logo />
-          <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
-            Demo — no real payment
-          </span>
+          <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700"><LocalizedText text={"No real payment is processed"} /></span>
         </div>
       </header>
 
@@ -49,43 +48,38 @@ export function CheckoutSuccessClient({
               <Check className="relative size-8 text-emerald-600" strokeWidth={3} aria-hidden />
             </span>
             <p className="mt-5 flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-emerald-700 uppercase">
-              <PartyPopper className="size-3.5" aria-hidden />
-              Enrollment confirmed
-            </p>
-            <h1 className="font-display mt-2 text-[24px] leading-tight font-bold tracking-tight">
-              You&apos;re enrolled in {course.title}
+              <PartyPopper className="size-3.5" aria-hidden /><LocalizedText text={"Enrollment confirmed"} /></p>
+            <h1 className="font-display mt-2 text-[24px] leading-tight font-bold tracking-tight"><LocalizedText text={"You're enrolled in"} /><LocalizedText text={course.title} />
             </h1>
             <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-muted-foreground">
-              {order?.email
+              {<LocalizedText text={order?.email
                 ? `A receipt was (not really) sent to ${order.email}.`
-                : "Your demo enrollment is complete."}{" "}
-              The course is waiting for you in My Learning.
-            </p>
+                : "Your preview enrollment is complete."} />}<LocalizedText text={" "} /><LocalizedText text={"The course is waiting for you in My Learning."} /></p>
           </div>
 
           <Separator />
 
           <dl className="space-y-2.5 px-6 py-5 text-[13.5px] sm:px-10">
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Course</dt>
-              <dd className="text-right font-medium">{course.title}</dd>
+              <dt className="text-muted-foreground"><LocalizedText text={"Course"} /></dt>
+              <dd className="text-right font-medium"><LocalizedText text={course.title} /></dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Order</dt>
-              <dd className="font-mono text-[12.5px]">{orderId || "—"}</dd>
+              <dt className="text-muted-foreground"><LocalizedText text={"Order"} /></dt>
+              <dd className="font-mono text-[12.5px]"><LocalizedText text={orderId || "—"} /></dd>
             </div>
             {order && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Date</dt>
-                <dd>{formatDate(order.createdAt)}</dd>
+                <dt className="text-muted-foreground"><LocalizedText text={"Date"} /></dt>
+                <dd><LocalizedText text={formatDate(order.createdAt)} /></dd>
               </div>
             )}
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Total paid</dt>
+              <dt className="text-muted-foreground"><LocalizedText text={"Total paid"} /></dt>
               <dd className="font-semibold">
-                {hydrated && order ? formatPrice(order.total) : formatPrice(course.price)}
+                <LocalizedText text={hydrated && order ? formatPrice(order.total) : formatPrice(course.price)} />
                 {order && order.cardLast4 !== "FREE" && (
-                  <span className="text-zinc-400"> · card •••• {order.cardLast4}</span>
+                  <span className="text-zinc-400"><LocalizedText text={"· card ••••"} /><LocalizedText text={order.cardLast4} /></span>
                 )}
               </dd>
             </div>
@@ -94,15 +88,11 @@ export function CheckoutSuccessClient({
           <div className="flex flex-col gap-2 px-6 pb-8 sm:flex-row sm:px-10">
             <Button asChild size="lg" className="flex-1">
               <Link href="/my-learning">
-                <GraduationCap aria-hidden />
-                Start learning
-              </Link>
+                <GraduationCap aria-hidden /><LocalizedText text={"Start learning"} /></Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="flex-1">
               <Link href="/">
-                <Compass aria-hidden />
-                Keep exploring
-              </Link>
+                <Compass aria-hidden /><LocalizedText text={"Keep exploring"} /></Link>
             </Button>
           </div>
         </div>

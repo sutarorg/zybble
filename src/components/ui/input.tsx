@@ -1,7 +1,11 @@
+"use client";
+
+import { useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  const t = useTranslate();
   return (
     <input
       type={type}
@@ -13,11 +17,14 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         className
       )}
       {...props}
+      placeholder={props.placeholder ? t(props.placeholder) : undefined}
+      aria-label={props["aria-label"] ? t(props["aria-label"]) : undefined}
     />
   );
 }
 
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
+  const t = useTranslate();
   return (
     <textarea
       data-slot="textarea"
@@ -28,6 +35,8 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
         className
       )}
       {...props}
+      placeholder={props.placeholder ? t(props.placeholder) : undefined}
+      aria-label={props["aria-label"] ? t(props["aria-label"]) : undefined}
     />
   );
 }

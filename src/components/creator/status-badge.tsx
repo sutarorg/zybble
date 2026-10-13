@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import type { CourseStatus } from "@/types";
 import { STATUS_META } from "@/lib/creator";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,7 @@ export function StatusBadge({ status, className }: { status: CourseStatus; class
   return (
     <Badge variant={meta.badge === "sky" ? "sky" : meta.badge} className={cn("gap-1.5", className)}>
       <span className={cn("size-1.5 rounded-full", meta.dot)} aria-hidden />
-      {meta.label}
+      <LocalizedText text={meta.label} />
     </Badge>
   );
 }

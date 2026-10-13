@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import { ArrowUpDown } from "lucide-react";
 import type { SortOption } from "@/types";
 import { SORT_LABELS } from "@/lib/courses";
@@ -16,18 +17,19 @@ export function SortSelect({
   onChange: (sort: SortOption) => void;
   className?: string;
 }) {
+  const translateUi = useTranslate();
   return (
     <Select value={value} onValueChange={(v) => onChange(v as SortOption)}>
-      <SelectTrigger className={className} aria-label="Sort courses">
+      <SelectTrigger className={className} aria-label={translateUi("Sort courses")}>
         <span className="flex items-center gap-2">
           <ArrowUpDown className="size-3.5 text-zinc-400" aria-hidden />
-          <SelectValue placeholder="Sort by" />
+          <SelectValue placeholder={translateUi("Sort by")} />
         </span>
       </SelectTrigger>
       <SelectContent align="end">
         {ORDER.map((key) => (
           <SelectItem key={key} value={key}>
-            {SORT_LABELS[key]}
+            <LocalizedText text={SORT_LABELS[key]} />
           </SelectItem>
         ))}
       </SelectContent>

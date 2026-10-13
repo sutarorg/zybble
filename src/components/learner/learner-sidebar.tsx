@@ -1,6 +1,8 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
+import { TeachingCard } from "@/components/layout/teaching-card";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Award,
@@ -54,13 +56,14 @@ function NavItem({
           active ? "text-primary" : "text-zinc-400 group-hover:text-foreground"
         )}
       />
-      <span className="truncate">{label}</span>
+      <span className="truncate"><LocalizedText text={label} /></span>
       {trailing ? <span className="ml-auto">{trailing}</span> : null}
     </Link>
   );
 }
 
 export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const translateUi = useTranslate();
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut, wishlist, enrollments, learnerPrefs, certificates, language } = useApp();
@@ -115,7 +118,7 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 scrollbar-thin">
-        <nav aria-label="Learner" className="flex flex-col gap-0.5">
+        <nav aria-label={translateUi("Learner")} className="flex flex-col gap-0.5">
           {items.map((item) => (
             <NavItem key={item.href} {...item} onNavigate={onNavigate} />
           ))}
@@ -124,9 +127,7 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
         {/* Streak / goal panel */}
         <div className="mx-0.5 mt-6 mb-4 rounded-xl border border-violet-200/80 bg-accent p-3.5">
           <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-foreground">
-            <Flame className="size-3.5" aria-hidden />
-            Daily goal: {learnerPrefs.goalMinutesPerDay} min
-          </p>
+            <Flame className="size-3.5" aria-hidden /><LocalizedText text={"Daily goal:"} />{learnerPrefs.goalMinutesPerDay}<LocalizedText text={"min"} /></p>
           <div className="mt-2.5 flex gap-1">
             {[0, 1, 2, 3, 4, 5, 6].map((d) => (
               <span
@@ -139,40 +140,25 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
               />
             ))}
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-violet-900/60">
-            Simulated 4-day streak — small sessions compound.
-          </p>
+          <p className="mt-2 text-[11px] leading-relaxed text-violet-900/60"><LocalizedText text={"Simulated 4-day streak — small sessions compound."} /></p>
         </div>
       </div>
 
       <div className="border-t border-border p-3">
         {user ? (
           <div className="flex flex-col gap-3">
-            {user.role !== "creator" && (
-              <Link
-                href="/creator/signup"
-                className="flex items-center gap-3 rounded-lg border border-border bg-white p-3 text-left transition-colors hover:border-violet-200 hover:shadow-card-hover"
-              >
-                <Presentation className="size-5 text-primary" aria-hidden />
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-foreground">Start teaching</p>
-                  <p className="truncate text-[11.5px] text-muted-foreground">
-                    Share your knowledge and earn money
-                  </p>
-                </div>
-              </Link>
-            )}
+            <TeachingCard onNavigate={onNavigate} />
             <div className="flex items-center gap-2.5 rounded-lg p-1.5">
               <Avatar className="size-8.5">
-                {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
+                {user.avatar && <AvatarImage src={user.avatar} alt={translateUi(user.name)} />}
                 <AvatarFallback className="bg-primary text-[11px] text-white">
-                  {user.initials}
+                  <LocalizedText text={user.initials} />
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold">{user.name}</p>
+                <p className="truncate text-[13px] font-semibold"><LocalizedText text={user.name} /></p>
                 <Link href="/settings" className="text-[11.5px] font-medium text-primary hover:underline">
-                  {dict.viewSettings}
+                  <LocalizedText text={dict.viewSettings} />
                 </Link>
               </div>
             <button
@@ -181,20 +167,18 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
                 signOut();
                 router.push("/");
               }}
-              title={dict.signOut}
+              title={translateUi(dict.signOut)}
               className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
             >
               <LogOut className="size-4" />
-              <span className="sr-only">{dict.signOut}</span>
+              <span className="sr-only"><LocalizedText text={dict.signOut} /></span>
             </button>
             </div>
             <Link
               href="/"
               className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
             >
-              <Compass className="size-4 text-zinc-400" aria-hidden />
-              Back to Explore
-            </Link>
+              <Compass className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Back to Explore"} /></Link>
           </div>
         ) : (
           <div className="flex flex-col gap-2 p-1">
@@ -202,9 +186,7 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
               href="/"
               className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
             >
-              <Compass className="size-4 text-zinc-400" aria-hidden />
-              Back to Explore
-            </Link>
+              <Compass className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Back to Explore"} /></Link>
           </div>
         )}
       </div>

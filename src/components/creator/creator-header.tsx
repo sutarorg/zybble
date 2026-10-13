@@ -1,5 +1,8 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
+import { useApp } from "@/components/providers/app-providers";
+import { LanguageMenu } from "@/components/layout/language-menu";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -36,6 +39,7 @@ import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 const KIND_ICON = { review: ClipboardCheck, sale: Star, payout: Wallet, system: Sparkles } as const;
 
 function CreatorNotificationsMenu() {
+  const translateUi = useTranslate();
   const router = useRouter();
   const { creatorNotifications, readCreatorNotifIds, markAllCreatorNotifsRead, hydrated } =
     useCreator();
@@ -48,7 +52,7 @@ function CreatorNotificationsMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`Creator notifications${unread.length ? `, ${unread.length} unread` : ""}`}
+          aria-label={translateUi(`Creator notifications${unread.length ? `, ${unread.length} unread` : ""}`)}
           className="relative flex size-9.5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
         >
           <Bell className="size-4.5" aria-hidden />
@@ -61,16 +65,14 @@ function CreatorNotificationsMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-88 p-0">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <p className="font-display text-sm font-semibold">Studio notifications</p>
+          <p className="font-display text-sm font-semibold"><LocalizedText text={"Studio notifications"} /></p>
           <button
             type="button"
             disabled={unread.length === 0}
             onClick={() => markAllCreatorNotifsRead(creatorNotifications.map((n) => n.id))}
             className="flex cursor-pointer items-center gap-1 text-[12px] font-medium text-primary transition-colors hover:text-primary-hover disabled:cursor-not-allowed disabled:text-zinc-400"
           >
-            <CheckCheck className="size-3.5" aria-hidden />
-            Mark all read
-          </button>
+            <CheckCheck className="size-3.5" aria-hidden /><LocalizedText text={"Mark all read"} /></button>
         </div>
         <ul className="max-h-96 overflow-y-auto p-1.5 scrollbar-thin">
           {creatorNotifications.map((n) => {
@@ -103,13 +105,13 @@ function CreatorNotificationsMenu() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <span className="truncate text-[13px] font-semibold">{n.title}</span>
+                      <span className="truncate text-[13px] font-semibold"><LocalizedText text={n.title} /></span>
                       {isUnread && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
                     </span>
                     <span className="mt-0.5 line-clamp-2 block text-[12px] leading-snug text-muted-foreground">
-                      {n.body}
+                      <LocalizedText text={n.body} />
                     </span>
-                    <span className="mt-1 block text-[11px] text-zinc-400">{timeAgo(n.createdAt)}</span>
+                    <span className="mt-1 block text-[11px] text-zinc-400"><LocalizedText text={timeAgo(n.createdAt)} /></span>
                   </span>
                 </button>
               </li>
@@ -122,18 +124,21 @@ function CreatorNotificationsMenu() {
 }
 
 function CreatorAvatarMenu() {
+  const translateUi = useTranslate();
+  const router = useRouter();
+  const { signOut } = useApp();
   const { profile } = useCreator();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label="Creator account menu"
+          aria-label={translateUi("Creator account menu")}
           className="flex cursor-pointer items-center gap-1.5 rounded-full p-0.5 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
         >
           <Avatar className="size-8.5 ring-1 ring-border">
             <AvatarFallback className={cn("text-[11px]", profile.avatarColor)}>
-              {profile.initials}
+              <LocalizedText text={profile.initials} />
             </AvatarFallback>
           </Avatar>
         </button>
@@ -142,37 +147,36 @@ function CreatorAvatarMenu() {
         <div className="flex items-center gap-3 px-2.5 py-2.5">
           <Avatar className="size-10">
             <AvatarFallback className={cn("text-xs", profile.avatarColor)}>
-              {profile.initials}
+              <LocalizedText text={profile.initials} />
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="truncate text-[13.5px] font-semibold">{profile.displayName}</p>
-            <p className="truncate text-[12px] text-muted-foreground">{profile.headline}</p>
+            <p className="truncate text-[13.5px] font-semibold"><LocalizedText text={profile.displayName} /></p>
+            <p className="truncate text-[12px] text-muted-foreground"><LocalizedText text={profile.headline} /></p>
           </div>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/instructors/maya-lindqvist">View public profile</Link>
+          <Link href={`/instructors/${profile.instructorId}`}><LocalizedText text="Public profile" /></Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/creator/profile">Edit instructor profile</Link>
+          <Link href="/creator/profile"><LocalizedText text={"Edit instructor profile"} /></Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/creator/settings">Studio settings</Link>
+          <Link href="/creator/settings"><LocalizedText text={"Studio settings"} /></Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/">Back to learner experience</Link>
+          <Link href="/"><LocalizedText text={"Back to learner experience"} /></Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => toast.info("This demo signs you in as the instructor permanently.")}>
-          Switch account (demo)
-        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { signOut(); router.push("/"); }}><LocalizedText text="Sign out" /></DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
 export function CreatorHeader({ title }: { title?: string }) {
+  const translateUi = useTranslate();
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -183,7 +187,7 @@ export function CreatorHeader({ title }: { title?: string }) {
       <div className="flex h-16 items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <IconButton
-            label="Open creator navigation"
+            label={translateUi("Open creator navigation")}
             onClick={() => setNavOpen(true)}
             className="lg:hidden"
           >
@@ -191,7 +195,7 @@ export function CreatorHeader({ title }: { title?: string }) {
           </IconButton>
           <SheetContent side="left" className="w-72 p-0">
             <VisuallyHidden.Root>
-              <SheetTitle>Creator navigation</SheetTitle>
+              <SheetTitle><LocalizedText text={"Creator navigation"} /></SheetTitle>
             </VisuallyHidden.Root>
             <CreatorSidebarContent onNavigate={() => setNavOpen(false)} />
           </SheetContent>
@@ -214,8 +218,8 @@ export function CreatorHeader({ title }: { title?: string }) {
               type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder={title ?? "Search your courses…"}
-              aria-label="Search your courses"
+              placeholder={translateUi(title ?? "Search your courses…")}
+              aria-label={translateUi("Search your courses")}
               className="h-10 w-full rounded-full border border-transparent bg-muted pr-4 pl-10 text-sm outline-none placeholder:text-zinc-400 focus:border-primary/40 focus:bg-white focus:ring-2 focus:ring-ring/15 [&::-webkit-search-cancel-button]:hidden"
             />
           </div>
@@ -224,14 +228,14 @@ export function CreatorHeader({ title }: { title?: string }) {
         {/* Mobile: search collapses to an icon that opens a sheet */}
         <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
           <IconButton
-            label="Search your courses"
+            label={translateUi("Search your courses")}
             onClick={() => setSearchOpen(true)}
             className="ml-auto sm:hidden"
           >
             <Search className="size-5" aria-hidden />
           </IconButton>
           <SheetContent side="top" className="p-0">
-            <SheetTitle className="sr-only">Search your courses</SheetTitle>
+            <SheetTitle className="sr-only"><LocalizedText text={"Search your courses"} /></SheetTitle>
             <form
               role="search"
               className="px-4 py-4 pt-5"
@@ -252,8 +256,8 @@ export function CreatorHeader({ title }: { title?: string }) {
                   type="search"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder={title ?? "Search your courses…"}
-                  aria-label="Search your courses"
+                  placeholder={translateUi(title ?? "Search your courses…")}
+                  aria-label={translateUi("Search your courses")}
                   autoFocus
                   className="h-11 w-full rounded-full border border-transparent bg-muted pr-4 pl-10 text-sm outline-none placeholder:text-zinc-400 focus:border-primary/40 focus:bg-white focus:ring-2 focus:ring-ring/15 [&::-webkit-search-cancel-button]:hidden"
                 />
@@ -265,10 +269,9 @@ export function CreatorHeader({ title }: { title?: string }) {
         <div className="ml-auto flex items-center gap-1.5 sm:ml-0">
           <Button asChild size="sm" className="hidden sm:inline-flex">
             <Link href="/creator/courses/new">
-              <Plus aria-hidden />
-              Create Course
-            </Link>
+              <Plus aria-hidden /><LocalizedText text={"Create Course"} /></Link>
           </Button>
+          <LanguageMenu />
           <CreatorNotificationsMenu />
           <div className="mx-1 hidden h-5 w-px bg-border sm:block" aria-hidden />
           <CreatorAvatarMenu />

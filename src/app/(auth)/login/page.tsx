@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -14,11 +15,8 @@ export default function LoginPage() {
       title="Welcome back"
       subtitle="Sign in to pick up right where you left off."
       footer={
-        <>
-          New to Zybble?{" "}
-          <Link href="/signup" className="font-medium text-primary hover:underline">
-            Create a free account
-          </Link>
+        <><LocalizedText text={"New to Zybble?"} /><LocalizedText text={" "} />
+          <Link href="/signup" className="font-medium text-primary hover:underline"><LocalizedText text={"Create a free account"} /></Link>
         </>
       }
     >

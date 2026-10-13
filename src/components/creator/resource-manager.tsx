@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useRef, useState } from "react";
 import { CloudUpload, File, FileText, FileVideo, Package, Plus, Trash2 } from "lucide-react";
@@ -34,6 +35,7 @@ export function UploadSlot({
   uploads: UploadedMedia[];
   onChange: (uploads: UploadedMedia[]) => void;
 }) {
+  const translateUi = useTranslate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -71,11 +73,8 @@ export function UploadSlot({
         <span className="flex size-10 items-center justify-center rounded-xl bg-white text-primary shadow-card">
           <CloudUpload className="size-5" aria-hidden />
         </span>
-        <span className="text-[13.5px] font-medium">{title}</span>
-        <span className="max-w-xs text-[12px] leading-relaxed text-zinc-400">
-          Drop files or click to browse. Files stay on this device — uploading and media
-          processing are not connected in this demo.
-        </span>
+        <span className="text-[13.5px] font-medium"><LocalizedText text={title} /></span>
+        <span className="max-w-xs text-[12px] leading-relaxed text-zinc-400"><LocalizedText text={"Drop files or click to browse. Files stay on this device — uploading and media processing are not connected in this preview."} /></span>
       </button>
       <input
         ref={inputRef}
@@ -100,17 +99,14 @@ export function UploadSlot({
                 {u.kind === "video" ? <FileVideo className="size-4" aria-hidden /> : <File className="size-4" aria-hidden />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium">{u.fileName}</p>
+                <p className="truncate text-[13px] font-medium"><LocalizedText text={u.fileName} /></p>
                 <p className="text-[11.5px] text-zinc-400">
-                  {formatSize(u.fileSize)} · Local preview — not uploaded
-                </p>
+                  <LocalizedText text={formatSize(u.fileSize)} /><LocalizedText text={"· Local preview — not uploaded"} /></p>
               </div>
-              <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-emerald-700">
-                Ready
-              </span>
+              <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-emerald-700"><LocalizedText text={"Ready"} /></span>
               <button
                 type="button"
-                aria-label={`Remove ${u.fileName}`}
+                aria-label={translateUi(`Remove ${u.fileName}`)}
                 onClick={() => onChange(uploads.filter((_, idx) => idx !== i))}
                 className="cursor-pointer rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-destructive"
               >
@@ -132,6 +128,7 @@ export function ResourceManager({
   resources: CreatorResource[];
   onChange: (resources: CreatorResource[]) => void;
 }) {
+  const translateUi = useTranslate();
   const [title, setTitle] = useState("");
   const [fileType, setFileType] = useState<CreatorResource["fileType"]>("pdf");
   const [sizeMb, setSizeMb] = useState(1);
@@ -148,8 +145,8 @@ export function ResourceManager({
       {resources.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No downloadable resources yet"
-          description="Templates, checklists and cheat-sheets make your course much more valuable."
+          title={translateUi("No downloadable resources yet")}
+          description={translateUi("Templates, checklists and cheat-sheets make your course much more valuable.")}
         />
       ) : (
         <ul className="space-y-2">
@@ -161,14 +158,13 @@ export function ResourceManager({
                   <Icon className="size-4" aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium">{r.title}</p>
+                  <p className="truncate text-[13px] font-medium"><LocalizedText text={r.title} /></p>
                   <p className="text-[11.5px] text-zinc-400 uppercase">
-                    {r.fileType} · {r.sizeMb} MB
-                  </p>
+                    {r.fileType} · {r.sizeMb}<LocalizedText text={"MB"} /></p>
                 </div>
                 <button
                   type="button"
-                  aria-label={`Remove ${r.title}`}
+                  aria-label={translateUi(`Remove ${r.title}`)}
                   onClick={() => onChange(resources.filter((x) => x.id !== r.id))}
                   className="cursor-pointer rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-destructive"
                 >
@@ -184,8 +180,8 @@ export function ResourceManager({
         <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Resource title, e.g. Prompt library (PDF)"
-          aria-label="Resource title"
+          placeholder={translateUi("Resource title, e.g. Prompt library (PDF)")}
+          aria-label={translateUi("Resource title")}
           className="flex-1 bg-white"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -196,15 +192,15 @@ export function ResourceManager({
         />
         <div className="flex gap-2">
           <select
-            aria-label="Resource type"
+            aria-label={translateUi("Resource type")}
             value={fileType}
             onChange={(e) => setFileType(e.target.value as CreatorResource["fileType"])}
             className="h-9.5 cursor-pointer rounded-lg border border-input bg-white px-2.5 text-sm shadow-xs outline-none focus-visible:border-primary/50"
           >
-            <option value="pdf">PDF</option>
-            <option value="doc">Doc</option>
-            <option value="zip">ZIP</option>
-            <option value="file">Other</option>
+            <option value="pdf"><LocalizedText text={"PDF"} /></option>
+            <option value="doc"><LocalizedText text={"Doc"} /></option>
+            <option value="zip"><LocalizedText text={"ZIP"} /></option>
+            <option value="file"><LocalizedText text={"Other"} /></option>
           </select>
           <Input
             type="number"
@@ -212,13 +208,11 @@ export function ResourceManager({
             step={0.1}
             value={sizeMb}
             onChange={(e) => setSizeMb(Number(e.target.value))}
-            aria-label="Size in MB"
+            aria-label={translateUi("Size in MB")}
             className="w-20 bg-white"
           />
           <Button type="button" variant="outline" onClick={add} disabled={!title.trim()}>
-            <Plus aria-hidden />
-            Add
-          </Button>
+            <Plus aria-hidden /><LocalizedText text={"Add"} /></Button>
         </div>
       </div>
     </div>

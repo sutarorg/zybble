@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState } from "react";
 import Link from "next/link";
@@ -54,7 +55,7 @@ export function CertificateDialog({
             <Award className="relative size-6 text-emerald-600" aria-hidden />
           </span>
           <div className="min-w-0">
-            <DialogTitle className="font-display text-xl">{title}</DialogTitle>
+            <DialogTitle className="font-display text-xl"><LocalizedText text={title} /></DialogTitle>
             <DialogDescription className="mt-1">
               {description ??
                 "Every lesson is done. Your certificate is ready — download it or find it any time under Certificates."}
@@ -75,18 +76,14 @@ export function CertificateDialog({
           </Button>
           <Button asChild variant="outline" size="lg" className="flex-1">
             <Link href="/certificates">
-              <PartyPopper aria-hidden />
-              All my certificates
-            </Link>
+              <PartyPopper aria-hidden /><LocalizedText text={"All my certificates"} /></Link>
           </Button>
           <Button
             variant="ghost"
             size="lg"
             className="flex-1"
             onClick={() => onOpenChange(false)}
-          >
-            Keep reviewing
-          </Button>
+          ><LocalizedText text={"Keep reviewing"} /></Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -34,6 +35,7 @@ const TYPE_META = {
 } as const;
 
 export default function AdminReportsPage() {
+  const translateUi = useTranslate();
   const { hydrated, reports, setReport } = useAdmin();
   const [statusFilter, setStatusFilter] = useState<ReportStatus | "all">("open");
   const [selected, setSelected] = useState<AdminReport | null>(null);
@@ -69,16 +71,13 @@ export default function AdminReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Trust & Safety</p>
-        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">Reports</h1>
-        <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground">
-          Flagged courses, reviews and users. Work through the queue: triage, resolve or dismiss —
-          each action confirms first and updates local mock state.
-        </p>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Trust & Safety"} /></p>
+        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Reports"} /></h1>
+        <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground"><LocalizedText text={"Flagged courses, reviews and users. Work through the queue: triage, resolve or dismiss — each action confirms first and updates local mock state."} /></p>
       </div>
 
       {/* Status tabs */}
-      <div className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide" role="tablist" aria-label="Report status">
+      <div className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide" role="tablist" aria-label={translateUi("Report status")}>
         {tabs.map((t) => {
           const active = statusFilter === t.id;
           return (
@@ -93,7 +92,7 @@ export default function AdminReportsPage() {
                 active ? "border-primary bg-primary text-white shadow-sm" : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:text-foreground"
               )}
             >
-              {t.label}
+              <LocalizedText text={t.label} />
               <span className={cn("rounded px-1 text-[10.5px] tabular-nums", active ? "bg-white/20" : "bg-muted")}>
                 {counts[t.id] ?? 0}
               </span>
@@ -129,15 +128,14 @@ export default function AdminReportsPage() {
                         <ReportPriorityBadge priority={report.priority} />
                         <ReportStatusBadge status={report.status} />
                       </div>
-                      <h2 className="mt-2 text-[14.5px] font-semibold">{report.targetTitle}</h2>
+                      <h2 className="mt-2 text-[14.5px] font-semibold"><LocalizedText text={report.targetTitle} /></h2>
                       {report.targetExcerpt && (
                         <p className="mt-1 line-clamp-2 max-w-2xl rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[12px] text-muted-foreground italic">
-                          “{report.targetExcerpt}”
+                          “<LocalizedText text={report.targetExcerpt} />”
                         </p>
                       )}
-                      <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">{report.reason}</p>
-                      <p className="mt-1.5 text-[11.5px] text-zinc-400">
-                        Reported by {report.reporterName} · {timeAgo(report.submittedAt)}
+                      <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground"><LocalizedText text={report.reason} /></p>
+                      <p className="mt-1.5 text-[11.5px] text-zinc-400"><LocalizedText text={"Reported by"} /><LocalizedText text={report.reporterName} /> · <LocalizedText text={timeAgo(report.submittedAt)} />
                       </p>
                     </div>
                   </div>
@@ -145,7 +143,7 @@ export default function AdminReportsPage() {
                     {(report.status === "open" || report.status === "under_review") && (
                       <>
                         <ActionButton
-                          label="Resolve"
+                          label={translateUi("Resolve")}
                           icon={CheckCircle2}
                           size="sm"
                           confirmTitle={`Resolve report on “${report.targetTitle}”?`}
@@ -155,7 +153,7 @@ export default function AdminReportsPage() {
                           toastText="Report resolved (simulated)"
                         />
                         <ActionButton
-                          label="Dismiss"
+                          label={translateUi("Dismiss")}
                           icon={XCircle}
                           variant="outline"
                           danger
@@ -170,7 +168,7 @@ export default function AdminReportsPage() {
                     )}
                     {(report.status === "resolved" || report.status === "dismissed") && (
                       <ActionButton
-                        label="Reopen"
+                        label={translateUi("Reopen")}
                         icon={CornerUpLeft}
                         variant="outline"
                         size="sm"
@@ -182,9 +180,7 @@ export default function AdminReportsPage() {
                       />
                     )}
                     <Button variant="outline" size="sm" onClick={() => openReport(report)}>
-                      <Eye aria-hidden />
-                      Details
-                    </Button>
+                      <Eye aria-hidden /><LocalizedText text={"Details"} /></Button>
                   </div>
                 </div>
               </li>
@@ -200,13 +196,13 @@ export default function AdminReportsPage() {
           if (!open) setSelected(null);
           else if (selected && selected.status === "open") setReport(selected.id, { status: "under_review" });
         }}
-        title={selected ? `Report — ${selected.targetTitle}` : ""}
+        title={translateUi(selected ? `Report — ${selected.targetTitle}` : "")}
         description={selected ? `${TYPE_META[selected.type].label} report · submitted ${formatDate(selected.submittedAt)}` : undefined}
         footer={
           selected && (
             <div className="flex flex-wrap gap-2">
               <ActionButton
-                label="Resolve with note"
+                label={translateUi("Resolve with note")}
                 icon={CheckCircle2}
                 size="sm"
                 confirmTitle="Resolve this report?"
@@ -219,7 +215,7 @@ export default function AdminReportsPage() {
                 toastText="Report resolved with note (simulated)"
               />
               <ActionButton
-                label="Dismiss"
+                label={translateUi("Dismiss")}
                 icon={XCircle}
                 variant="outline"
                 danger
@@ -245,47 +241,45 @@ export default function AdminReportsPage() {
               <Badge variant="secondary">{TYPE_META[selected.type].label}</Badge>
             </div>
             <section>
-              <h3 className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">Reporter&apos;s claim</h3>
-              <p className="mt-1.5 text-[13.5px] leading-relaxed">{selected.reason}</p>
-              <p className="mt-1 text-[12px] text-muted-foreground">— {selected.reporterName}</p>
+              <h3 className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase"><LocalizedText text={"Reporter's claim"} /></h3>
+              <p className="mt-1.5 text-[13.5px] leading-relaxed"><LocalizedText text={selected.reason} /></p>
+              <p className="mt-1 text-[12px] text-muted-foreground">— <LocalizedText text={selected.reporterName} /></p>
             </section>
             {selected.targetExcerpt && (
               <section>
-                <h3 className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">Reported content</h3>
+                <h3 className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase"><LocalizedText text={"Reported content"} /></h3>
                 <p className="mt-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-[13px] leading-relaxed text-muted-foreground italic">
-                  “{selected.targetExcerpt}”
+                  “<LocalizedText text={selected.targetExcerpt} />”
                 </p>
               </section>
             )}
             <section>
-              <h3 className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">Related</h3>
+              <h3 className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase"><LocalizedText text={"Related"} /></h3>
               <div className="mt-2">
                 {selected.type === "course" && (
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/admin/courses/${selected.targetId}`}>Open in moderation</Link>
+                    <Link href={`/admin/courses/${selected.targetId}`}><LocalizedText text={"Open in moderation"} /></Link>
                   </Button>
                 )}
                 {selected.type === "review" && (
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/admin/reviews">Open review moderation</Link>
+                    <Link href="/admin/reviews"><LocalizedText text={"Open review moderation"} /></Link>
                   </Button>
                 )}
                 {selected.type === "user" && (
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/admin/users?selected=${selected.targetId}`}>Open user profile</Link>
+                    <Link href={`/admin/users?selected=${selected.targetId}`}><LocalizedText text={"Open user profile"} /></Link>
                   </Button>
                 )}
               </div>
             </section>
             <section>
-              <label htmlFor="admin-note" className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase">
-                Admin note
-              </label>
+              <label htmlFor="admin-note" className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase"><LocalizedText text={"Admin note"} /></label>
               <Textarea
                 id="admin-note"
                 value={adminNote}
                 onChange={(e) => setAdminNote(e.target.value)}
-                placeholder="What did you find, and why did you resolve it this way?"
+                placeholder={translateUi("What did you find, and why did you resolve it this way?")}
                 className="mt-2 min-h-24 text-[13px]"
               />
               <Button
@@ -296,9 +290,7 @@ export default function AdminReportsPage() {
                   setReport(selected.id, { adminNote: adminNote.trim() || undefined });
                   toast.success("Admin note saved (local)");
                 }}
-              >
-                Save note
-              </Button>
+              ><LocalizedText text={"Save note"} /></Button>
             </section>
           </div>
         )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState, useRef, useCallback } from "react";
 import { Camera, Loader2, X } from "lucide-react";
@@ -26,6 +27,7 @@ export function ProfilePictureUpload({
   className,
   avatarClassName,
 }: ProfilePictureUploadProps) {
+  const translateUi = useTranslate();
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatar || null);
   const [error, setError] = useState<string | null>(null);
@@ -92,8 +94,8 @@ export function ProfilePictureUpload({
     <div className={cn("flex flex-col items-center gap-3", className)}>
       <div className="relative">
         <Avatar className={cn("size-24", avatarClassName)}>
-          {previewUrl && <AvatarImage src={previewUrl} alt={name} />}
-          <AvatarFallback className="bg-primary text-xl text-white">{initials}</AvatarFallback>
+          {previewUrl && <AvatarImage src={previewUrl} alt={translateUi(name)} />}
+          <AvatarFallback className="bg-primary text-xl text-white"><LocalizedText text={initials} /></AvatarFallback>
         </Avatar>
         
         {/* Upload overlay */}
@@ -102,7 +104,7 @@ export function ProfilePictureUpload({
           onClick={triggerFileInput}
           disabled={isUploading}
           className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/30 transition-colors hover:bg-black/40 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Change profile picture"
+          aria-label={translateUi("Change profile picture")}
         >
           {isUploading ? (
             <Loader2 className="size-5 animate-spin text-white" />
@@ -120,7 +122,7 @@ export function ProfilePictureUpload({
               handleRemove();
             }}
             className="absolute -top-1 -right-1 flex size-6 items-center justify-center rounded-full bg-destructive text-white shadow-md transition-colors hover:bg-destructive/90"
-            aria-label="Remove profile picture"
+            aria-label={translateUi("Remove profile picture")}
           >
             <X className="size-3" />
           </button>
@@ -137,10 +139,10 @@ export function ProfilePictureUpload({
       />
 
       <div className="text-center">
-        <p className="text-[13px] font-medium">{name}</p>
+        <p className="text-[13px] font-medium"><LocalizedText text={name} /></p>
         <p className="text-[11.5px] text-muted-foreground">Click to upload</p>
-        {error && <p className="mt-1 text-[12px] text-red-500">{error}</p>}
-        <p className="text-[10px] text-zinc-400">Max {formatFileSize(MAX_FILE_SIZE)}</p>
+        {error && <p className="mt-1 text-[12px] text-red-500"><LocalizedText text={error} /></p>}
+        <p className="text-[10px] text-zinc-400">Max <LocalizedText text={formatFileSize(MAX_FILE_SIZE)} /></p>
       </div>
     </div>
   );

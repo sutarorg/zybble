@@ -1,22 +1,26 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Eye, EyeOff, Sparkles } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useApp } from "@/components/providers/app-providers";
 import { initialsOf } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DEMO_USER } from "@/data/mock-data";
+import { authenticate, registerAccount } from "@/lib/auth";
+import { getDictionary } from "@/lib/i18n";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+  const translateUi = useTranslate();
   const router = useRouter();
-  const { signIn } = useApp();
+  const { signIn, language } = useApp();
+  const dict = getDictionary(language);
   const isSignup = mode === "signup";
 
   const [name, setName] = useState("");
@@ -29,80 +33,70 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
   const validate = () => {
     const next: typeof errors = {};
-    if (isSignup && name.trim().length < 2) next.name = "Please enter your name.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = "Enter a valid email address.";
-    if (password.length < 8) next.password = "Password must be at least 8 characters.";
-    if (isSignup && !terms) next.terms = "Please accept the terms to continue.";
+    if (isSignup && name.trim().length < 2) next.name = dict.errName;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = dict.errEmail;
+    if (password.length < 8) next.password = dict.errPasswordShort;
+    if (isSignup && !terms) next.terms = dict.agreeTerms;
     setErrors(next);
     return Object.keys(next).length === 0;
-  };
-
-  const finish = (displayName: string, displayEmail: string) => {
-    signIn({ id: `usr_${Date.now()}`, name: displayName, email: displayEmail, initials: initialsOf(displayName) });
-    toast.success(isSignup ? `Welcome to Zybble, ${displayName.split(" ")[0]}!` : "Welcome back!");
-    router.push("/");
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    const account = isSignup
+      ? { id: crypto.randomUUID(), name: name.trim(), email: email.trim().toLowerCase(), initials: initialsOf(name), role: "learner" as const }
+      : authenticate(email, password);
+    if (!account) { setErrors({ password: dict.errCredentials }); return; }
+    if (isSignup && !registerAccount(account, password)) {
+      setErrors({ email: translateUi("An account with this email already exists.") }); return;
+    }
     setLoading(true);
-    window.setTimeout(() => {
-      const displayName = isSignup ? name.trim() : email === DEMO_USER.email ? DEMO_USER.name : email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-      finish(displayName, email.trim().toLowerCase());
-    }, 900);
-  };
-
-  const useDemoAccount = () => {
-    setEmail(DEMO_USER.email);
-    setPassword("demo12345");
-    setErrors({});
-    setLoading(true);
-    window.setTimeout(() => finish(DEMO_USER.name, DEMO_USER.email), 700);
+    signIn(account);
+    toast.success(isSignup ? dict.welcomeToast(account.name.split(" ")[0]) : dict.welcomeBackToast);
+    router.push("/");
   };
 
   return (
     <form onSubmit={submit} noValidate className="space-y-4">
       {isSignup && (
         <div className="space-y-1.5">
-          <Label htmlFor="name">Full name</Label>
+          <Label htmlFor="name"><LocalizedText text={"Full name"} /></Label>
           <Input
             id="name"
             autoComplete="name"
-            placeholder="Ada Lovelace"
+            placeholder={translateUi("Ada Lovelace")}
             value={name}
             onChange={(e) => setName(e.target.value)}
             aria-invalid={!!errors.name}
           />
-          {errors.name && <p className="text-[12px] text-destructive">{errors.name}</p>}
+          {errors.name && <p className="text-[12px] text-destructive"><LocalizedText text={errors.name} /></p>}
         </div>
       )}
 
       <div className="space-y-1.5">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email"><LocalizedText text={"Email"} /></Label>
         <Input
           id="email"
           type="email"
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder={translateUi("you@example.com")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           aria-invalid={!!errors.email}
         />
-        {errors.email && <p className="text-[12px] text-destructive">{errors.email}</p>}
+        {errors.email && <p className="text-[12px] text-destructive"><LocalizedText text={errors.email} /></p>}
       </div>
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password"><LocalizedText text={"Password"} /></Label>
           {!isSignup && (
             <button
               type="button"
-              onClick={() => toast.info("Password reset is illustrative in this demo")}
+              onClick={() => toast.info("Contact support to reset your password.")}
               className="cursor-pointer text-[12px] font-medium text-primary hover:text-primary-hover"
-            >
-              Forgot password?
-            </button>
+            ><LocalizedText text={"Forgot password?"} /></button>
           )}
         </div>
         <div className="relative">
@@ -125,7 +119,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
         </div>
-        {errors.password && <p className="text-[12px] text-destructive">{errors.password}</p>}
+        {errors.password && <p className="text-[12px] text-destructive"><LocalizedText text={errors.password} /></p>}
       </div>
 
       {isSignup && (
@@ -137,19 +131,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               onCheckedChange={(v) => setTerms(v === true)}
               className="mt-0.5"
             />
-            <Label htmlFor="terms" className="cursor-pointer text-[13px] leading-snug font-normal text-muted-foreground">
-              I agree to the{" "}
-              <Link href="/terms" className="font-medium text-primary hover:underline">
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className="font-medium text-primary hover:underline">
-                Privacy Policy
-              </Link>
+            <Label htmlFor="terms" className="cursor-pointer text-[13px] leading-snug font-normal text-muted-foreground"><LocalizedText text={"I agree to the"} /><LocalizedText text={" "} />
+              <Link href="/terms" className="font-medium text-primary hover:underline"><LocalizedText text={"Terms of Service"} /></Link><LocalizedText text={" "} /><LocalizedText text={"and"} /><LocalizedText text={" "} />
+              <Link href="/privacy" className="font-medium text-primary hover:underline"><LocalizedText text={"Privacy Policy"} /></Link>
               .
             </Label>
           </div>
-          {errors.terms && <p className="mt-1.5 text-[12px] text-destructive">{errors.terms}</p>}
+          {errors.terms && <p className="mt-1.5 text-[12px] text-destructive"><LocalizedText text={errors.terms} /></p>}
         </div>
       )}
 
@@ -157,26 +145,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         {isSignup ? "Create account" : "Sign in"}
       </Button>
 
-      {!isSignup && (
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          className="w-full"
-          onClick={useDemoAccount}
-          loading={loading}
-        >
-          <Sparkles aria-hidden />
-          Use demo account
-        </Button>
-      )}
-
       <div className="relative py-1">
         <div className="absolute inset-0 flex items-center" aria-hidden>
           <span className="w-full border-t border-border" />
         </div>
         <p className="relative flex justify-center">
-          <span className="bg-white px-3 text-[11.5px] text-zinc-400">or continue with</span>
+          <span className="bg-white px-3 text-[11.5px] text-zinc-400"><LocalizedText text={"or continue with"} /></span>
         </p>
       </div>
 
@@ -184,26 +158,22 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <Button
           type="button"
           variant="outline"
-          onClick={() => toast.info("Social sign-in is illustrative in this demo")}
+          onClick={() => toast.info("Social sign-in is not available yet. Please use email and password.")}
         >
           <svg viewBox="0 0 24 24" className="size-4" aria-hidden>
             <path
               fill="currentColor"
               d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27c3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10c5.35 0 9.25-3.67 9.25-9.09c0-1.15-.15-1.81-.15-1.81"
             />
-          </svg>
-          Google
-        </Button>
+          </svg><LocalizedText text={"Google"} /></Button>
         <Button
           type="button"
           variant="outline"
-          onClick={() => toast.info("Social sign-in is illustrative in this demo")}
+          onClick={() => toast.info("Social sign-in is not available yet. Please use email and password.")}
         >
           <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden>
             <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.7 1.25 3.35.96.1-.75.4-1.26.72-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.66.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.2.67.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5" />
-          </svg>
-          GitHub
-        </Button>
+          </svg><LocalizedText text={"GitHub"} /></Button>
       </div>
     </form>
   );

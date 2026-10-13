@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import { useState } from "react";
 import { Menu, Search } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
@@ -13,6 +14,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
 export function LearnerHeader() {
+  const translateUi = useTranslate();
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -21,7 +23,7 @@ export function LearnerHeader() {
       <div className="flex h-16 items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:px-10">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <IconButton
-            label="Open navigation"
+            label={translateUi("Open navigation")}
             onClick={() => setNavOpen(true)}
             className="lg:hidden"
           >
@@ -29,7 +31,7 @@ export function LearnerHeader() {
           </IconButton>
           <SheetContent side="left" className="w-72 p-0">
             <VisuallyHidden.Root>
-              <SheetTitle>Navigation</SheetTitle>
+              <SheetTitle><LocalizedText text={"Navigation"} /></SheetTitle>
             </VisuallyHidden.Root>
             <LearnerSidebarContent onNavigate={() => setNavOpen(false)} />
           </SheetContent>
@@ -42,14 +44,14 @@ export function LearnerHeader() {
         {/* Mobile: search collapses to an icon that opens a sheet */}
         <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
           <IconButton
-            label="Search courses"
+            label={translateUi("Search courses")}
             onClick={() => setSearchOpen(true)}
             className="ml-auto sm:hidden"
           >
             <Search className="size-5" aria-hidden />
           </IconButton>
           <SheetContent side="top" className="p-0">
-            <SheetTitle className="sr-only">Search courses</SheetTitle>
+            <SheetTitle className="sr-only"><LocalizedText text={"Search courses"} /></SheetTitle>
             <div className="px-4 py-4 pt-5">
               <SearchBox
                 mode="panel"

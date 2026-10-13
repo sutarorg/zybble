@@ -63,6 +63,8 @@ export interface Course {
   longDescription: string[];
   category: CategorySlug;
   instructorId: string;
+  /** Author snapshot for courses created during this session. */
+  instructor?: Instructor;
   thumbnail: string; // path under /images/courses
   price: number; // USD, 0 = free
   compareAtPrice?: number;

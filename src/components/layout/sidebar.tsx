@@ -1,6 +1,8 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
+import { TeachingCard } from "@/components/layout/teaching-card";
 import { usePathname, useRouter } from "next/navigation";
 import { Compass, GraduationCap, LogOut, ArrowLeft, Presentation } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,13 +48,14 @@ function NavItem({
           active ? "text-primary" : "text-zinc-400 group-hover:text-foreground"
         )}
       />
-      <span className="truncate">{label}</span>
+      <span className="truncate"><LocalizedText text={label} /></span>
       {trailing ? <span className="ml-auto">{trailing}</span> : null}
     </Link>
   );
 }
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const translateUi = useTranslate();
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut, language, enrollments } = useApp();
@@ -92,7 +95,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 scrollbar-thin">
-        <nav aria-label="Primary" className="flex flex-col gap-0.5">
+        <nav aria-label={translateUi("Primary")} className="flex flex-col gap-0.5">
           {mainNav.map((item) => (
             <NavItem key={item.href} {...item} onNavigate={onNavigate} />
           ))}
@@ -101,9 +104,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <Separator className="my-4" />
 
         <p className="px-3 pb-2 text-[10.5px] font-semibold tracking-[0.08em] text-zinc-400 uppercase">
-          {dict.categories}
+          <LocalizedText text={dict.categories} />
         </p>
-        <nav aria-label={dict.categories} className="flex flex-col gap-0.5 pb-4">
+        <nav aria-label={translateUi(dict.categories)} className="flex flex-col gap-0.5 pb-4">
           {CATEGORIES.map((category) => {
             const Icon = categoryIcon(category.icon);
             const href = `/categories/${category.slug}`;
@@ -112,7 +115,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 key={category.slug}
                 href={href}
                 icon={Icon}
-                label={category.name}
+                label={translateUi(category.name)}
                 active={pathname === href}
                 onNavigate={onNavigate}
               />
@@ -124,32 +127,17 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="border-t border-border p-3">
         {user ? (
           <div className="flex flex-col gap-3">
-            {user.role !== "creator" && (
-              <Link
-                href="/creator/signup"
-                className="flex items-center gap-3 rounded-lg border border-border bg-white p-3 text-left transition-colors hover:border-violet-200 hover:shadow-card-hover"
-              >
-                <Presentation className="size-5 text-primary" aria-hidden />
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-foreground">Start teaching</p>
-                  <p className="truncate text-[11.5px] text-muted-foreground">
-                    Share your knowledge and earn money
-                  </p>
-                </div>
-              </Link>
-            )}
+            <TeachingCard onNavigate={onNavigate} />
             <div className="flex items-center gap-2.5 rounded-lg p-1.5">
               <Avatar className="size-8.5">
-                {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
+                {user.avatar && <AvatarImage src={user.avatar} alt={translateUi(user.name)} />}
                 <AvatarFallback className="bg-primary text-[11px] text-white">
-                  {user.initials}
+                  <LocalizedText text={user.initials} />
                 </AvatarFallback>
               </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold">{user.name}</p>
-              <Link href="/" className="text-[11.5px] font-medium text-primary hover:underline">
-                Explore
-              </Link>
+              <p className="truncate text-[13px] font-semibold"><LocalizedText text={user.name} /></p>
+              <span className="text-[11.5px] text-muted-foreground"><LocalizedText text={dict.account} /></span>
             </div>
             <button
               type="button"
@@ -157,24 +145,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 signOut();
                 router.push("/");
               }}
-              title={dict.signOut}
+              title={translateUi(dict.signOut)}
               className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
             >
               <LogOut className="size-4" />
-              <span className="sr-only">{dict.signOut}</span>
+              <span className="sr-only"><LocalizedText text={dict.signOut} /></span>
             </button>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 p-1">
-            <Link
-              href="/"
-              className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
-            >
-              <Compass className="size-4 text-zinc-400" aria-hidden />
-              Back to Explore
-            </Link>
-          </div>
+          <TeachingCard onNavigate={onNavigate} />
         )}
       </div>
     </div>

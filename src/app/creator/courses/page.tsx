@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState, use } from "react";
 import Link from "next/link";
@@ -34,6 +35,7 @@ export default function CreatorCoursesPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  const translateUi = useTranslate();
   const { q } = use(searchParams);
   const { courses, hydrated } = useCreator();
 
@@ -83,22 +85,20 @@ export default function CreatorCoursesPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Creator Studio</p>
-          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl">My Courses</h1>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Creator Studio"} /></p>
+          <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"My Courses"} /></h1>
           <p className="mt-1.5 text-[14px] text-muted-foreground">
-            {hydrated ? `${courses.length} ${courses.length === 1 ? "course" : "courses"} in your studio.` : "Loading your courses…"}
+            <LocalizedText text={hydrated ? `${courses.length} ${courses.length === 1 ? "course" : "courses"} in your studio.` : "Loading your courses…"} />
           </p>
         </div>
         <Button asChild size="lg">
           <Link href="/creator/courses/new">
-            <Plus aria-hidden />
-            Create Course
-          </Link>
+            <Plus aria-hidden /><LocalizedText text={"Create Course"} /></Link>
         </Button>
       </div>
 
       {/* Status chips */}
-      <div className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide" role="tablist" aria-label="Filter by status">
+      <div className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-hide" role="tablist" aria-label={translateUi("Filter by status")}>
         {STATUS_ORDER.map((s) => {
           const meta = s === "all" ? null : STATUS_META[s];
           const active = status === s;
@@ -117,7 +117,7 @@ export default function CreatorCoursesPage({
                   : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:text-foreground"
               )}
             >
-              {s === "all" ? "All" : meta!.label}
+              <LocalizedText text={s === "all" ? "All" : meta!.label} />
               <span className={cn("rounded px-1 text-[10.5px] tabular-nums", active ? "bg-white/20" : "bg-muted")}>
                 {count}
               </span>
@@ -134,34 +134,34 @@ export default function CreatorCoursesPage({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search your courses…"
-            aria-label="Search your courses"
+            placeholder={translateUi("Search your courses…")}
+            aria-label={translateUi("Search your courses")}
             className="h-9.5 w-full rounded-lg border border-input bg-white pr-3 pl-9 text-sm shadow-xs outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-44" aria-label="Filter by category">
-            <SelectValue placeholder="All categories" />
+          <SelectTrigger className="w-44" aria-label={translateUi("Filter by category")}>
+            <SelectValue placeholder={translateUi("All categories")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
+            <SelectItem value="all"><LocalizedText text={"All categories"} /></SelectItem>
             {CATEGORIES.map((c) => (
               <SelectItem key={c.slug} value={c.slug}>
-                {c.name}
+                <LocalizedText text={c.name} />
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-          <SelectTrigger className="w-44" aria-label="Sort courses">
+          <SelectTrigger className="w-44" aria-label={translateUi("Sort courses")}>
             <SlidersHorizontal className="size-3.5 text-zinc-400" aria-hidden />
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
-            <SelectItem value="updated">Recently updated</SelectItem>
-            <SelectItem value="title">Title A–Z</SelectItem>
-            <SelectItem value="students">Most students</SelectItem>
-            <SelectItem value="revenue">Highest revenue</SelectItem>
+            <SelectItem value="updated"><LocalizedText text={"Recently updated"} /></SelectItem>
+            <SelectItem value="title"><LocalizedText text={"Title A–Z"} /></SelectItem>
+            <SelectItem value="students"><LocalizedText text={"Most students"} /></SelectItem>
+            <SelectItem value="revenue"><LocalizedText text={"Highest revenue"} /></SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -173,21 +173,20 @@ export default function CreatorCoursesPage({
         courses.length === 0 ? (
           <EmptyState
             icon={LibraryBig}
-            title="No courses yet"
-            description="Your studio is empty. Create your first course — it only takes a few minutes."
+            title={translateUi("No courses yet")}
+            description={translateUi("Your studio is empty. Create your first course — it only takes a few minutes.")}
             action={
               <Button asChild>
                 <Link href="/creator/courses/new">
-                  <Plus aria-hidden /> Create Course
-                </Link>
+                  <Plus aria-hidden /><LocalizedText text={"Create Course"} /></Link>
               </Button>
             }
           />
         ) : (
           <EmptyState
             icon={SearchX}
-            title="Nothing matches"
-            description="Try a different search term or clear the active status and category filters."
+            title={translateUi("Nothing matches")}
+            description={translateUi("Try a different search term or clear the active status and category filters.")}
             action={
               <Button
                 variant="outline"
@@ -196,9 +195,7 @@ export default function CreatorCoursesPage({
                   setStatus("all");
                   setCategory("all");
                 }}
-              >
-                Clear filters
-              </Button>
+              ><LocalizedText text={"Clear filters"} /></Button>
             }
           />
         )
@@ -206,8 +203,7 @@ export default function CreatorCoursesPage({
         <>
           <CoursesTable courses={pageItems} />
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[12.5px] text-muted-foreground">
-              Page {current} of {totalPages} · {filtered.length} {filtered.length === 1 ? "course" : "courses"}
+            <p className="text-[12.5px] text-muted-foreground"><LocalizedText text={"Page"} />{current}<LocalizedText text={"of"} />{totalPages} · {filtered.length} {filtered.length === 1 ? "course" : "courses"}
             </p>
             <Pagination page={current} totalPages={totalPages} onChange={setPage} />
           </div>

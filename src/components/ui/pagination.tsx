@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,13 +21,14 @@ export function Pagination({
   onChange: (page: number) => void;
   className?: string;
 }) {
+  const translateUi = useTranslate();
   if (totalPages <= 1) return null;
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
   return (
-    <nav aria-label="Pagination" className={cn("flex items-center gap-1", className)}>
+    <nav aria-label={translateUi("Pagination")} className={cn("flex items-center gap-1", className)}>
       <button
         type="button"
-        aria-label="Previous page"
+        aria-label={translateUi("Previous page")}
         disabled={page === 1}
         onClick={() => onChange(page - 1)}
         className="flex size-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted-foreground shadow-xs transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
@@ -51,7 +53,7 @@ export function Pagination({
       ))}
       <button
         type="button"
-        aria-label="Next page"
+        aria-label={translateUi("Next page")}
         disabled={page === totalPages}
         onClick={() => onChange(page + 1)}
         className="flex size-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted-foreground shadow-xs transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"

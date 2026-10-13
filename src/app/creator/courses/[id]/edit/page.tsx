@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import { use, useState } from "react";
 import Link from "next/link";
@@ -59,36 +60,28 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
       <div>
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link href="/creator/courses">
-            <ArrowLeft aria-hidden />
-            My Courses
-          </Link>
+            <ArrowLeft aria-hidden /><LocalizedText text={"My Courses"} /></Link>
         </Button>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-[24px] font-bold tracking-tight">{course.title}</h1>
+            <h1 className="font-display text-[24px] font-bold tracking-tight"><LocalizedText text={course.title} /></h1>
             <div className="mt-1.5 flex items-center gap-2.5 text-[12.5px] text-muted-foreground">
               <StatusBadge status={course.status} />
               <span>·</span>
-              <span>Last saved {new Date(course.lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+              <span><LocalizedText text={"Last saved"} /><LocalizedText text={new Date(course.lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} /></span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm">
               <Link href={`/creator/courses/${id}/curriculum`}>
-                <ListTree aria-hidden />
-                Curriculum
-              </Link>
+                <ListTree aria-hidden /><LocalizedText text={"Curriculum"} /></Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={`/courses/${course.slug}`}>
-                <Eye aria-hidden />
-                Preview
-              </Link>
+                <Eye aria-hidden /><LocalizedText text={"Preview"} /></Link>
             </Button>
             <Button size="sm" onClick={save} loading={saving} disabled={!dirty}>
-              <Save aria-hidden />
-              Save changes
-            </Button>
+              <Save aria-hidden /><LocalizedText text={"Save changes"} /></Button>
           </div>
         </div>
       </div>
@@ -96,10 +89,10 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
       <div className="flex items-center justify-between">
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList>
-            <TabsTrigger value="basics">Basics</TabsTrigger>
-            <TabsTrigger value="outcomes">Outcomes</TabsTrigger>
-            <TabsTrigger value="thumbnail">Thumbnail</TabsTrigger>
-            <TabsTrigger value="pricing">Pricing</TabsTrigger>
+            <TabsTrigger value="basics"><LocalizedText text={"Basics"} /></TabsTrigger>
+            <TabsTrigger value="outcomes"><LocalizedText text={"Outcomes"} /></TabsTrigger>
+            <TabsTrigger value="thumbnail"><LocalizedText text={"Thumbnail"} /></TabsTrigger>
+            <TabsTrigger value="pricing"><LocalizedText text={"Pricing"} /></TabsTrigger>
           </TabsList>
 
           <div className="mt-4 rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
@@ -121,12 +114,10 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
           <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3 shadow-card">
             <p className="text-[12.5px] text-muted-foreground">
               {dirty ? (
-                <span className="font-medium text-amber-600">You have unsaved changes</span>
+                <span className="font-medium text-amber-600"><LocalizedText text={"You have unsaved changes"} /></span>
               ) : (
                 <span className="flex items-center gap-1.5">
-                  <CircleCheck className="size-3.5 text-emerald-500" aria-hidden />
-                  All changes saved
-                </span>
+                  <CircleCheck className="size-3.5 text-emerald-500" aria-hidden /><LocalizedText text={"All changes saved"} /></span>
               )}
             </p>
             <div className="flex items-center gap-2">
@@ -139,13 +130,9 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     setDraft(d);
                     toast("Changes discarded");
                   }}
-                >
-                  Discard
-                </Button>
+                ><LocalizedText text={"Discard"} /></Button>
               )}
-              <Button size="sm" onClick={save} loading={saving} disabled={!dirty}>
-                Save changes
-              </Button>
+              <Button size="sm" onClick={save} loading={saving} disabled={!dirty}><LocalizedText text={"Save changes"} /></Button>
             </div>
           </div>
         </Tabs>

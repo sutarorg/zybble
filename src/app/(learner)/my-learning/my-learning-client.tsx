@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -49,6 +50,7 @@ function LearningCard({
   course: Course;
   enrollment: Enrollment;
 }) {
+  const translateUi = useTranslate();
   const instructor = instructorOf(course);
   const p = progressOf(course, enrollment);
 
@@ -58,18 +60,18 @@ function LearningCard({
       <Link
         href={`/courses/${course.slug}`}
         className="relative block aspect-video w-full shrink-0 self-start overflow-hidden rounded-lg bg-muted sm:w-52 lg:w-60"
-        aria-label={course.title}
+        aria-label={translateUi(course.title)}
       >
         <Image
           src={course.thumbnail}
-          alt={course.title}
+          alt={translateUi(course.title)}
           fill
           sizes="(max-width: 640px) 100vw, 240px"
           className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
         />
         {p.isCompleted && (
           <span className="absolute inset-0 flex items-center justify-center bg-emerald-950/40">
-            <Badge className="bg-emerald-500 text-white">Completed</Badge>
+            <Badge className="bg-emerald-500 text-white"><LocalizedText text={"Completed"} /></Badge>
           </span>
         )}
       </Link>
@@ -81,7 +83,7 @@ function LearningCard({
               href={`/courses/${course.slug}`}
               className="font-display block truncate text-[15px] font-semibold tracking-tight transition-colors hover:text-primary"
             >
-              {course.title}
+              <LocalizedText text={course.title} />
             </Link>
             <div className="mt-1 flex items-center gap-2">
               <Avatar className="size-4.5">
@@ -94,8 +96,8 @@ function LearningCard({
           </div>
           <Link
             href={`/courses/${course.slug}`}
-            aria-label={`Open curriculum for ${course.title}`}
-            title="Course details & curriculum"
+            aria-label={translateUi(`Open curriculum for ${course.title}`)}
+            title={translateUi("Course details & curriculum")}
             className="flex size-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground sm:size-8"
           >
             <ChevronRight className="size-4.5" aria-hidden />
@@ -105,11 +107,11 @@ function LearningCard({
         <div className="mt-3">
           <div className="flex items-center justify-between text-[11.5px] text-muted-foreground">
             <span>
-              {p.isCompleted
+              {<LocalizedText text={p.isCompleted
                 ? "Course completed"
                 : p.completedCount === 0
                   ? "Not started"
-                  : `${p.completedCount} of ${p.totalLessons} lessons`}
+                  : `${p.completedCount} of ${p.totalLessons} lessons`} />}
             </span>
             <span className="tabular-nums">{p.percent}%</span>
           </div>
@@ -122,13 +124,12 @@ function LearningCard({
               style={{ width: `${p.percent}%` }}
             />
           </div>
-          <p className="mt-1.5 text-[11.5px] break-anywhere text-zinc-400">
-            Last visited {timeAgoShort(enrollment.lastVisitedAt ?? enrollment.enrolledAt)}
+          <p className="mt-1.5 text-[11.5px] break-anywhere text-zinc-400"><LocalizedText text={"Last visited"} /><LocalizedText text={timeAgoShort(enrollment.lastVisitedAt ?? enrollment.enrolledAt)} />
             {p.resumeLesson && !p.isCompleted && (
               <>
-                {" "}· up next:{" "}
+                <LocalizedText text={" "} /><LocalizedText text={"· up next:"} /><LocalizedText text={" "} />
                 <span className="font-medium text-foreground">
-                  {p.resumeLesson.number} {p.resumeLesson.lesson.title}
+                  <LocalizedText text={p.resumeLesson.number} /> <LocalizedText text={p.resumeLesson.lesson.title} />
                 </span>
               </>
             )}
@@ -140,12 +141,10 @@ function LearningCard({
             <>
               <Button asChild variant="outline" size="sm">
                 <Link href="/certificates">
-                  <BadgeCheck aria-hidden />
-                  View certificate
-                </Link>
+                  <BadgeCheck aria-hidden /><LocalizedText text={"View certificate"} /></Link>
               </Button>
               <Button asChild variant="outline" size="sm">
-                <Link href={`/learn/${course.id}`}>Review course</Link>
+                <Link href={`/learn/${course.id}`}><LocalizedText text={"Review course"} /></Link>
               </Button>
             </>
           ) : (
@@ -163,6 +162,7 @@ function LearningCard({
 }
 
 export function MyLearningClient() {
+  const translateUi = useTranslate();
   const { enrollments, hydrated } = useApp();
   const community = useCommunityCourses();
   const [tab, setTab] = useState<Tab>("all");
@@ -224,23 +224,19 @@ export function MyLearningClient() {
     <div className="page-container py-7 sm:py-9">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">My Learning</p>
-          <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]">
-            Your courses
-          </h1>
+          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"My Learning"} /></p>
+          <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]"><LocalizedText text={"Your courses"} /></h1>
           <p className="mt-2 text-[14.5px] text-muted-foreground">
-            {hydrated
+            {<LocalizedText text={hydrated
               ? counts.all > 0
                 ? `${counts.all} enrolled · ${counts.completed} completed. Progress saves on this device.`
                 : "Enroll in a course and it will show up here."
-              : "Loading your courses…"}
+              : "Loading your courses…"} />}
           </p>
         </div>
         <Button asChild variant="outline">
           <Link href="/">
-            <Compass aria-hidden />
-            Browse catalog
-          </Link>
+            <Compass aria-hidden /><LocalizedText text={"Browse catalog"} /></Link>
         </Button>
       </header>
 
@@ -249,7 +245,7 @@ export function MyLearningClient() {
         <div
           className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1 scrollbar-hide"
           role="tablist"
-          aria-label="Filter courses"
+          aria-label={translateUi("Filter courses")}
         >
           {tabs.map((t) => (
             <button
@@ -263,7 +259,7 @@ export function MyLearningClient() {
                 tab === t.id ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {t.label}
+              <LocalizedText text={t.label} />
               <span className={cn("rounded px-1 text-[10.5px] tabular-nums", tab === t.id ? "bg-accent text-accent-foreground" : "bg-white text-zinc-400")}>
                 {t.count}
               </span>
@@ -277,21 +273,21 @@ export function MyLearningClient() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search enrolled…"
-              aria-label="Search enrolled courses"
+              placeholder={translateUi("Search enrolled…")}
+              aria-label={translateUi("Search enrolled courses")}
               className="h-10 w-full rounded-lg border border-input bg-white pr-3 pl-8.5 text-[13px] shadow-xs outline-none placeholder:text-zinc-400 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20 sm:h-9 sm:w-52 [&::-webkit-search-cancel-button]:hidden"
             />
           </div>
           <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
-            <SelectTrigger className="h-10 w-36 shrink-0 text-[13px] sm:h-9 sm:w-40" aria-label="Sort courses">
+            <SelectTrigger className="h-10 w-36 shrink-0 text-[13px] sm:h-9 sm:w-40" aria-label={translateUi("Sort courses")}>
               <ArrowUpDown className="size-3.5 text-zinc-400" aria-hidden />
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="end">
-              <SelectItem value="recent">Recently viewed</SelectItem>
-              <SelectItem value="progress">Most progress</SelectItem>
-              <SelectItem value="enrolled">Recently enrolled</SelectItem>
-              <SelectItem value="title">Title A–Z</SelectItem>
+              <SelectItem value="recent"><LocalizedText text={"Recently viewed"} /></SelectItem>
+              <SelectItem value="progress"><LocalizedText text={"Most progress"} /></SelectItem>
+              <SelectItem value="enrolled"><LocalizedText text={"Recently enrolled"} /></SelectItem>
+              <SelectItem value="title"><LocalizedText text={"Title A–Z"} /></SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -308,14 +304,12 @@ export function MyLearningClient() {
         ) : pairs.length === 0 ? (
           <EmptyState
             icon={GraduationCap}
-            title="No courses yet"
-            description="When you enroll — free or paid — your learning dashboard starts here, with lesson-by-lesson progress."
+            title={translateUi("No courses yet")}
+            description={translateUi("When you enroll — free or paid — your learning dashboard starts here, with lesson-by-lesson progress.")}
             action={
               <Button asChild size="lg">
                 <Link href="/">
-                  <BookOpen aria-hidden />
-                  Explore Courses
-                </Link>
+                  <BookOpen aria-hidden /><LocalizedText text={"Explore Courses"} /></Link>
               </Button>
             }
           />
@@ -330,9 +324,7 @@ export function MyLearningClient() {
             }
             action={
               tab === "completed" ? (
-                <Button variant="outline" onClick={() => setTab("in-progress")}>
-                  View in-progress courses
-                </Button>
+                <Button variant="outline" onClick={() => setTab("in-progress")}><LocalizedText text={"View in-progress courses"} /></Button>
               ) : (
                 <Button
                   variant="outline"
@@ -340,9 +332,7 @@ export function MyLearningClient() {
                     setQuery("");
                     setTab("all");
                   }}
-                >
-                  Clear filters
-                </Button>
+                ><LocalizedText text={"Clear filters"} /></Button>
               )
             }
           />

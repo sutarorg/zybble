@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -17,11 +18,12 @@ export function IconButton({
   label: string;
   size?: "default" | "sm";
 }) {
+  const translateUi = useTranslate();
   return (
     <button
       type="button"
-      aria-label={label}
-      title={label}
+      aria-label={translateUi(label)}
+      title={translateUi(label)}
       className={cn(
         "flex shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors",
         "hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none",

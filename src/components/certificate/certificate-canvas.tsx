@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import type { Certificate } from "@/types";
@@ -26,6 +27,7 @@ export function CertificateCanvas({
   certificate: Certificate;
   className?: string;
 }) {
+  const translateUi = useTranslate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ready, setReady] = useState(false);
 
@@ -55,7 +57,7 @@ export function CertificateCanvas({
       width={CERT_WIDTH}
       height={CERT_HEIGHT}
       role="img"
-      aria-label={`Certificate of completion for ${certificate.courseTitle}, awarded to ${certificate.studentName}`}
+      aria-label={translateUi(`Certificate of completion for ${certificate.courseTitle}, awarded to ${certificate.studentName}`)}
       className={cn(
         "block h-auto w-full rounded-lg bg-[#fdfbf7] shadow-card transition-opacity",
         ready ? "opacity-100" : "opacity-0",

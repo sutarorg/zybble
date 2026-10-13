@@ -1,3 +1,4 @@
+import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -20,14 +21,14 @@ export function InfoPage({
   return (
     <div className={cn("page-container py-8 sm:py-12", className)}>
       <header className="max-w-3xl">
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">{label}</p>
+        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={label} /></p>
         <h1 className="font-display mt-2 text-[28px] leading-tight font-bold tracking-tight sm:text-4xl">
-          {title}
+          <LocalizedText text={title} />
         </h1>
         {description && (
-          <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground"><LocalizedText text={description} /></p>
         )}
-        {updated && <p className="mt-3 text-[12.5px] text-zinc-400">Last updated: {updated}</p>}
+        {updated && <p className="mt-3 text-[12.5px] text-zinc-400"><LocalizedText text={"Last updated:"} /><LocalizedText text={updated} /></p>}
       </header>
       {children}
     </div>
@@ -48,9 +49,9 @@ export function LegalSection({
     <section className="mt-10">
       <h2 className="font-display flex items-baseline gap-3 text-[17px] font-semibold tracking-tight">
         <span className="text-[13px] font-semibold text-zinc-400 tabular-nums">
-          {String(index).padStart(2, "0")}
+          <LocalizedText text={String(index).padStart(2, "0")} />
         </span>
-        {title}
+        <LocalizedText text={title} />
       </h2>
       <div className="mt-3 space-y-3 pl-0 text-[14px] leading-relaxed text-muted-foreground sm:pl-9">
         {children}
@@ -71,7 +72,7 @@ export function LegalList({ items }: { items: string[] }) {
   return (
     <ul className="list-disc space-y-1.5 pl-5">
       {items.map((item) => (
-        <li key={item.slice(0, 40)}>{item}</li>
+        <li key={item.slice(0, 40)}><LocalizedText text={item} /></li>
       ))}
     </ul>
   );
