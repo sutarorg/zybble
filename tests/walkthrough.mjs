@@ -136,64 +136,92 @@ test("creator signup is usable at narrow mobile widths and gates guests", async 
   await page.close();
 });
 
-test("public chatbot suggests courses, handles follow-ups and preserves chat on close", async () => {
+/** Waits for the launcher's fade to settle on the expected opacity, then returns it. */
+function waitForLauncherOpacity(page, opacity) {
+  return page.waitForFunction((expected) => {
+    const launcher = document.querySelector('button[aria-label="Chat with Zybble AI"]');
+    return launcher ? getComputedStyle(launcher).opacity === expected : false;
+  }, opacity);
+}
+
+test("public chatbot animates open, offers suggestions once and preserves chat on close", async () => {
   const page = await pageFor();
+  const launcher = page.getByRole("button", { name: "Chat with Zybble AI" });
+  const dialog = page.getByRole("dialog", { name: "Zybble AI" });
+  const suggestions = dialog.getByLabel("Suggested questions");
   await page.goto(`${base}/explore`);
-  await page.getByRole("button", { name: "Chat with Zybble guide" }).click();
-  const dialog = page.getByRole("dialog", { name: "Zybble guide" });
-  assert.equal(await dialog.getByLabel("Suggested questions").getByRole("button").count(), 3);
+  await launcher.click();
+  await dialog.waitFor();
+  // Opening animates the panel in and animates the launcher out of the corner.
+  assert.equal(await dialog.evaluate((panel) => getComputedStyle(panel).animationName), "enter");
+  await waitForLauncherOpacity(page, "0");
+  assert.equal(await launcher.count(), 0, "Launcher leaves the a11y tree while the panel is open");
+  assert.equal(await suggestions.getByRole("button").count(), 3);
   assert.equal(await dialog.getByRole("button", { name: "Send message" }).isDisabled(), true);
   await dialog.getByRole("button", { name: "Find a beginner course", exact: true }).click();
   await dialog.getByRole("log").getByRole("link").first().waitFor();
+  // The suggestions are a one-time offer: the first answer collapses them and the card settles.
+  await suggestions.waitFor({ state: "detached" });
+  assert.equal(await suggestions.count(), 0);
   await dialog.getByLabel("Your message").fill("ChatGPT under $100");
   await dialog.getByLabel("Your message").press("Enter");
   await dialog.getByRole("log").getByText(/matching generative ai · beginner · up to \$100/).waitFor();
   await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "detached" });
   assert.equal(await dialog.count(), 0);
-  await page.getByRole("button", { name: "Chat with Zybble guide" }).click();
+  await waitForLauncherOpacity(page, "1");
+  await launcher.click();
   await dialog.getByRole("log").getByText("ChatGPT under $100", { exact: true }).waitFor();
+  assert.equal(await suggestions.count(), 0, "Suggestions stay hidden for the rest of the conversation");
   await dialog.getByRole("button", { name: "Start a new chat" }).click();
   assert.equal(await dialog.getByRole("log").getByRole("link").count(), 0);
+  await suggestions.waitFor();
+  assert.equal(await suggestions.getByRole("button").count(), 3, "A new chat offers the suggestions again");
   await dialog.getByRole("button", { name: "How do I enroll?", exact: true }).click();
   await dialog.getByRole("link", { name: "Visit Help Center" }).click();
   await page.waitForURL("**/help");
-  assert.equal(await page.getByRole("dialog", { name: "Zybble guide" }).count(), 0);
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble guide" }).count(), 0);
+  assert.equal(await page.getByRole("dialog", { name: "Zybble AI" }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Chat with Zybble AI" }).count(), 0);
   await page.goto(`${base}/categories/automation`);
-  await page.getByRole("button", { name: "Chat with Zybble guide" }).click();
+  await page.getByRole("button", { name: "Chat with Zybble AI" }).click();
   await dialog.getByRole("button", { name: "Explore Automation" }).click();
   const courseLink = dialog.getByRole("log").getByRole("link").first();
   await courseLink.waitFor();
   await courseLink.click();
   await page.waitForURL("**/courses/**");
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble guide" }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Chat with Zybble AI" }).count(), 0);
   await login(page);
   await page.getByRole("button", { name: "Account menu", exact: true }).click();
   await page.getByRole("menuitem", { name: "My Learning", exact: true }).click();
   await page.waitForURL("**/my-learning");
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble guide" }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Chat with Zybble AI" }).count(), 0);
   await page.getByRole("link", { name: /Start teaching/ }).click();
   await page.waitForURL("**/creator/signup");
   await page.getByLabel("Headline", { exact: true }).waitFor();
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble guide" }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Chat with Zybble AI" }).count(), 0);
   await page.close();
 });
 
 test("chatbot is usable at 320px with keyboard, long messages and no overflow", async () => {
   const page = await pageFor({ width: 320, height: 740 });
+  const launcher = page.getByRole("button", { name: "Chat with Zybble AI" });
+  const dialog = page.getByRole("dialog", { name: "Zybble AI" });
   await page.goto(`${base}/`);
-  await page.getByRole("button", { name: "Chat with Zybble guide" }).click();
-  const dialog = page.getByRole("dialog", { name: "Zybble guide" });
+  await launcher.click();
   await dialog.waitFor();
   assert.equal(await dialog.getByLabel("Your message").evaluate((input) => input === document.activeElement), true);
   await dialog.getByLabel("Your message").fill("x".repeat(500));
   await dialog.getByLabel("Your message").press("Enter");
   await dialog.getByRole("link", { name: "Visit Help Center" }).waitFor();
+  // Measure after the one-time suggestions collapse, so the settled card is what is checked.
+  await dialog.getByLabel("Suggested questions").waitFor({ state: "detached" });
   const box = await dialog.boundingBox();
   assert.ok(box.x >= 0 && box.x + box.width <= 320 && box.y >= 0 && box.y + box.height <= 740, "Panel fits viewport");
   assert.ok(await dialog.evaluate((panel) => panel.scrollWidth <= panel.clientWidth), "No panel horizontal overflow");
   assert.ok(await dialog.getByRole("log").evaluate((log) => log.scrollWidth <= log.clientWidth), "Long messages wrap inside the conversation");
   await dialog.getByRole("button", { name: "Close chat" }).click();
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble guide" }).evaluate((button) => button === document.activeElement), true);
+  await dialog.waitFor({ state: "detached" });
+  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Chat with Zybble AI");
+  assert.equal(await launcher.evaluate((button) => button === document.activeElement), true);
   await page.close();
 });
