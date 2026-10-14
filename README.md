@@ -26,6 +26,29 @@ npm run dev            # http://localhost:3000
 
 `/` is the full catalog (the former Explore page; `/explore` redirects to `/` and there is no `/home` page). Sign in as a learner, choose **Start teaching**, then complete the profile and review steps at `/creator/signup`. This upgrades the same account to a creator without replacing its identity or learner activity. **Go to Studio** appears in the public/learner surfaces only for creators. The studio is role-gated. Deleting the creator account under `/creator/settings` clears its namespace and returns the same account to learner mode.
 
+### Public course-discovery chatbot
+
+The bottom-right **Zybble guide** is available only on the catalog (`/`, including
+visits via the `/explore` redirect) and the eight public `/categories/[slug]` pages.
+It is absent from course detail, help, authentication, checkout, learner, creator
+and admin pages. Visibility follows the page, not the signed-in account’s role.
+
+The violet chat panel offers three short suggested questions, free-text messages,
+linked course recommendations and common enrollment/account/billing help. It
+searches the static catalog plus courses published in the current session. Topic,
+level, budget and duration preferences carry across follow-ups; **Start a new
+chat** clears them. Category pages initially scope recommendations to that
+category. Closing and reopening preserves the conversation; route navigation or
+refresh clears it. Messages are capped at 500 characters and 60 conversation
+entries and are not persisted or sent to an external service.
+
+This is an **offline, rule-based catalog assistant**, not an LLM integration or
+human support channel. Chat guidance is currently in English; recommendation
+titles follow the selected catalog language. Unmatched requests offer the Help
+Center rather than invented courses. It cannot access accounts or process
+payments. A non-modal accessible dialog supports Escape, input focus and focus
+return, and fits narrow/mobile viewports.
+
 ### Certificates
 
 Finishing every lesson in a course issues a certificate. The parchment artwork in
@@ -44,7 +67,8 @@ you see is exactly what you download. Certificates are stored for the document s
 | `npm run start` | Serve the production build (`next start`) |
 | `npm run typecheck` | TypeScript, no emit (`tsc --noEmit`) |
 | `npm run lint` | ESLint across the repo (`eslint .`) |
-| `npm test` | Typecheck + lint — the full verification available without a browser |
+| `npm test` | Typecheck + lint + offline chatbot unit tests |
+| `npm run test:chatbot` | Discovery-route restrictions, course matching, follow-up filters and help answers |
 
 Recommended pre-PR check:
 

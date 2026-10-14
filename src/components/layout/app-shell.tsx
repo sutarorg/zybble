@@ -2,6 +2,7 @@ import * as React from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { PublicChatbot } from "@/components/layout/public-chatbot";
 
 /**
  * The shared public shell: fixed sidebar + sticky header + content + footer.
@@ -16,6 +17,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="min-w-0 flex-1">{children}</main>
         <Footer />
       </div>
+      <PublicChatbot />
     </div>
   );
 }
