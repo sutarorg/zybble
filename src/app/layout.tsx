@@ -29,8 +29,10 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  /* data-scroll-behavior tells Next.js the smooth scrolling in globals.css is
+     intentional, so route transitions still jump instantly. */
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <head>
         {/*
           Inter + Space Grotesk (the Zybble type pair) are loaded as a plain

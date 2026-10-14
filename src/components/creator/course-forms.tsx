@@ -78,7 +78,9 @@ export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; on
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label><LocalizedText text={"Category *"} /></Label>
-          <Select value={draft.category || undefined} onValueChange={(v) => onChange({ category: v as CourseDraft["category"] })}>
+          {/* Always controlled: an empty string keeps Radix on the controlled
+              path and still renders the placeholder. */}
+          <Select value={draft.category || ""} onValueChange={(v) => onChange({ category: v as CourseDraft["category"] })}>
             <SelectTrigger aria-invalid={!!errors.category}>
               <SelectValue placeholder={translateUi("Choose…")} />
             </SelectTrigger>
