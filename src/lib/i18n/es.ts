@@ -282,17 +282,6 @@ export const es: Dictionary = {
   csPanelStat2Value: "70 %",
   csPanelStat3: "Pago medio del primer mes",
   csPanelStat3Value: "1,2 k $",
-  csTopicOptions: [
-    "Automatización IA",
-    "Desarrollo IA",
-    "IA generativa",
-    "Vídeo y audio IA",
-    "Marketing IA",
-    "Ciencia de datos",
-    "Negocios IA",
-    "Productividad",
-    "Prompting",
-  ],
   csLanguageOptions: [
     "Inglés",
     "Español",

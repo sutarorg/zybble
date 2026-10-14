@@ -15,14 +15,14 @@ import type {
 /* -------------------------------------------------------------------------- */
 
 export const CATEGORIES: Category[] = [
-  { slug: "automation", name: "AI Automation", shortName: "Automation", icon: "workflow", description: "Automate real workflows with n8n, Zapier, agents and APIs." },
-  { slug: "development", name: "AI Development", shortName: "Development", icon: "code-2", description: "Build, ship and deploy AI-powered applications end to end." },
+  { slug: "automation", name: "Automation", shortName: "Automation", icon: "workflow", description: "Automate real workflows with n8n, Zapier, agents and APIs." },
+  { slug: "development", name: "Development", shortName: "Development", icon: "code-2", description: "Build, ship and deploy AI-powered applications end to end." },
   { slug: "generative-ai", name: "Generative AI", shortName: "Generative AI", icon: "sparkles", description: "Master ChatGPT, prompting and modern generative models." },
-  { slug: "creation", name: "AI Creation", shortName: "Creation", icon: "clapperboard", description: "Create video, audio, music and visuals with AI tools." },
-  { slug: "marketing", name: "AI Marketing", shortName: "Marketing", icon: "megaphone", description: "Grow faster with AI-driven campaigns, funnels and content." },
+  { slug: "creation", name: "Creation", shortName: "Creation", icon: "palette", description: "Create video, audio, music and visuals with AI tools." },
+  { slug: "marketing", name: "Marketing", shortName: "Marketing", icon: "megaphone", description: "Grow faster with AI-driven campaigns, funnels and content." },
   { slug: "data-science", name: "Data Science", shortName: "Data Science", icon: "bar-chart-3", description: "Analyze data and build machine-learning models in Python." },
-  { slug: "business", name: "AI Business", shortName: "Business", icon: "briefcase", description: "Launch AI products and build companies around them." },
-  { slug: "productivity", name: "AI Productivity", shortName: "Productivity", icon: "timer", description: "Design personal AI systems that save hours every week." },
+  { slug: "business", name: "Business", shortName: "Business", icon: "briefcase", description: "Launch AI products and build companies around them." },
+  { slug: "productivity", name: "Productivity", shortName: "Productivity", icon: "timer", description: "Design personal AI systems that save hours every week." },
 ];
 
 /* -------------------------------------------------------------------------- */

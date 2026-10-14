@@ -284,17 +284,6 @@ export const en = {
   csPanelStat2Value: "70%",
   csPanelStat3: "Median first-month payout",
   csPanelStat3Value: "$1.2k",
-  csTopicOptions: [
-    "AI Automation",
-    "AI Development",
-    "Generative AI",
-    "AI Video & Audio",
-    "AI Marketing",
-    "Data Science",
-    "AI Business",
-    "Productivity",
-    "Prompting",
-  ],
   csLanguageOptions: ["English", "Spanish", "Portuguese", "French", "German", "Japanese", "Italian"],
 
   /* ---------------------------------------------------------- creator studio */

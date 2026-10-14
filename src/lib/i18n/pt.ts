@@ -282,17 +282,6 @@ export const pt: Dictionary = {
   csPanelStat2Value: "70%",
   csPanelStat3: "Pagamento médio no 1º mês",
   csPanelStat3Value: "R$ 6,2 mil",
-  csTopicOptions: [
-    "Automação com IA",
-    "Desenvolvimento de IA",
-    "IA generativa",
-    "Vídeo e áudio com IA",
-    "Marketing com IA",
-    "Ciência de dados",
-    "Negócios com IA",
-    "Produtividade",
-    "Engenharia de prompt",
-  ],
   csLanguageOptions: ["Inglês", "Espanhol", "Português", "Francês", "Alemão", "Japonês", "Italiano"],
 
   /* ---------------------------------------------------------- creator studio */

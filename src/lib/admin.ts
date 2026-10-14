@@ -156,6 +156,7 @@ export function seedAdminCategories(): AdminCategory[] {
     slug: c.slug,
     name: c.name,
     description: c.description,
+    icon: c.icon,
     order: order + 1,
     visible: true,
     courseCount: COURSES.filter((course) => course.category === c.slug).length,

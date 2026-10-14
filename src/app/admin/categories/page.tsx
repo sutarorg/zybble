@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import type { AdminCategory } from "@/types";
 import { useAdmin } from "@/components/providers/admin-provider";
-import { categoryIcon } from "@/lib/icons";
+import { CATEGORY_ICON_OPTIONS, DEFAULT_CATEGORY_ICON, categoryIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,6 +42,7 @@ export default function AdminCategoriesPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
+  const [icon, setIcon] = useState(DEFAULT_CATEGORY_ICON);
   const [slugEdited, setSlugEdited] = useState(false);
   const [error, setError] = useState("");
 
@@ -52,6 +53,7 @@ export default function AdminCategoriesPage() {
     setName("");
     setSlug("");
     setDescription("");
+    setIcon(DEFAULT_CATEGORY_ICON);
     setSlugEdited(false);
     setError("");
     setDialogOpen(true);
@@ -62,6 +64,7 @@ export default function AdminCategoriesPage() {
     setName(cat.name);
     setSlug(cat.slug);
     setDescription(cat.description);
+    setIcon(cat.icon);
     setSlugEdited(true);
     setError("");
     setDialogOpen(true);
@@ -85,13 +88,14 @@ export default function AdminCategoriesPage() {
       return;
     }
     if (editing) {
-      updateCategory(editing.id, { name: name.trim(), slug: finalSlug, description: description.trim() });
+      updateCategory(editing.id, { name: name.trim(), slug: finalSlug, description: description.trim(), icon });
       toast.success(`Category “${name.trim()}” updated (local)`);
     } else {
       addCategory({
         name: name.trim(),
         slug: finalSlug,
         description: description.trim() || "Custom marketplace category .",
+        icon,
         order: sorted.length + 1,
         visible: true,
       });
@@ -117,7 +121,7 @@ export default function AdminCategoriesPage() {
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
         <ul className="divide-y divide-border">
           {sorted.map((cat, i) => {
-            const Icon = categoryIcon(cat.slug);
+            const Icon = categoryIcon(cat.icon);
             return (
               <li key={cat.id} className={cn("flex items-center gap-3 px-4 py-3.5 sm:px-5", !cat.visible && "opacity-55")}>
                 <span className="flex w-7 shrink-0 justify-center font-display text-[13px] font-bold text-zinc-300 tabular-nums">
@@ -200,7 +204,7 @@ export default function AdminCategoriesPage() {
           <DialogHeader>
             <DialogTitle>{editing ? "Edit category" : "Add category"}</DialogTitle>
             <DialogDescription>
-              {editing ? "Update the label, slug or blurb." : "Give the category a name — the slug is generated automatically unless you override it."}
+              {editing ? "Update the label, icon, slug or blurb." : "Give the category a name and icon — the slug is generated automatically unless you override it."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -232,6 +236,37 @@ export default function AdminCategoriesPage() {
                 className="font-mono text-[13px]"
                 aria-invalid={!!error}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label><LocalizedText text={"Icon"} /></Label>
+              <div
+                role="radiogroup"
+                aria-label={translateUi("Category icon")}
+                className="flex flex-wrap gap-1.5"
+              >
+                {CATEGORY_ICON_OPTIONS.map((option) => {
+                  const OptionIcon = categoryIcon(option.key);
+                  const active = icon === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      aria-label={translateUi(`${option.label} icon`)}
+                      onClick={() => setIcon(option.key)}
+                      className={cn(
+                        "flex size-9 cursor-pointer items-center justify-center rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-ring/25",
+                        active
+                          ? "border-primary bg-accent text-primary"
+                          : "border-border text-zinc-400 hover:border-violet-300 hover:text-foreground"
+                      )}
+                    >
+                      <OptionIcon className="size-4.5" aria-hidden />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cat-desc"><LocalizedText text={"Description"} /></Label>

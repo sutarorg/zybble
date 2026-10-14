@@ -396,6 +396,7 @@ export interface AdminCategory {
   slug: string;
   name: string;
   description: string;
+  icon: string; // lucide icon key, see CATEGORY_ICONS
   order: number;
   visible: boolean;
   courseCount: number;
