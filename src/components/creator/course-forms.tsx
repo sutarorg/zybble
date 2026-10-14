@@ -2,8 +2,9 @@
 
 import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
+import { useState } from "react";
 import Image from "next/image";
-import { Check, GripHorizontal, ImageIcon, Plus, Trash2, X } from "lucide-react";
+import { Check, GripVertical, ImageIcon, ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import type { CourseDraft } from "@/types";
 import { CATEGORIES, COURSES } from "@/data/mock-data";
 import { LEVEL_LABELS } from "@/lib/courses";
@@ -128,6 +129,13 @@ export function BasicsForm({ draft, onChange, errors }: { draft: CourseDraft; on
 
 /* --------------------------- String list editor ---------------------------- */
 
+/**
+ * Reorderable list of short strings (outcomes, prerequisites, audience).
+ *
+ * Rows can be dragged by the grip handle — the row only becomes draggable once
+ * the handle is pressed, so text selection inside the inputs still works. The
+ * up/down buttons give keyboard and touch users the same control.
+ */
 function StringListEditor({
   label,
   hint,
@@ -146,9 +154,28 @@ function StringListEditor({
   error?: string;
 }) {
   const translateUi = useTranslate();
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [armed, setArmed] = useState<number | null>(null);
+
   const update = (i: number, value: string) =>
     onChange(items.map((item, idx) => (idx === i ? value : item)));
+
   const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+
+  const move = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange(next);
+  };
+
+  const endDrag = () => {
+    setDragIndex(null);
+    setOverIndex(null);
+    setArmed(null);
+  };
 
   return (
     <fieldset className="space-y-2">
@@ -157,25 +184,83 @@ function StringListEditor({
         {hint && <span className="ml-2 font-normal text-zinc-400"><LocalizedText text={hint} /></span>}
       </legend>
       <div className="space-y-2">
-        {items.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <GripHorizontal className="size-4 shrink-0 text-zinc-300" aria-hidden />
-            <Input
-              value={item}
-              placeholder={translateUi(`${placeholder} ${items.length > 1 ? i + 1 : ""}`.trim())}
-              onChange={(e) => update(i, e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => remove(i)}
-              disabled={items.length <= 1}
-              aria-label={translateUi("Remove item")}
-              className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-red-50 hover:text-destructive disabled:opacity-30"
+        {items.map((item, i) => {
+          const isDragging = dragIndex === i;
+          const isDropTarget = overIndex === i && dragIndex !== null && dragIndex !== i;
+          return (
+            <div
+              key={i}
+              draggable={armed === i}
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(i));
+                setDragIndex(i);
+              }}
+              onDragEnter={() => setOverIndex(i)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const from = dragIndex ?? Number(e.dataTransfer.getData("text/plain"));
+                move(Number.isNaN(from) ? -1 : from, i);
+                endDrag();
+              }}
+              onDragEnd={endDrag}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border border-transparent transition-all",
+                isDropTarget && "border-primary/50 bg-accent/70",
+                isDragging && "border-dashed border-zinc-300 bg-muted opacity-60"
+              )}
             >
-              <Trash2 className="size-4" aria-hidden />
-            </button>
-          </div>
-        ))}
+              <button
+                type="button"
+                aria-label={translateUi(`Drag to reorder item ${i + 1}`)}
+                title={translateUi("Drag to reorder")}
+                onMouseDown={() => setArmed(i)}
+                onMouseUp={() => setArmed(null)}
+                className="flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-muted hover:text-zinc-500 active:cursor-grabbing"
+              >
+                <GripVertical className="size-4" aria-hidden />
+              </button>
+              <Input
+                value={item}
+                placeholder={translateUi(`${placeholder} ${items.length > 1 ? i + 1 : ""}`.trim())}
+                onChange={(e) => update(i, e.target.value)}
+              />
+              <div className="flex shrink-0 items-center">
+                <button
+                  type="button"
+                  aria-label={translateUi(`Move item ${i + 1} up`)}
+                  disabled={i === 0}
+                  onClick={() => move(i, i - 1)}
+                  className="flex size-7 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-25"
+                >
+                  <ArrowUp className="size-3.5" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  aria-label={translateUi(`Move item ${i + 1} down`)}
+                  disabled={i === items.length - 1}
+                  onClick={() => move(i, i + 1)}
+                  className="flex size-7 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-25"
+                >
+                  <ArrowDown className="size-3.5" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => remove(i)}
+                  disabled={items.length <= 1}
+                  aria-label={translateUi("Remove item")}
+                  className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-red-50 hover:text-destructive disabled:opacity-30"
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
       <button
         type="button"

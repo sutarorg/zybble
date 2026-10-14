@@ -26,14 +26,39 @@ export type CourseLevel = "beginner" | "intermediate" | "advanced";
 export type CourseLanguage = "English" | "Spanish" | "Portuguese";
 export type CourseBadge = "bestseller" | "popular" | "new";
 
+export interface QuizQuestion {
+  id: string;
+  prompt: string;
+  options: string[];
+  /** Index into `options` of the correct answer. */
+  correctIndex: number;
+}
+
+/** Local-preview metadata for a lesson's uploaded video or resource file. */
+export interface LessonMedia {
+  fileName: string;
+  fileSize: number;
+  /** Detected from the file name — e.g. "mp4", "pdf", "zip". */
+  extension: string;
+  kind: "video" | "resource";
+}
+
 export interface Lesson {
   id: string;
   title: string;
+  /**
+   * Minutes of video. Lessons without playback time (quizzes, resources) use
+   * `0` — the UI renders those as "Untimed quiz" / "Reference file".
+   */
   durationMinutes: number;
   type: "video" | "reading" | "quiz" | "resource";
   description?: string;
   freePreview?: boolean;
   downloadable?: boolean;
+  /** Quiz lessons only. */
+  quiz?: QuizQuestion[];
+  /** Uploaded file metadata (video and resource lessons). */
+  media?: LessonMedia;
 }
 
 export interface CurriculumSection {
@@ -155,6 +180,19 @@ export interface Certificate {
   lessonsCount: number;
   durationMinutes: number;
   issuedAt: string; // ISO
+}
+
+/**
+ * A review written by the learner on this device. Only allowed once the
+ * course is completed — see the course player.
+ */
+export interface CourseReview {
+  courseId: string;
+  rating: number; // 1–5
+  title: string;
+  text: string;
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
 }
 
 export interface ActivityItem {

@@ -65,10 +65,31 @@ export function CourseDetailView({
   // local and rendering it as JSX makes the compiler treat it as a
   // "component created during render".
   const isNew = course.ratingsCount === 0;
-  const { recordCourseView } = useApp();
+  const { recordCourseView, courseReviews, user, hydrated } = useApp();
   const { hiddenReviewIds, hydrated: adminHydrated } = useAdmin();
   // Admin moderation: hidden reviews are filtered from public course pages (local simulation).
-  const visibleReviews = adminHydrated ? reviews.filter((r) => !hiddenReviewIds.includes(r.id)) : reviews;
+  const published = adminHydrated ? reviews.filter((r) => !hiddenReviewIds.includes(r.id)) : reviews;
+  // The learner's own review (unlocked on completion) always shows first.
+  const myReview = hydrated ? courseReviews.find((r) => r.courseId === course.id) : undefined;
+  const visibleReviews: Review[] = [
+    ...(myReview
+      ? [
+          {
+            id: `learner-review-${course.id}`,
+            courseId: course.id,
+            author: user?.name ?? "You",
+            initials: user?.initials ?? "YO",
+            avatarColor: "bg-violet-100 text-violet-700",
+            rating: myReview.rating,
+            date: myReview.updatedAt,
+            title: myReview.title,
+            text: myReview.text,
+            role: "Your review",
+          } satisfies Review,
+        ]
+      : []),
+    ...published,
+  ];
 
   // Track for the learner dashboard "recently viewed" rail (client, localStorage).
   React.useEffect(() => {

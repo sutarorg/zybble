@@ -23,6 +23,9 @@
 *.pem
 *.tsbuildinfo
 
+# visual QA output from the browser harness scripts (verify.mjs, shot.mjs …)
+/shots
+
 # debug
 npm-debug.log*
 yarn-debug.log*

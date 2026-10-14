@@ -3,25 +3,21 @@
 import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { TeachingCard } from "@/components/layout/teaching-card";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Award,
   Bookmark,
   Flame,
   GraduationCap,
   LayoutDashboard,
-  LogOut,
   Receipt,
   Settings,
-  Presentation,
   Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDictionary } from "@/lib/i18n";
 import { Logo } from "@/components/layout/logo";
 import { useApp } from "@/components/providers/app-providers";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 
 function NavItem({
   href,
@@ -65,8 +61,7 @@ function NavItem({
 export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const translateUi = useTranslate();
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, signOut, wishlist, enrollments, learnerPrefs, certificates, language } = useApp();
+  const { wishlist, enrollments, learnerPrefs, certificates, language } = useApp();
   const dict = getDictionary(language);
 
   const items = [
@@ -144,51 +139,18 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
         </div>
       </div>
 
-      <div className="border-t border-border p-3">
-        {user ? (
-          <div className="flex flex-col gap-3">
-            <TeachingCard onNavigate={onNavigate} />
-            <div className="flex items-center gap-2.5 rounded-lg p-1.5">
-              <Avatar className="size-8.5">
-                {user.avatar && <AvatarImage src={user.avatar} alt={translateUi(user.name)} />}
-                <AvatarFallback className="bg-primary text-[11px] text-white">
-                  <LocalizedText text={user.initials} />
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold"><LocalizedText text={user.name} /></p>
-                <Link href="/settings" className="text-[11.5px] font-medium text-primary hover:underline">
-                  <LocalizedText text={dict.viewSettings} />
-                </Link>
-              </div>
-            <button
-              type="button"
-              onClick={() => {
-                signOut();
-                router.push("/");
-              }}
-              title={translateUi(dict.signOut)}
-              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
-            >
-              <LogOut className="size-4" />
-              <span className="sr-only"><LocalizedText text={dict.signOut} /></span>
-            </button>
-            </div>
-            <Link
-              href="/"
-              className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
-            >
-              <Compass className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Back to Explore"} /></Link>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 p-1">
-            <Link
-              href="/"
-              className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
-            >
-              <Compass className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Back to Explore"} /></Link>
-          </div>
-        )}
+      {/*
+       * The account credentials card (avatar · name · settings · sign out) was
+       * removed from the bottom of the rail — identity and sign-out stay in the
+       * header avatar menu, and Settings is a first-class item above.
+       */}
+      <div className="border-t border-border px-3 pt-5 pb-3">
+        <TeachingCard onNavigate={onNavigate} />
+        <Link
+          href="/"
+          className="mt-1 flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
+        >
+          <Compass className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Back to Explore"} /></Link>
       </div>
     </div>
   );

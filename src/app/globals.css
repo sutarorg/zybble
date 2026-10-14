@@ -72,6 +72,30 @@ html {
 }
 
 /*
+ * Vertical scrolling is removed from the whole product surface: every scroll
+ * container still scrolls (nothing becomes unreachable), but no scrollbar is
+ * ever painted — so the UI reads as a single, fixed canvas on every page.
+ * Wheel, trackpad, touch and keyboard scrolling all keep working.
+ */
+html,
+body {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge/IE */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+}
+
+/*
  * Keyboard focus fallback for plain links and custom interactive elements
  * (buttons/inputs carry their own ring styles via the design system).
  */

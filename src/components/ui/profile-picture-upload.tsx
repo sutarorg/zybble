@@ -17,6 +17,8 @@ interface ProfilePictureUploadProps {
   onUpload: (file: File) => Promise<{ success: boolean; error?: string; avatarUrl?: string }>;
   className?: string;
   avatarClassName?: string;
+  /** Hide the name/limit caption — used when the avatar sits next to a form. */
+  showMeta?: boolean;
 }
 
 export function ProfilePictureUpload({
@@ -26,6 +28,7 @@ export function ProfilePictureUpload({
   onUpload,
   className,
   avatarClassName,
+  showMeta = true,
 }: ProfilePictureUploadProps) {
   const translateUi = useTranslate();
   const [isUploading, setIsUploading] = useState(false);
@@ -138,12 +141,14 @@ export function ProfilePictureUpload({
         disabled={isUploading}
       />
 
-      <div className="text-center">
-        <p className="text-[13px] font-medium"><LocalizedText text={name} /></p>
-        <p className="text-[11.5px] text-muted-foreground">Click to upload</p>
-        {error && <p className="mt-1 text-[12px] text-red-500"><LocalizedText text={error} /></p>}
-        <p className="text-[10px] text-zinc-400">Max <LocalizedText text={formatFileSize(MAX_FILE_SIZE)} /></p>
-      </div>
+      {showMeta && (
+        <div className="text-center">
+          <p className="text-[13px] font-medium"><LocalizedText text={name} /></p>
+          <p className="text-[11.5px] text-muted-foreground">Click to upload</p>
+          {error && <p className="mt-1 text-[12px] text-red-500"><LocalizedText text={error} /></p>}
+          <p className="text-[10px] text-zinc-400">Max <LocalizedText text={formatFileSize(MAX_FILE_SIZE)} /></p>
+        </div>
+      )}
     </div>
   );
 }

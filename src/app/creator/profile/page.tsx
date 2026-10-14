@@ -6,14 +6,16 @@ import { useState } from "react";
 import type { CreatorProfile } from "@/types";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Eye, Globe2, MapPin, Plus, Save, X } from "lucide-react";
+import { Camera, Eye, Globe2, MapPin, Save } from "lucide-react";
 import { useCreator } from "@/components/providers/creator-provider";
 import { instructorStats } from "@/lib/courses";
 import { formatCompact, initialsOf } from "@/lib/format";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CountryCombobox } from "@/components/ui/country-combobox";
+import { ProfilePictureUpload } from "@/components/ui/profile-picture-upload";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +30,7 @@ const AVATAR_COLORS = [
 
 export default function CreatorProfilePage() {
   const translateUi = useTranslate();
-  const { hydrated, profile, saveProfile } = useCreator();
+  const { hydrated, profile, saveProfile, uploadCreatorAvatar } = useCreator();
   /* Derived draft: follows the stored creator profile until the creator edits it. */
   const [formDraft, setFormDraft] = useState<CreatorProfile | null>(null);
   const form = formDraft ?? profile;
@@ -37,7 +39,6 @@ export default function CreatorProfilePage() {
       const current = prev ?? profile;
       return typeof next === "function" ? next(current) : next;
     });
-  const [topicInput, setTopicInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   if (!hydrated) {
@@ -68,13 +69,6 @@ export default function CreatorProfilePage() {
     }, 500);
   };
 
-  const addTopic = () => {
-    const t = topicInput.trim().toLowerCase();
-    if (!t || form.topics.includes(t)) return;
-    update({ topics: [...form.topics, t] });
-    setTopicInput("");
-  };
-
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -85,7 +79,7 @@ export default function CreatorProfilePage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link href="/instructors/maya-lindqvist">
+            <Link href={`/instructors/${profile.instructorId}`}>
               <Eye aria-hidden /><LocalizedText text={"View public profile"} /></Link>
           </Button>
           <Button onClick={save} loading={saving} disabled={!dirty}>
@@ -96,14 +90,22 @@ export default function CreatorProfilePage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* Form */}
         <section className="space-y-4 rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="size-16 ring-1 ring-border">
-              <AvatarFallback className={cn("text-lg font-bold", form.avatarColor)}>
-                <LocalizedText text={displayInitials} />
-              </AvatarFallback>
-            </Avatar>
+          <div className="flex flex-wrap items-center gap-5">
+            {/* Clicking the picture opens the file picker and uploads instantly. */}
+            <ProfilePictureUpload
+              currentAvatar={form.avatar}
+              initials={displayInitials}
+              name={form.displayName || "Your name"}
+              onUpload={uploadCreatorAvatar}
+              showMeta={false}
+              avatarClassName="size-20 ring-1 ring-border"
+            />
             <div>
-              <Label><LocalizedText text={"Avatar color"} /></Label>
+              <Label><LocalizedText text={"Profile picture & avatar color"} /></Label>
+              <p className="mb-1.5 flex items-center gap-1 text-[11.5px] text-zinc-400">
+                <Camera className="size-3" aria-hidden />
+                <LocalizedText text={"Click the picture to upload a new one."} />
+              </p>
               <div className="mt-1.5 flex gap-1.5">
                 {AVATAR_COLORS.map((c) => (
                   <button
@@ -137,7 +139,15 @@ export default function CreatorProfilePage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="p-country"><LocalizedText text={"Country"} /></Label>
-              <Input id="p-country" value={form.country} onChange={(e) => update({ country: e.target.value })} />
+              <CountryCombobox
+                id="p-country"
+                value={form.country}
+                onChange={(country) => update({ country })}
+                placeholder="Search and choose a country…"
+              />
+              <p className="text-[11.5px] text-zinc-400">
+                <LocalizedText text={"Pick from the list — or type a custom region."} />
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="p-languages"><LocalizedText text={"Languages"} /><span className="font-normal text-zinc-400"><LocalizedText text={"(comma-separated)"} /></span></Label>
@@ -160,41 +170,6 @@ export default function CreatorProfilePage() {
             <p className="text-[11.5px] text-zinc-400">{form.bio.length}<LocalizedText text={"characters · shown on your public profile"} /></p>
           </div>
 
-          <div className="space-y-1.5">
-            <Label><LocalizedText text={"Teaching topics"} /></Label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {form.topics.map((t) => (
-                <span key={t} className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[12px] font-medium">
-                  <LocalizedText text={t} />
-                  <button
-                    type="button"
-                    aria-label={translateUi(`Remove topic ${t}`)}
-                    onClick={() => update({ topics: form.topics.filter((x) => x !== t) })}
-                    className="cursor-pointer text-zinc-400 hover:text-destructive"
-                  >
-                    <X className="size-3" aria-hidden />
-                  </button>
-                </span>
-              ))}
-              <div className="flex items-center gap-1.5">
-                <Input
-                  value={topicInput}
-                  onChange={(e) => setTopicInput(e.target.value)}
-                  placeholder={translateUi("Add topic…")}
-                  className="h-8 w-32 text-[12.5px]"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addTopic();
-                    }
-                  }}
-                />
-                <Button type="button" variant="outline" size="icon-sm" onClick={addTopic} aria-label={translateUi("Add topic")}>
-                  <Plus aria-hidden />
-                </Button>
-              </div>
-            </div>
-          </div>
         </section>
 
         {/* Live preview */}
@@ -203,6 +178,7 @@ export default function CreatorProfilePage() {
           <div className="rounded-xl border border-border bg-gradient-to-br from-muted/70 to-white p-5 shadow-card">
             <div className="flex items-center gap-3.5">
               <Avatar className="size-14 ring-2 ring-white shadow-sm">
+                {form.avatar && <AvatarImage src={form.avatar} alt={translateUi(form.displayName)} />}
                 <AvatarFallback className={cn("text-base font-bold", form.avatarColor)}>
                   <LocalizedText text={displayInitials} />
                 </AvatarFallback>

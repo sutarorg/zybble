@@ -115,7 +115,6 @@ export const CREATOR_STEPS = [
   "Outcomes",
   "Thumbnail",
   "Pricing",
-  "Curriculum",
   "Content",
   "Preview",
   "Submit",
@@ -365,6 +364,14 @@ export function seedPayouts(): PayoutRecord[] {
 /* Draft helpers                                                               */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Every new course starts with a single editable section so the creator never
+ * faces a blank canvas. They are free to rename, reorder or delete it.
+ */
+export function starterSection(): CurriculumSection {
+  return { id: uid("sec"), title: "Getting Started", lessons: [] };
+}
+
 export function emptyCourseDraft(): CourseDraft {
   return {
     title: "",
@@ -380,9 +387,63 @@ export function emptyCourseDraft(): CourseDraft {
     isFree: false,
     price: 49.99,
     compareAtPrice: null,
-    sections: [],
+    sections: [starterSection()],
     draftResources: [],
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Upload helpers (local preview)                                              */
+/* -------------------------------------------------------------------------- */
+
+/** Rough "minutes of video per megabyte" used when metadata is unavailable. */
+const VIDEO_MB_PER_MINUTE = 2.5;
+
+function estimateMinutesFromSize(bytes: number): number {
+  return Math.max(1, Math.round(bytes / (VIDEO_MB_PER_MINUTE * 1024 * 1024)));
+}
+
+/**
+ * Reads the real duration of a video file in the browser and returns whole
+ * minutes, so creators never type a duration by hand. Falls back to a
+ * size-based estimate (and never rejects) when metadata cannot be read.
+ */
+export function readVideoDurationMinutes(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    if (typeof document === "undefined") {
+      resolve(estimateMinutesFromSize(file.size));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    let settled = false;
+    const finish = (minutes: number) => {
+      if (settled) return;
+      settled = true;
+      video.removeAttribute("src");
+      URL.revokeObjectURL(url);
+      resolve(Math.max(1, minutes));
+    };
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      const seconds = Number.isFinite(video.duration) ? video.duration : 0;
+      finish(seconds > 0 ? Math.round(seconds / 60) : estimateMinutesFromSize(file.size));
+    };
+    video.onerror = () => finish(estimateMinutesFromSize(file.size));
+    window.setTimeout(() => finish(estimateMinutesFromSize(file.size)), 5000);
+    video.src = url;
+  });
+}
+
+/** Resource lessons are the course's downloadable files. */
+export function countResourceLessons(sections: CurriculumSection[]): number {
+  return sections.reduce((n, s) => n + s.lessons.filter((l) => l.type === "resource").length, 0);
+}
+
+/** Lower-cased extension of a file name without the dot ("PDF" → "pdf"). */
+export function fileExtension(fileName: string): string {
+  const match = /\.([a-z0-9]+)$/i.exec(fileName.trim());
+  return match ? match[1].toLowerCase() : "file";
 }
 
 export function draftFromCourse(course: CreatorCourse): CourseDraft {
@@ -427,6 +488,7 @@ export function applyDraftToCourse(course: CreatorCourse, draft: CourseDraft): C
     audience: draft.audience.map((a) => a.trim()).filter(Boolean),
     curriculum: draft.sections,
     lessonsCount: draft.sections.reduce((n, s) => n + s.lessons.length, 0),
+    downloadableResources: countResourceLessons(draft.sections),
     durationMinutes: draft.sections.reduce(
       (n, s) => n + s.lessons.reduce((m, l) => m + l.durationMinutes, 0),
       0
@@ -455,7 +517,7 @@ export function newCourseFromDraft(draft: CourseDraft): CreatorCourse {
     captions: [draft.language],
     durationMinutes: 0,
     lessonsCount: 0,
-    downloadableResources: draft.draftResources.length,
+    downloadableResources: countResourceLessons(draft.sections),
     lastUpdated: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     whatYouLearn: draft.outcomes.map((o) => o.trim()).filter(Boolean),

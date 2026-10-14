@@ -84,7 +84,18 @@ test("learner upgrades in-place, deletion preserves wishlist, refreshing resets 
   assert.equal(await page.locator('aside a').filter({ hasText: "Go to Studio" }).count(), 0);
   await page.getByRole("link", { name: "Back to Explore", exact: true }).click();
   await page.getByRole("link", { name: /Go to Studio/ }).waitFor();
-  assert.match(await page.locator("aside").innerText(), /Jordan Ellis/);
+  // The account credentials card is gone from the sidebar: identity now lives
+  // in the header avatar menu, which also hides "Explore" while on Explore.
+  assert.doesNotMatch(await page.locator("aside").innerText(), /Jordan Ellis/);
+  await page.getByRole("button", { name: "Account menu", exact: true }).click();
+  assert.match(await page.getByRole("menu", { exact: true }).innerText(), /Jordan Ellis/);
+  assert.equal(
+    await page.getByRole("menuitem", { name: "Explore", exact: true }).count(),
+    0,
+    "Explore is hidden while already on the Explore page"
+  );
+  await page.getByRole("menuitem", { name: "Settings", exact: true }).waitFor();
+  await page.keyboard.press("Escape");
   await page.getByRole("link", { name: /Go to Studio/ }).click();
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Delete Creator Account", exact: true }).click();
@@ -96,7 +107,10 @@ test("learner upgrades in-place, deletion preserves wishlist, refreshing resets 
   await page.getByRole("link", { name: /Start teaching/ }).waitFor();
   await page.getByRole("button", { name: "Account menu", exact: true }).click();
   await page.getByRole("menuitem", { name: "Wishlist", exact: true }).click();
-  await page.getByRole("button", { name: "Remove from wishlist", exact: true }).waitFor();
+  // Wait for the route change first — the Explore rails also render wishlist
+  // toggles, so querying before navigation settles is ambiguous.
+  await page.waitForURL(`${base}/wishlist`);
+  await page.getByRole("button", { name: "Remove from wishlist", exact: true }).first().waitFor();
   await page.getByRole("link", { name: "Back to Explore", exact: true }).click();
   await upgrade(page);
   await page.reload();

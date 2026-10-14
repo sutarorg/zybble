@@ -12,28 +12,37 @@ import {
   ArrowRight,
   Check,
   CircleCheck,
+  CirclePlay,
   Eraser,
+  Eye,
   FileDown,
-  Info,
+  FileText,
+  LayoutGrid,
+  ListChecks,
+  Layers3,
   PartyPopper,
   Save,
   Send,
+  Sparkles,
+  Star,
+  Users,
 } from "lucide-react";
 import type { CourseDraft } from "@/types";
 import { useCreator } from "@/components/providers/creator-provider";
 import {
   CREATOR_STEPS,
   PLATFORM_COMMISSION,
+  countResourceLessons,
   emptyCourseDraft,
   moneyExact,
   validateDraftStep,
 } from "@/lib/creator";
 import { getCategoryBySlug, LEVEL_LABELS } from "@/lib/courses";
-import { formatPrice } from "@/lib/format";
+import { formatDuration, formatPrice } from "@/lib/format";
+import { lessonDurationLabel } from "@/lib/learn";
 import { BasicsForm, OutcomesForm, PricingForm, ThumbnailPicker } from "@/components/creator/course-forms";
 import { WizardStepper } from "@/components/creator/wizard-stepper";
 import { CurriculumEditor } from "@/components/creator/curriculum-editor";
-import { ResourceManager, UploadSlot } from "@/components/creator/resource-manager";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,9 +53,8 @@ const STEP_HELP: { title: string; text: string }[] = [
   { title: "Outcomes & prerequisites", text: "Great outcomes start with verbs: build, automate, deploy, analyze." },
   { title: "Thumbnail", text: "A clean 16:9 image. Cards everywhere use the exact preview below." },
   { title: "Pricing", text: "Paid or free — you can change this any time before publishing." },
-  { title: "Curriculum", text: "Sections group lessons into milestones. 4–6 sections is a proven structure." },
-  { title: "Course content", text: "Attach videos and downloadable resources. Local preview only in this preview." },
-  { title: "Course preview", text: "Review everything as learners will see it before submitting." },
+  { title: "Content", text: "Sections group lessons into milestones. Videos, quizzes and resource files live here." },
+  { title: "Course preview", text: "Review everything exactly as learners will see it before submitting." },
   { title: "Submit for review", text: "Simulated submission — transitions this course to Pending Review." },
 ];
 
@@ -259,12 +267,9 @@ export default function NewCoursePage() {
                 </div>
               )}
               {step === 5 && (
-                <ContentStep draft={draft} update={update} />
-              )}
-              {step === 6 && (
                 <PreviewStep draft={draft} category={category?.name} lessonsCount={lessonsCount} />
               )}
-              {step === 7 && (
+              {step === 6 && (
                 <SubmitStep draft={draft} lessonsCount={lessonsCount} />
               )}
             </div>
@@ -290,35 +295,19 @@ export default function NewCoursePage() {
 
 /* --------------------------------- Step 6 ---------------------------------- */
 
-function ContentStep({ draft, update }: { draft: CourseDraft; update: (p: Partial<CourseDraft>) => void }) {
-  const translateUi = useTranslate();
-  const [uploads, setUploads] = useState<{ fileName: string; fileSize: number; kind: "video" | "resource" }[]>([]);
+const PREVIEW_TABS = [
+  { id: "landing", label: "Landing page", icon: LayoutGrid },
+  { id: "curriculum", label: "Curriculum", icon: Layers3 },
+  { id: "card", label: "Course card", icon: Eye },
+] as const;
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="mb-2 text-[13.5px] font-semibold"><LocalizedText text={"Lesson videos"} /></h3>
-        <UploadSlot
-          title={translateUi("Select lesson videos")}
-          uploads={uploads}
-          onChange={setUploads}
-        />
-        <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-relaxed text-zinc-400">
-          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden /><LocalizedText text={"Files stay on this device and are only listed here. Persistent upload and transcoding are not connected in this preview."} /></p>
-      </div>
-      <div>
-        <h3 className="mb-2 text-[13.5px] font-semibold"><LocalizedText text={"Downloadable resources"} /></h3>
-        <ResourceManager
-          resources={draft.draftResources}
-          onChange={(draftResources) => update({ draftResources })}
-        />
-      </div>
-    </div>
-  );
-}
+const LESSON_PREVIEW_ICON = { video: CirclePlay, reading: FileText, quiz: ListChecks, resource: FileDown } as const;
 
-/* --------------------------------- Step 7 ---------------------------------- */
-
+/**
+ * Live preview of the finished course. Three views — the marketplace card, the
+ * public landing page and the curriculum — all rendered from the same draft,
+ * so creators can sanity-check copy, pricing and structure before submitting.
+ */
 function PreviewStep({
   draft,
   category,
@@ -329,68 +318,278 @@ function PreviewStep({
   lessonsCount: number;
 }) {
   const translateUi = useTranslate();
+  const [view, setView] = useState<(typeof PREVIEW_TABS)[number]["id"]>("landing");
   const outcomes = draft.outcomes.map((o) => o.trim()).filter(Boolean);
+  const requirements = draft.requirements.map((r) => r.trim()).filter(Boolean);
+  const resourceCount = countResourceLessons(draft.sections);
+  const totalMinutes = draft.sections.reduce(
+    (n, s) => n + s.lessons.reduce((m, l) => m + l.durationMinutes, 0),
+    0
+  );
+  const priceLabel = draft.isFree ? "Free" : formatPrice(draft.price);
+  const netPerSale = moneyExact(Math.round(draft.price * (1 - PLATFORM_COMMISSION) * 100) / 100);
+
+  const stats = [
+    { icon: Layers3, label: "Sections", value: String(draft.sections.length) },
+    { icon: CirclePlay, label: "Lessons", value: String(lessonsCount) },
+    { icon: FileDown, label: "Resources", value: String(resourceCount) },
+    { icon: Star, label: "Price", value: priceLabel },
+  ];
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-      {/* Card preview */}
-      <div>
-        <p className="mb-2 text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase"><LocalizedText text={"Course card (16:9)"} /></p>
-        <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
-          <div className="relative aspect-video w-full bg-muted">
-            {draft.thumbnail && (
-              <Image src={draft.thumbnail} alt={translateUi("")} fill sizes="300px" className="object-cover" />
-            )}
-          </div>
-          <div className="p-3.5">
-            {category && <Badge variant="solid_white" className="mb-2 border"><LocalizedText text={category} /></Badge>}
-            <p className="font-display line-clamp-2 text-[14px] font-semibold tracking-tight">
-              <LocalizedText text={draft.title || "Untitled course"} />
-            </p>
-            <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground"><LocalizedText text={draft.subtitle} /></p>
-            <p className="mt-2 font-display text-[14px] font-bold">
-              {draft.isFree ? <span className="text-success"><LocalizedText text={"Free"} /></span> : formatPrice(draft.price)}
-            </p>
-          </div>
+    <div className="space-y-4">
+      {/* View switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-xl border border-border bg-muted/50 p-1">
+          {PREVIEW_TABS.map((tab) => {
+            const active = view === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setView(tab.id)}
+                className={cn(
+                  "flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-all",
+                  active ? "bg-white text-primary shadow-card" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <tab.icon className="size-3.5" aria-hidden />
+                <LocalizedText text={tab.label} />
+              </button>
+            );
+          })}
         </div>
+        <p className="flex items-center gap-1.5 text-[12px] text-zinc-500">
+          <Sparkles className="size-3.5 text-primary" aria-hidden />
+          <LocalizedText text={"This is exactly what learners will see."} />
+        </p>
       </div>
 
-      {/* Detail summary */}
-      <dl className="space-y-3">
-        {[
-          { label: "Level & language", value: `${LEVEL_LABELS[draft.level]} · ${draft.language}` },
-          { label: "Curriculum", value: `${draft.sections.length} sections · ${lessonsCount} lessons` },
-          { label: "Resources", value: `${draft.draftResources.length} downloadable files` },
-          {
-            label: "Pricing",
-            value: draft.isFree
-              ? "Free"
-              : `${formatPrice(draft.price)}${draft.compareAtPrice ? ` (compare at ${formatPrice(draft.compareAtPrice)})` : ""} — you keep ${moneyExact(Math.round(draft.price * (1 - PLATFORM_COMMISSION) * 100) / 100)}`,
-          },
-        ].map((row) => (
-          <div key={row.label} className="flex flex-col gap-0.5 rounded-lg border border-border bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <dt className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase"><LocalizedText text={row.label} /></dt>
-            <dd className="text-[13.5px] font-medium"><LocalizedText text={row.value} /></dd>
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_290px]">
+        {/* ------------------------------ Preview canvas ----------------------------- */}
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-white shadow-card">
+          {/* Browser-ish chrome so the preview reads as a real page */}
+          <div className="flex items-center gap-2 border-b border-border bg-muted/60 px-4 py-2.5">
+            <span className="flex gap-1.5" aria-hidden>
+              <span className="size-2.5 rounded-full bg-red-300" />
+              <span className="size-2.5 rounded-full bg-amber-300" />
+              <span className="size-2.5 rounded-full bg-emerald-300" />
+            </span>
+            <span className="mx-auto flex items-center gap-1.5 rounded-md bg-white px-3 py-1 text-[11px] text-zinc-400 ring-1 ring-border">
+              zybble.com/courses/<LocalizedText text={draft.title ? draft.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) : "your-course"} />
+            </span>
           </div>
-        ))}
-        {outcomes.length > 0 && (
-          <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
-            <dt className="text-[12px] font-semibold tracking-wide text-zinc-400 uppercase"><LocalizedText text={"Outcomes"} /></dt>
-            <dd className="mt-2 space-y-1.5">
-              {outcomes.map((o) => (
-                <p key={o} className="flex items-start gap-2 text-[13px]">
-                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                  <LocalizedText text={o} />
-                </p>
+
+          {view === "card" ? (
+            <div className="flex items-center justify-center bg-gradient-to-br from-muted/60 to-white p-8">
+              <div className="w-full max-w-xs overflow-hidden rounded-xl border border-border bg-white shadow-card-hover">
+                <div className="relative aspect-video w-full bg-muted">
+                  {draft.thumbnail && (
+                    <Image src={draft.thumbnail} alt={translateUi("Course thumbnail preview")} fill sizes="320px" className="object-cover" />
+                  )}
+                </div>
+                <div className="p-3.5">
+                  {category && <Badge variant="violet" className="mb-2"><LocalizedText text={category} /></Badge>}
+                  <p className="font-display line-clamp-2 text-[14px] font-semibold tracking-tight">
+                    <LocalizedText text={draft.title || "Untitled course"} />
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground"><LocalizedText text={draft.subtitle} /></p>
+                  <p className="mt-2 font-display text-[14px] font-bold">
+                    {draft.isFree ? <span className="text-success"><LocalizedText text={"Free"} /></span> : priceLabel}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : view === "curriculum" ? (
+            <div className="max-h-[540px] overflow-y-auto scrollbar-thin p-5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted-foreground">
+                <span><span className="font-semibold text-foreground">{draft.sections.length}</span><LocalizedText text={" sections"} /></span>
+                <span aria-hidden>·</span>
+                <span><span className="font-semibold text-foreground">{lessonsCount}</span><LocalizedText text={" lessons"} /></span>
+                <span aria-hidden>·</span>
+                <span><span className="font-semibold text-foreground">{formatDuration(totalMinutes)}</span><LocalizedText text={" of video"} /></span>
+              </div>
+              <ol className="mt-4 space-y-2.5">
+                {draft.sections.length === 0 && (
+                  <li className="rounded-xl border border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center text-[13px] text-muted-foreground">
+                    <LocalizedText text={"No sections yet — add them in the Content step."} />
+                  </li>
+                )}
+                {draft.sections.map((section, si) => (
+                  <li key={section.id} className="overflow-hidden rounded-xl border border-border">
+                    <div className="flex items-center justify-between gap-3 bg-muted/50 px-3.5 py-2.5">
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span className="text-[11px] font-bold text-zinc-400 tabular-nums">
+                          <LocalizedText text={String(si + 1).padStart(2, "0")} />
+                        </span>
+                        <span className="truncate text-[13px] font-semibold"><LocalizedText text={section.title} /></span>
+                      </span>
+                      <span className="shrink-0 text-[11.5px] text-zinc-400">
+                        {section.lessons.length}<LocalizedText text={" lessons"} />
+                      </span>
+                    </div>
+                    {section.lessons.length > 0 && (
+                      <ul className="divide-y divide-border">
+                        {section.lessons.map((lesson) => {
+                          const Icon = LESSON_PREVIEW_ICON[lesson.type];
+                          return (
+                            <li key={lesson.id} className="flex items-center gap-3 px-3.5 py-2.5">
+                              <Icon className="size-4 shrink-0 text-zinc-400" aria-hidden />
+                              <span className="min-w-0 flex-1 truncate text-[13px]"><LocalizedText text={lesson.title} /></span>
+                              <span className="shrink-0 text-[11.5px] text-zinc-400"><LocalizedText text={lessonDurationLabel(lesson)} /></span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : (
+            /* ---------------------------- Landing page view --------------------------- */
+            <div className="max-h-[540px] overflow-y-auto scrollbar-thin">
+              <div className="relative">
+                <div className="relative h-40 w-full bg-muted">
+                  {draft.thumbnail && (
+                    <Image src={draft.thumbnail} alt={translateUi("Course thumbnail preview")} fill sizes="800px" className="object-cover" />
+                  )}
+                  <span className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-zinc-950/30 to-transparent" aria-hidden />
+                  <div className="absolute inset-x-0 bottom-0 p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {category && <Badge variant="violet"><LocalizedText text={category} /></Badge>}
+                      <Badge variant="emerald"><LocalizedText text={LEVEL_LABELS[draft.level]} /></Badge>
+                    </div>
+                    <h3 className="font-display mt-2 line-clamp-2 text-[20px] leading-tight font-bold tracking-tight text-white">
+                      <LocalizedText text={draft.title || "Untitled course"} />
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_220px]">
+                  <div className="min-w-0">
+                    <p className="text-[14px] leading-relaxed text-muted-foreground">
+                      <LocalizedText text={draft.subtitle || "Add a subtitle to summarize the course in one line."} />
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-muted-foreground">
+                      <span className="flex items-center gap-1.5"><Star className="size-3.5 fill-star text-star" aria-hidden /><LocalizedText text={"New · no ratings yet"} /></span>
+                      <span className="flex items-center gap-1.5"><CirclePlay className="size-3.5" aria-hidden />{lessonsCount}<LocalizedText text={" lessons"} /></span>
+                      <span className="flex items-center gap-1.5"><FileDown className="size-3.5" aria-hidden />{resourceCount}<LocalizedText text={" downloads"} /></span>
+                      <span className="flex items-center gap-1.5"><Users className="size-3.5" aria-hidden />{draft.language}</span>
+                    </div>
+
+                    {outcomes.length > 0 && (
+                      <section className="mt-5">
+                        <h4 className="font-display text-[14px] font-semibold"><LocalizedText text={"What you'll learn"} /></h4>
+                        <ul className="mt-2.5 grid gap-2 sm:grid-cols-2">
+                          {outcomes.map((o) => (
+                            <li key={o} className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-[12.5px]">
+                              <Check className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                              <LocalizedText text={o} />
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+
+                    <section className="mt-5">
+                      <h4 className="font-display text-[14px] font-semibold"><LocalizedText text={"Course content"} /></h4>
+                      <ul className="mt-2.5 space-y-1.5">
+                        {draft.sections.map((section, si) => (
+                          <li key={section.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 text-[12.5px]">
+                            <span className="truncate"><span className="mr-2 text-zinc-400 tabular-nums"><LocalizedText text={String(si + 1).padStart(2, "0")} /></span><LocalizedText text={section.title} /></span>
+                            <span className="shrink-0 text-zinc-400">{section.lessons.length}<LocalizedText text={" lessons"} /></span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+
+                    {requirements.length > 0 && (
+                      <section className="mt-5">
+                        <h4 className="font-display text-[14px] font-semibold"><LocalizedText text={"Requirements"} /></h4>
+                        <ul className="mt-2.5 list-disc space-y-1 pl-5 text-[12.5px] text-muted-foreground">
+                          {requirements.map((r) => (
+                            <li key={r}><LocalizedText text={r} /></li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+                  </div>
+
+                  {/* Enroll card mock */}
+                  <aside className="lg:sticky lg:top-0 lg:self-start">
+                    <div className="rounded-xl border border-border bg-white p-4 shadow-card-hover">
+                      <p className="font-display text-[22px] font-bold">{priceLabel}</p>
+                      {!draft.isFree && draft.compareAtPrice ? (
+                        <p className="text-[12.5px] text-zinc-400 line-through">{formatPrice(draft.compareAtPrice)}</p>
+                      ) : null}
+                      <button type="button" disabled className="mt-3 w-full cursor-default rounded-lg bg-primary py-2.5 text-[13px] font-semibold text-white opacity-90">
+                        <LocalizedText text={"Enroll now"} />
+                      </button>
+                      <p className="mt-2 text-center text-[11px] text-zinc-400"><LocalizedText text={"Preview button — nothing happens here."} /></p>
+                      <ul className="mt-3 space-y-1.5 border-t border-border pt-3 text-[11.5px] text-muted-foreground">
+                        <li><LocalizedText text={`${lessonsCount} lessons · ${formatDuration(totalMinutes)}`} /></li>
+                        <li><LocalizedText text={`${draft.sections.length} sections · ${resourceCount} downloadable resources`} /></li>
+                        <li><LocalizedText text={`${draft.language} · lifetime access`} /></li>
+                      </ul>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* -------------------------------- Summary rail -------------------------------- */}
+        <aside className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            {stats.map((stat) => (
+              <div key={stat.label} className="rounded-xl border border-border bg-white p-3 shadow-card">
+                <stat.icon className="size-4 text-primary" aria-hidden />
+                <p className="font-display mt-2 text-[17px] font-bold tracking-tight">{stat.value}</p>
+                <p className="text-[11px] text-muted-foreground"><LocalizedText text={stat.label} /></p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-border bg-white p-4 shadow-card">
+            <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase"><LocalizedText text={"At a glance"} /></p>
+            <dl className="mt-2.5 space-y-2 text-[12.5px]">
+              {[
+                { label: "Level", value: LEVEL_LABELS[draft.level] },
+                { label: "Language", value: draft.language },
+                { label: "Video length", value: formatDuration(totalMinutes) },
+                { label: "Audience", value: draft.audience.filter((a) => a.trim()).length ? `${draft.audience.filter((a) => a.trim()).length} groups` : "—" },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground"><LocalizedText text={row.label} /></dt>
+                  <dd className="font-medium"><LocalizedText text={row.value} /></dd>
+                </div>
               ))}
-            </dd>
+            </dl>
           </div>
-        )}
-      </dl>
+
+          {!draft.isFree && (
+            <div className="rounded-xl border border-violet-200 bg-accent p-4">
+              <p className="text-[11px] font-bold tracking-[0.1em] text-accent-foreground uppercase"><LocalizedText text={"You keep per sale"} /></p>
+              <p className="font-display mt-1.5 text-[20px] font-bold text-violet-950">{netPerSale}</p>
+              <p className="mt-1 text-[11.5px] leading-relaxed text-violet-950/60">
+                <LocalizedText text={"After the 10% Zybble commission. Before fees and taxes."} />
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-border bg-muted/40 p-4 text-[11.5px] leading-relaxed text-zinc-500">
+            <LocalizedText text={"Everything on this page is a live preview of your draft. Nothing is published until you submit for review."} />
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
 
-/* --------------------------------- Step 8 ---------------------------------- */
+/* --------------------------------- Step 7 ---------------------------------- */
 
 function SubmitStep({ draft, lessonsCount }: { draft: CourseDraft; lessonsCount: number }) {
   const checks = [

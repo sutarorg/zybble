@@ -208,48 +208,288 @@ function drawFrame(ctx: CanvasRenderingContext2D): void {
   }
 }
 
+/**
+ * Laurel branch: a curved stem with tapered leaves, mirrored by `side`
+ * (−1 = left, 1 = right). Used inside the medallion for a classic seal look.
+ */
+function drawLaurelBranch(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  side: -1 | 1
+): void {
+  const start = side === -1 ? Math.PI * 0.72 : Math.PI * 0.28;
+  const end = side === -1 ? Math.PI * 1.28 : Math.PI * -0.28;
+  ctx.save();
+  ctx.strokeStyle = "rgba(91, 67, 5, 0.8)";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, start, end, side === -1);
+  ctx.stroke();
+
+  const steps = 6;
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    const angle = start + (end - start) * t * 0.92;
+    const px = cx + Math.cos(angle) * radius;
+    const py = cy + Math.sin(angle) * radius;
+    const outward = angle + (side === -1 ? Math.PI / 2 : -Math.PI / 2);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(outward + side * 0.5);
+    const leaf = ctx.createLinearGradient(0, 0, 0, -10);
+    leaf.addColorStop(0, "rgba(169, 129, 26, 0.95)");
+    leaf.addColorStop(1, "rgba(233, 209, 126, 0.95)");
+    ctx.fillStyle = leaf;
+    ctx.beginPath();
+    ctx.ellipse(0, -5, 3.1, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/** Ring of tiny beads — the milled edge of a struck medallion. */
+function drawBeadedRing(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  count: number,
+  color: string
+): void {
+  ctx.save();
+  ctx.fillStyle = color;
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius, 1.7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * The completion medallion: cast-gold disc with a milled edge, beaded ring,
+ * laurel wreath, engraved "Z" monogram, star and ribbon tails.
+ */
 function drawSeal(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
   ctx.save();
-  // Ribbons
-  ctx.fillStyle = GOLD;
+
+  /* Ribbon tails (behind the disc) */
+  const ribbon = ctx.createLinearGradient(cx - 46, cy, cx + 46, cy + 108);
+  ribbon.addColorStop(0, "#7c3aed");
+  ribbon.addColorStop(0.5, "#5b21b6");
+  ribbon.addColorStop(1, "#4c1d95");
+  ctx.fillStyle = ribbon;
+  // left tail
   ctx.beginPath();
-  ctx.moveTo(cx - 16, cy + 34);
-  ctx.lineTo(cx - 40, cy + 96);
-  ctx.lineTo(cx - 8, cy + 78);
+  ctx.moveTo(cx - 40, cy + 34);
+  ctx.lineTo(cx - 58, cy + 112);
+  ctx.lineTo(cx - 22, cy + 96);
+  ctx.lineTo(cx - 6, cy + 48);
   ctx.closePath();
   ctx.fill();
+  // right tail
   ctx.beginPath();
-  ctx.moveTo(cx + 16, cy + 34);
-  ctx.lineTo(cx + 40, cy + 96);
-  ctx.lineTo(cx + 8, cy + 78);
+  ctx.moveTo(cx + 40, cy + 34);
+  ctx.lineTo(cx + 58, cy + 112);
+  ctx.lineTo(cx + 22, cy + 96);
+  ctx.lineTo(cx + 6, cy + 48);
   ctx.closePath();
   ctx.fill();
-
-  // Medallion
-  const g = ctx.createLinearGradient(cx - 52, cy - 52, cx + 52, cy + 52);
-  g.addColorStop(0, GOLD_LIGHT);
-  g.addColorStop(0.45, GOLD);
-  g.addColorStop(1, "#a8801a");
+  // ribbon shading kept subtle so the gold stays the hero
+  ctx.strokeStyle = "rgba(24, 24, 27, 0.18)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(cx, cy, 52, 0, Math.PI * 2);
-  ctx.fillStyle = g;
+  ctx.moveTo(cx - 40, cy + 34);
+  ctx.lineTo(cx - 58, cy + 112);
+  ctx.moveTo(cx + 40, cy + 34);
+  ctx.lineTo(cx + 58, cy + 112);
+  ctx.stroke();
+
+  /* Soft drop shadow under the disc */
+  ctx.save();
+  ctx.shadowColor = "rgba(120, 84, 10, 0.35)";
+  ctx.shadowBlur = 22;
+  ctx.shadowOffsetY = 6;
+
+  /* Outer milled rim */
+  const rim = ctx.createLinearGradient(cx - 62, cy - 62, cx + 62, cy + 62);
+  rim.addColorStop(0, "#f6e7ae");
+  rim.addColorStop(0.35, "#d8b64a");
+  rim.addColorStop(0.7, "#b8912a");
+  rim.addColorStop(1, "#8d6b12");
+  ctx.beginPath();
+  ctx.arc(cx, cy, 72, 0, Math.PI * 2);
+  ctx.fillStyle = rim;
   ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(255,255,255,0.65)";
-  ctx.stroke();
+  ctx.restore();
+
   ctx.beginPath();
-  ctx.arc(cx, cy, 41, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(255,255,255,0.5)";
-  ctx.lineWidth = 1.5;
+  ctx.arc(cx, cy, 72, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(91, 67, 5, 0.55)";
+  ctx.lineWidth = 1.6;
   ctx.stroke();
 
-  setFont(ctx, 700, 26, DISPLAY);
-  ctx.fillStyle = "#5b4305";
-  ctx.textBaseline = "middle";
+  /* Beaded edge */
+  drawBeadedRing(ctx, cx, cy, 66, 52, "rgba(255, 249, 224, 0.85)");
+
+  /* Inner field */
+  const field = ctx.createRadialGradient(cx - 16, cy - 22, 7, cx, cy, 58);
+  field.addColorStop(0, "#fdf3cd");
+  field.addColorStop(0.55, "#e8cf7f");
+  field.addColorStop(1, "#c2a03a");
+  ctx.beginPath();
+  ctx.arc(cx, cy, 58, 0, Math.PI * 2);
+  ctx.fillStyle = field;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 58, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(120, 90, 12, 0.45)";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  /* Laurel wreath */
+  drawLaurelBranch(ctx, cx, cy, 44, -1);
+  drawLaurelBranch(ctx, cx, cy, 44, 1);
+
+  /* Star above the monogram */
+  ctx.save();
+  ctx.translate(cx, cy - 32);
+  ctx.fillStyle = "#8a6712";
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? 10.5 : 4.6;
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const px = Math.cos(a) * r;
+    const py = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  /* Engraved monogram */
+  ctx.save();
+  ctx.translate(cx, cy - 2);
+  setFont(ctx, 700, 50, DISPLAY);
   ctx.textAlign = "center";
-  ctx.fillText("Z", cx, cy - 2);
-  setFont(ctx, 600, 11, BODY);
-  ctx.fillText("CERTIFIED", cx, cy + 22);
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(255, 252, 240, 0.75)";
+  ctx.fillText("Z", 1.4, 1.6);
+  ctx.fillStyle = "#6b4d06";
+  ctx.fillText("Z", 0, 0);
+  ctx.restore();
+
+  /* Wordmark inside the seal */
+  ctx.save();
+  setFont(ctx, 700, 11.5, BODY);
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(107, 77, 6, 0.9)";
+  drawTracked(ctx, "CERTIFIED", cx, cy + 42, 3);
+  ctx.restore();
+
+  /* Top fold where the ribbons meet the disc */
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cx - 18, cy - 56);
+  ctx.lineTo(cx + 18, cy - 56);
+  ctx.lineTo(cx + 11, cy - 74);
+  ctx.lineTo(cx - 11, cy - 74);
+  ctx.closePath();
+  const fold = ctx.createLinearGradient(cx, cy - 74, cx, cy - 56);
+  fold.addColorStop(0, "#a87f1c");
+  fold.addColorStop(1, "#e8cf7f");
+  ctx.fillStyle = fold;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
+ * The Zybble brand lockup (rounded-square mark + wordmark), drawn centred on
+ * `cx`. Mirrors `<ZybbleMark />` from the app shell so the certificate carries
+ * the same identity learners see in the product.
+ */
+function drawBrandLockup(ctx: CanvasRenderingContext2D, cx: number, centerY: number): void {
+  const size = 46;
+  const gap = 16;
+
+  ctx.save();
+  setFont(ctx, 700, 30, DISPLAY);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  const wordWidth = measureTracked(ctx, "Zybble", 0);
+  const totalWidth = size + gap + wordWidth;
+  const markX = cx - totalWidth / 2;
+  const markY = centerY - size / 2;
+
+  /* Violet tile */
+  const tile = ctx.createLinearGradient(markX, markY, markX + size, markY + size);
+  tile.addColorStop(0, "#8b5cf6");
+  tile.addColorStop(1, "#6d28d9");
+  ctx.save();
+  ctx.shadowColor = "rgba(109, 40, 217, 0.28)";
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = tile;
+  roundRect(ctx, markX, markY, size, size, 14);
+  ctx.fill();
+  ctx.restore();
+
+  /* Specular highlight + hairline border */
+  const gloss = ctx.createLinearGradient(markX, markY, markX, markY + size);
+  gloss.addColorStop(0, "rgba(255,255,255,0.24)");
+  gloss.addColorStop(0.55, "rgba(255,255,255,0)");
+  ctx.fillStyle = gloss;
+  roundRect(ctx, markX, markY, size, size, 14);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 1;
+  roundRect(ctx, markX + 0.5, markY + 0.5, size - 1, size - 1, 13.5);
+  ctx.stroke();
+
+  /* "Z" glyph — the same path the product mark uses, scaled from a 24pt grid */
+  const pad = 11;
+  const scale = (size - pad * 2) / 24;
+  ctx.save();
+  ctx.translate(markX + pad, markY + pad);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(6, 5.5);
+  ctx.lineTo(18, 5.5);
+  ctx.lineTo(9.5, 18.5);
+  ctx.lineTo(18, 18.5);
+  ctx.stroke();
+  ctx.restore();
+
+  /* Wordmark */
+  ctx.fillStyle = INK;
+  drawTrackedAsLeft(ctx, "Zybble", markX + size + gap, centerY + 1, 0);
+
+  /* Underline flourish that ties the lockup to the certificate */
+  const flourishY = centerY + size / 2 + 9;
+  const halfWidth = Math.max(120, totalWidth / 2 + 34);
+  const line = ctx.createLinearGradient(cx - halfWidth, flourishY, cx + halfWidth, flourishY);
+  line.addColorStop(0, "rgba(201, 162, 39, 0)");
+  line.addColorStop(0.5, "rgba(201, 162, 39, 0.85)");
+  line.addColorStop(1, "rgba(201, 162, 39, 0)");
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(cx - halfWidth, flourishY);
+  ctx.lineTo(cx + halfWidth, flourishY);
+  ctx.stroke();
+
   ctx.restore();
 }
 
@@ -410,23 +650,8 @@ export function paintCertificate(
     drawTracked(ctx, bits.join("  ·  "), cx, metaBase, 1);
   }
 
-  /* Zybble Logo at top */
-  setFont(ctx, 700, 24, DISPLAY);
-  ctx.fillStyle = PRIMARY;
-  ctx.textAlign = "center";
-  ctx.fillText("Zybble", cx, 100);
-  
-  // Zybble logo icon
-  ctx.save();
-  ctx.translate(cx - 40, 70);
-  ctx.strokeStyle = PRIMARY;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(15, 20);
-  ctx.lineTo(30, 0);
-  ctx.stroke();
-  ctx.restore();
+  /* Wordmark lockup at the top — the real Zybble mark, drawn as vectors. */
+  drawBrandLockup(ctx, cx, 104);
 
   /* Footer: instructor (left) · seal (centre) · date (right) */
   const ruleY = 856;
@@ -462,7 +687,7 @@ export function paintCertificate(
   ctx.fillStyle = "#27272a";
   ctx.fillText(formatCertificateDate(certificate.issuedAt), CERT_WIDTH - 180, 936);
 
-  drawSeal(ctx, cx, 862);
+  drawSeal(ctx, cx, 852);
 
   /* Verification code */
   ctx.textAlign = "center";

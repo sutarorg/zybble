@@ -67,7 +67,7 @@ export function LearnerHeader() {
           <LanguageMenu />
           <NotificationsMenu />
           <div className="mx-1.5 hidden h-5 w-px bg-border sm:block" aria-hidden />
-          <UserMenu />
+          <UserMenu variant="learner" />
         </div>
       </div>
     </header>

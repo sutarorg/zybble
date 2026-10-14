@@ -4,6 +4,7 @@ import { LocalizedText, useTranslate } from "@/components/providers/localized-te
 import { CirclePlay, FileText, FileDown, ListChecks, Lock } from "lucide-react";
 import type { Course } from "@/types";
 import { formatDuration } from "@/lib/format";
+import { lessonDurationLabel } from "@/lib/learn";
 import {
   Accordion,
   AccordionContent,
@@ -86,7 +87,7 @@ export function Curriculum({ course }: { course: Course }) {
                               <Lock className="size-3 shrink-0 text-zinc-300" aria-hidden />
                             )}
                             <span className="shrink-0 text-[12px] text-zinc-400 tabular-nums">
-                              <LocalizedText text={formatDuration(lesson.durationMinutes)} />
+                              <LocalizedText text={lessonDurationLabel(lesson)} />
                             </span>
                           </button>
                         </li>

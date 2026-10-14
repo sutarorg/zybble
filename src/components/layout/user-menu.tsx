@@ -2,7 +2,7 @@
 
 import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Bookmark,
@@ -11,8 +11,8 @@ import {
   HelpCircle,
   LogOut,
   Presentation,
-  ShieldCheck,
   Compass,
+  Settings,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,11 +26,22 @@ import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/providers/app-providers";
 import { getDictionary } from "@/lib/i18n";
 
-export function UserMenu() {
+/**
+ * Avatar menu shared by the public and learner headers.
+ *
+ * `variant="learner"` is used inside the learner workspace, where "My Learning"
+ * and "Wishlist" already live in the sidebar — so they are dropped from the
+ * menu instead of being duplicated.
+ */
+export function UserMenu({ variant = "public" }: { variant?: "public" | "learner" }) {
   const translateUi = useTranslate();
   const router = useRouter();
+  const pathname = usePathname();
   const { user, signOut, language } = useApp();
   const dict = getDictionary(language);
+  // "Explore" is redundant once the learner is already on the Explore page.
+  const onExplore = pathname === "/";
+  const learnerWorkspace = variant === "learner";
 
   if (!user) {
     return (
@@ -74,23 +85,34 @@ export function UserMenu() {
           </div>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/">
-            <Compass /><LocalizedText text={"Explore"} /></Link>
-        </DropdownMenuItem>
+        {!onExplore && (
+          <DropdownMenuItem asChild>
+            <Link href="/">
+              <Compass /><LocalizedText text={"Explore"} /></Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <Link href={user.role === "creator" ? "/creator" : "/creator/signup"}>
             <Presentation /> <LocalizedText text={user.role === "creator" ? dict.goToStudio : dict.startTeaching} />
           </Link>
         </DropdownMenuItem>
+        {!learnerWorkspace && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href="/my-learning">
+                <GraduationCap /> <LocalizedText text={dict.myLearning} />
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/wishlist">
+                <Bookmark /> <LocalizedText text={dict.wishlist} />
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuItem asChild>
-          <Link href="/my-learning">
-            <GraduationCap /> <LocalizedText text={dict.myLearning} />
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/wishlist">
-            <Bookmark /> <LocalizedText text={dict.wishlist} />
+          <Link href="/settings">
+            <Settings /> <LocalizedText text={dict.settings} />
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

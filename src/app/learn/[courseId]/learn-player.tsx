@@ -22,9 +22,10 @@ import type { Certificate, Course, CreatorResource, Enrollment } from "@/types";
 import type { FlatLesson } from "@/lib/learn";
 import { useApp } from "@/components/providers/app-providers";
 import { useCreator, useCommunityCourses } from "@/components/providers/creator-provider";
-import { flattenLessons, instructorOf, nextLessonOf, prevLessonOf, progressOf, resolveCourse } from "@/lib/learn";
+import { flattenLessons, instructorOf, lessonDurationLabel, nextLessonOf, prevLessonOf, progressOf, resolveCourse } from "@/lib/learn";
 import { SimulatedPlayer } from "@/components/learn/video-player";
 import { CurriculumPanel } from "@/components/learn/curriculum-panel";
+import { CourseReviewPanel } from "@/components/learn/course-review";
 import { CertificateDialog } from "@/components/certificate/certificate-dialog";
 import { EnrollCard } from "@/components/courses/enroll-card";
 import { Logo } from "@/components/layout/logo";
@@ -35,6 +36,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { formatDuration } from "@/lib/format";
+import { formatFileSize } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------ main player -------------------------------- */
@@ -303,14 +305,19 @@ export function LearnPlayer({
   const prev = prevLessonOf(course, current);
   const isCurrentDone = (enrollment?.completedLessons ?? []).includes(current.lesson.id);
   const instructor = instructorOf(course);
-  const percent = progressOf(course, enrollment).percent;
+  const courseProgress = progressOf(course, enrollment);
+  const percent = courseProgress.percent;
 
-  /* resources tab entries */
+  /* resources tab entries — resource lessons plus any legacy extra files */
   const resourceEntries: { title: string; size: string; lesson?: FlatLesson["lesson"] }[] = [
     ...course.curriculum.flatMap((s) =>
       s.lessons
-        .filter((l) => l.downloadable)
-        .map((l) => ({ title: `${l.title} — resources`, size: "0.4 MB", lesson: l }))
+        .filter((l) => l.downloadable || l.type === "resource")
+        .map((l) => ({
+          title: l.media ? l.media.fileName : `${l.title} — resources`,
+          size: l.media ? formatFileSize(l.media.fileSize) : "0.4 MB",
+          lesson: l,
+        }))
     ),
     ...((course as Course & { resourcesExtra?: CreatorResource[] }).resourcesExtra ?? []).map((r) => ({
       title: r.title,
@@ -413,8 +420,13 @@ export function LearnPlayer({
                   <LocalizedText text={current.lesson.title} />
                 </h1>
                 <p className="mt-1 text-[13px] text-muted-foreground">
-                  <LocalizedText text={formatDuration(current.lesson.durationMinutes)} />
-                  {current.lesson.type !== "video" && ` · ${capitalize(current.lesson.type)} lesson`}
+                  <LocalizedText text={lessonDurationLabel(current.lesson)} />
+                  {current.lesson.type === "quiz" && current.lesson.quiz?.length
+                    ? ` · ${current.lesson.quiz.length} question${current.lesson.quiz.length === 1 ? "" : "s"}`
+                    : ""}
+                  {current.lesson.media && current.lesson.type === "resource"
+                    ? ` · ${current.lesson.media.extension.toUpperCase()} file`
+                    : ""}
                   {current.lesson.freePreview && " · Free preview"}
                 </p>
               </div>
@@ -491,7 +503,7 @@ export function LearnPlayer({
                       <p className="mt-1.5 truncate text-[13px] font-semibold text-primary">
                         <LocalizedText text={next.number} /> — <LocalizedText text={next.lesson.title} />
                       </p>
-                      <p className="mt-1 text-[12.5px] text-muted-foreground"><LocalizedText text={formatDuration(next.lesson.durationMinutes)} /></p>
+                      <p className="mt-1 text-[12.5px] text-muted-foreground"><LocalizedText text={lessonDurationLabel(next.lesson)} /></p>
                     </button>
                   )}
                 </div>
@@ -545,6 +557,9 @@ export function LearnPlayer({
                 </div>
               </TabsContent>
             </Tabs>
+
+            {/* Reviews unlock only once every lesson is complete. */}
+            {courseProgress.isCompleted && <CourseReviewPanel course={course} />}
           </div>
         </main>
 

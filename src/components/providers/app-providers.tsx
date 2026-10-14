@@ -8,6 +8,7 @@ import { clearSessionNamespace, useLocalStorage } from "@/lib/hooks";
 import type {
   ActivityItem,
   Certificate,
+  CourseReview,
   Enrollment,
   LessonNote,
   Order,
@@ -28,6 +29,7 @@ const KEYS = {
   recentViews: "zybble.learner.recent-views.v1",
   activity: "zybble.learner.activity.v1",
   learnerPrefs: "zybble.learner.prefs.v1",
+  courseReviews: "zybble.learner.reviews.v1",
 } as const;
 
 export interface LearnerPrefs {
@@ -76,6 +78,14 @@ interface AppContextValue {
   getCertificate: (courseId: string) => Certificate | undefined;
   issueCertificate: (input: Omit<Certificate, "id" | "issuedAt">) => Certificate;
   revokeCertificate: (courseId: string) => void;
+  /* course reviews (unlocked once a course is completed) */
+  courseReviews: CourseReview[];
+  getCourseReview: (courseId: string) => CourseReview | undefined;
+  saveCourseReview: (
+    courseId: string,
+    review: { rating: number; title: string; text: string }
+  ) => void;
+  removeCourseReview: (courseId: string) => void;
   /* recently viewed */
   recentViews: RecentCourseView[];
   recordCourseView: (courseId: string) => void;
@@ -106,6 +116,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const recentViews = useLocalStorage<RecentCourseView[]>(KEYS.recentViews, []);
   const activity = useLocalStorage<ActivityItem[]>(KEYS.activity, []);
   const learnerPrefs = useLocalStorage<LearnerPrefs>(KEYS.learnerPrefs, DEFAULT_LEARNER_PREFS);
+  const courseReviews = useLocalStorage<CourseReview[]>(KEYS.courseReviews, []);
 
   // Mirror the selected interface language onto
   // <html lang> (the root layout can only render the SSR default) so screen
@@ -293,6 +304,38 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     [certificates.set]
   );
 
+  /* ------------------------------ course reviews ----------------------------- */
+
+  const getCourseReview = useCallback(
+    (courseId: string) => courseReviews.value.find((r) => r.courseId === courseId),
+    [courseReviews.value]
+  );
+
+  /** Create or update the learner's review for a course. */
+  const saveCourseReview = useCallback(
+    (courseId: string, review: { rating: number; title: string; text: string }) => {
+      const now = new Date().toISOString();
+      courseReviews.set((prev) => {
+        const existing = prev.find((r) => r.courseId === courseId);
+        if (existing) {
+          return prev.map((r) =>
+            r.courseId === courseId ? { ...r, ...review, updatedAt: now } : r
+          );
+        }
+        return [...prev, { courseId, ...review, createdAt: now, updatedAt: now }];
+      });
+      pushActivity({ kind: "complete", courseId, text: `Rated the course ${review.rating}/5` });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [courseReviews.set, pushActivity]
+  );
+
+  const removeCourseReview = useCallback(
+    (courseId: string) => courseReviews.set((prev) => prev.filter((r) => r.courseId !== courseId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [courseReviews.set]
+  );
+
   /* ------------------------------ recently viewed ---------------------------- */
 
   const recordCourseView = useCallback(
@@ -328,8 +371,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     activity.clear();
     learnerPrefs.clear();
     wishlist.clear();
+    courseReviews.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enrollments.clear, orders.clear, notes.clear, certificates.clear, recentViews.clear, activity.clear, learnerPrefs.clear, wishlist.clear]);
+  }, [enrollments.clear, orders.clear, notes.clear, certificates.clear, recentViews.clear, activity.clear, learnerPrefs.clear, wishlist.clear, courseReviews.clear]);
 
   /* --------------------------- profile picture upload ------------------------ */
 
@@ -377,6 +421,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       getCertificate,
       issueCertificate,
       revokeCertificate,
+      courseReviews: courseReviews.hydrated ? courseReviews.value : [],
+      getCourseReview,
+      saveCourseReview,
+      removeCourseReview,
       recentViews: recentViews.hydrated ? recentViews.value : [],
       recordCourseView,
       activity: activity.hydrated ? activity.value : [],
@@ -390,10 +438,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     }),
     [
       hydrated,
-      user, wishlist, enrollments, orders, readNotifs, language, notes, certificates, recentViews, activity, learnerPrefs,
+      user, wishlist, enrollments, orders, readNotifs, language, notes, certificates, courseReviews, recentViews, activity, learnerPrefs,
       toggleWishlist, isWishlisted, completeOrder, isEnrolled, toggleLessonComplete, setLastLesson,
       setNote, getCertificate, issueCertificate, revokeCertificate, recordCourseView, markAllNotificationsRead,
-      setLearnerPrefs, resetLearnerData, uploadAvatar,
+      setLearnerPrefs, resetLearnerData, uploadAvatar, getCourseReview, saveCourseReview, removeCourseReview,
     ]
   );
 

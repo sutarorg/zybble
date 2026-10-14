@@ -8,178 +8,41 @@ import {
   ArrowUp,
   ChevronDown,
   Eye,
-  FileDown,
-  FileText,
-  CirclePlay,
-  ListChecks,
   ListTree,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Course, CurriculumSection, Lesson } from "@/types";
-import { uid } from "@/lib/creator";
+import { starterSection, uid } from "@/lib/creator";
+import { lessonDurationLabel } from "@/lib/learn";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input, Textarea } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Curriculum } from "@/components/courses/curriculum";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  LessonWizardDialog,
+  LESSON_TYPES as LESSON_TYPE_META,
+  type LessonDraft,
+  draftToLesson,
+} from "@/components/creator/lesson-wizard";
 import { cn } from "@/lib/utils";
-import { useKeyedState } from "@/lib/hooks";
 
-const LESSON_TYPES: { value: Lesson["type"]; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { value: "video", label: "Video", icon: CirclePlay },
-  { value: "reading", label: "Reading", icon: FileText },
-  { value: "quiz", label: "Quiz", icon: ListChecks },
-  { value: "resource", label: "Resource", icon: FileDown },
-];
+/** Lesson type metadata (video · quiz · resource) shared with the wizard. */
+const LESSON_TYPES = LESSON_TYPE_META;
 
-/* ------------------------------ Lesson dialog ------------------------------ */
-
-interface LessonFormState {
-  title: string;
-  type: Lesson["type"];
-  durationMinutes: number;
-  description: string;
-  freePreview: boolean;
-  downloadable: boolean;
-}
-
-const EMPTY_LESSON_FORM: LessonFormState = {
-  title: "",
-  type: "video",
-  durationMinutes: 10,
-  description: "",
-  freePreview: false,
-  downloadable: false,
-};
-
-function LessonDialog({
-  open,
-  onOpenChange,
-  initial,
-  onSave,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  initial: LessonFormState | null;
-  onSave: (lesson: LessonFormState & { title: string }) => void;
-}) {
-  const translateUi = useTranslate();
-  /**
-   * The form resets whenever the dialog is (re)opened for a different lesson —
-   * derived from the open state and lesson identity instead of an effect, so no
-   * stale values flash and no cascading render happens.
-   */
-  const dialogKey = open ? `open:${initial ? "edit" : "add"}:${initial?.title ?? ""}` : "closed";
-  const [state, setState] = useKeyedState(dialogKey, {
-    form: initial ?? EMPTY_LESSON_FORM,
-    error: "",
-  });
-  const form = state.form;
-  const error = state.error;
-  const setForm = (next: LessonFormState) => setState((prev) => ({ ...prev, form: next }));
-  const setError = (next: string) => setState((prev) => ({ ...prev, error: next }));
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle>{initial ? "Edit lesson" : "Add lesson"}</DialogTitle>
-          <DialogDescription><LocalizedText text={"Lessons combine video, reading, quizzes and downloadable resources."} /></DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="ld-title"><LocalizedText text={"Lesson title *"} /></Label>
-            <Input
-              id="ld-title"
-              value={form.title}
-              placeholder={translateUi("e.g. Setting up your first workflow")}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              aria-invalid={!!error}
-            />
-            {error && <p className="text-[12px] font-medium text-destructive"><LocalizedText text={error} /></p>}
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label><LocalizedText text={"Type"} /></Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as Lesson["type"] })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LESSON_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      <LocalizedText text={t.label} />
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ld-duration"><LocalizedText text={"Duration (minutes)"} /></Label>
-              <Input
-                id="ld-duration"
-                type="number"
-                min={1}
-                max={300}
-                value={form.durationMinutes}
-                onChange={(e) => setForm({ ...form, durationMinutes: Math.max(1, Number(e.target.value) || 1) })}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="ld-desc"><LocalizedText text={"Description"} /><span className="font-normal text-zinc-400"><LocalizedText text={"(optional)"} /></span></Label>
-            <Textarea
-              id="ld-desc"
-              value={form.description}
-              placeholder={translateUi("What this lesson covers, in one or two sentences.")}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="min-h-20"
-            />
-          </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2">
-            <label className="flex cursor-pointer items-center gap-2 text-[13px]">
-              <Checkbox
-                checked={form.freePreview}
-                onCheckedChange={(v) => setForm({ ...form, freePreview: v === true })}
-              /><LocalizedText text={"Free preview"} /></label>
-            <label className="flex cursor-pointer items-center gap-2 text-[13px]">
-              <Checkbox
-                checked={form.downloadable}
-                onCheckedChange={(v) => setForm({ ...form, downloadable: v === true })}
-              /><LocalizedText text={"Downloadable resource"} /></label>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}><LocalizedText text={"Cancel"} /></Button>
-          <Button
-            onClick={() => {
-              if (form.title.trim().length < 3) {
-                setError("Give the lesson a title (3+ characters).");
-                return;
-              }
-              onSave({ ...form, title: form.title.trim() });
-              onOpenChange(false);
-            }}
-          >
-            {initial ? "Save lesson" : "Add lesson"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+/** Compact "meta" line shown under a lesson row in the editor. */
+function lessonSummary(lesson: Lesson): string {
+  if (lesson.type === "quiz") {
+    const count = lesson.quiz?.length ?? 0;
+    return count > 0 ? `${count} question${count === 1 ? "" : "s"}` : "Quiz";
+  }
+  if (lesson.type === "resource") {
+    return lesson.media ? `${lesson.media.extension.toUpperCase()} · ${lesson.media.fileName}` : "Reference file";
+  }
+  return lesson.media?.fileName ?? lessonDurationLabel(lesson);
 }
 
 /* ------------------------------ Main editor -------------------------------- */
@@ -202,8 +65,10 @@ export function CurriculumEditor({
   const [lessonDialog, setLessonDialog] = useState<{
     open: boolean;
     sectionId: string | null;
-    lesson: (LessonFormState & { id?: string }) | null;
-  }>({ open: false, sectionId: null, lesson: null });
+    lesson: Lesson | null;
+    /** Bumped per open so the wizard resets instead of resuming mid-flow. */
+    session: number;
+  }>({ open: false, sectionId: null, lesson: null, session: 0 });
   const [preview, setPreview] = useState(false);
 
   const lessonsTotal = useMemo(() => sections.reduce((n, s) => n + s.lessons.length, 0), [sections]);
@@ -246,34 +111,34 @@ export function CurriculumEditor({
   };
 
   /* lesson ops */
-  const openAddLesson = (sectionId: string) => setLessonDialog({ open: true, sectionId, lesson: null });
+  const openAddLesson = (sectionId: string) =>
+    setLessonDialog((prev) => ({ open: true, sectionId, lesson: null, session: prev.session + 1 }));
   const openEditLesson = (sectionId: string, lesson: Lesson) =>
-    setLessonDialog({
-      open: true,
-      sectionId,
-      lesson: {
-        id: lesson.id,
-        title: lesson.title,
-        type: lesson.type,
-        durationMinutes: lesson.durationMinutes,
-        description: lesson.description ?? "",
-        freePreview: lesson.freePreview ?? false,
-        downloadable: lesson.downloadable ?? false,
-      },
-    });
-  const saveLesson = (form: LessonFormState) => {
-    const { sectionId, lesson } = lessonDialog;
+    setLessonDialog((prev) => ({ open: true, sectionId, lesson, session: prev.session + 1 }));
+
+  const saveLesson = (draft: LessonDraft, existing: Lesson | null) => {
+    const { sectionId } = lessonDialog;
     if (!sectionId) return;
     mutate((d) =>
       d.map((s) => {
         if (s.id !== sectionId) return s;
-        if (lesson?.id) {
-          return { ...s, lessons: s.lessons.map((l) => (l.id === lesson.id ? { ...l, ...form } : l)) };
+        if (existing) {
+          return {
+            ...s,
+            lessons: s.lessons.map((l) => (l.id === existing.id ? draftToLesson(draft, l) : l)),
+          };
         }
-        const newLesson: Lesson = { id: uid("les"), ...form };
-        return { ...s, lessons: [...s.lessons, newLesson] };
+        return { ...s, lessons: [...s.lessons, draftToLesson(draft)] };
       })
     );
+    toast.success(existing ? "Lesson updated" : "Lesson added");
+  };
+
+  const addStarterSection = () => {
+    const section = starterSection();
+    onChange([...sections, section]);
+    setExpanded((prev) => new Set(prev).add(section.id));
+    toast.success("Added “Getting Started”");
   };
   const moveLesson = (sectionId: string, index: number, dir: -1 | 1) =>
     mutate((d) =>
@@ -334,9 +199,13 @@ export function CurriculumEditor({
       ) : sections.length === 0 ? (
         <EmptyState
           icon={ListTree}
-          title={translateUi("No curriculum yet")}
+          title={translateUi("No sections yet")}
           description={translateUi("Structure your course into sections and lessons. A great course usually has 4–6 sections.")}
-          action={null}
+          action={
+            <Button variant="outline" onClick={addStarterSection}>
+              <Sparkles aria-hidden /><LocalizedText text={"Add “Getting Started” section"} />
+            </Button>
+          }
         />
       ) : (
         <ol className="space-y-3">
@@ -400,8 +269,8 @@ export function CurriculumEditor({
                               {lesson.freePreview && (
                                 <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground"><LocalizedText text={"Preview"} /></span>
                               )}
-                              <span className="shrink-0 text-[11.5px] text-zinc-400 tabular-nums">
-                                {lesson.durationMinutes}m
+                              <span className="max-w-40 shrink-0 truncate text-[11.5px] text-zinc-400 tabular-nums" title={lessonSummary(lesson)}>
+                                <LocalizedText text={lessonSummary(lesson)} />
                               </span>
                               <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
                                 <button type="button" aria-label={translateUi("Move lesson up")} disabled={li === 0} onClick={() => moveLesson(section.id, li, -1)}
@@ -456,11 +325,13 @@ export function CurriculumEditor({
           <Plus aria-hidden /><LocalizedText text={"Add section"} /></Button>
       </form>
 
-      <LessonDialog
+      <LessonWizardDialog
         open={lessonDialog.open}
         onOpenChange={(open) => setLessonDialog((p) => ({ ...p, open }))}
         initial={lessonDialog.lesson}
         onSave={saveLesson}
+        mode={lessonDialog.lesson ? "edit" : "add"}
+        sessionKey={lessonDialog.session}
       />
     </div>
   );

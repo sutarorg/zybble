@@ -22,7 +22,7 @@ import { useApp } from "@/components/providers/app-providers";
 import { LANGUAGES } from "@/data/mock-data";
 import { getDictionary } from "@/lib/i18n";
 import { initialsOf } from "@/lib/format";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ProfilePictureUpload } from "@/components/ui/profile-picture-upload";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,7 @@ export default function LearnerSettingsPage() {
     language,
     setLanguage,
     resetLearnerData,
+    uploadAvatar,
   } = useApp();
 
   /* `null` = untouched, so the field follows the stored profile without an
@@ -107,14 +108,24 @@ export default function LearnerSettingsPage() {
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <UserRound className="size-4.5 text-primary" aria-hidden /><LocalizedText text={"Profile"} /></h2>
         <div className="mt-4 flex items-center gap-4">
-          <Avatar className="size-14 ring-1 ring-border">
-            <AvatarFallback className="bg-primary text-sm text-white">
-              <LocalizedText text={initialsOf(name || "Z L")} />
-            </AvatarFallback>
-          </Avatar>
-          <p className="text-[12.5px] leading-relaxed text-muted-foreground"><LocalizedText text={"Your learner identity for this preview. Signed in as"} /><LocalizedText text={" "} />
-            <span className="font-medium text-foreground"><LocalizedText text={user?.email ?? "guest "} /></span>.
-          </p>
+          {/* Clicking the picture (or the camera overlay) opens the file picker. */}
+          <ProfilePictureUpload
+            currentAvatar={user?.avatar}
+            initials={initialsOf(name || "Z L")}
+            name={name || "Your name"}
+            onUpload={uploadAvatar}
+            showMeta={false}
+            avatarClassName="size-16 ring-1 ring-border"
+          />
+          <div className="min-w-0">
+            <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+              <LocalizedText text={"Your learner identity for this preview. Signed in as"} /><LocalizedText text={" "} />
+              <span className="font-medium text-foreground"><LocalizedText text={user?.email ?? "guest "} /></span>.
+            </p>
+            <p className="mt-1 text-[12px] text-zinc-400">
+              <LocalizedText text={"Click your picture to upload a new one (JPEG, PNG, WebP or GIF, max 3MB)."} />
+            </p>
+          </div>
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="space-y-1.5">

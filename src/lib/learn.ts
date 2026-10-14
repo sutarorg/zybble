@@ -1,4 +1,5 @@
 import { COURSES, INSTRUCTORS } from "@/data/mock-data";
+import { formatDuration } from "@/lib/format";
 import type { Course, CurriculumSection, Enrollment, Lesson } from "@/types";
 
 /* -------------------------------------------------------------------------- */
@@ -122,6 +123,19 @@ export function learnerTotals(
     lessonsCompleted: lessons,
     minutesLearned: minutes,
   };
+}
+
+/**
+ * Human label for a lesson's time commitment. Video lessons carry a real
+ * duration (read from the uploaded file); quizzes and resources are untimed.
+ */
+export function lessonDurationLabel(lesson: Lesson): string {
+  if (lesson.type === "video" && lesson.durationMinutes > 0) {
+    return formatDuration(lesson.durationMinutes);
+  }
+  if (lesson.type === "quiz") return "Untimed quiz";
+  if (lesson.type === "resource") return "Reference file";
+  return formatDuration(lesson.durationMinutes);
 }
 
 /* -------------------------------------------------------------------------- */

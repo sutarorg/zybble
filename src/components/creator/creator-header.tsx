@@ -9,10 +9,15 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   CheckCheck,
+  Compass,
+  Eye,
+  LogOut,
   Menu,
   Plus,
   Search,
+  Settings2,
   Star,
+  UserRound,
   Wallet,
   Sparkles,
   ClipboardCheck,
@@ -22,7 +27,7 @@ import { toast } from "sonner";
 import { Logo } from "@/components/layout/logo";
 import { CreatorSidebarContent } from "@/components/creator/creator-sidebar";
 import { useCreator } from "@/components/providers/creator-provider";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -137,15 +142,17 @@ function CreatorAvatarMenu() {
           className="flex cursor-pointer items-center gap-1.5 rounded-full p-0.5 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
         >
           <Avatar className="size-8.5 ring-1 ring-border">
+            {profile.avatar && <AvatarImage src={profile.avatar} alt={translateUi(profile.displayName)} />}
             <AvatarFallback className={cn("text-[11px]", profile.avatarColor)}>
               <LocalizedText text={profile.initials} />
             </AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
+      <DropdownMenuContent align="end" className="w-64">
         <div className="flex items-center gap-3 px-2.5 py-2.5">
           <Avatar className="size-10">
+            {profile.avatar && <AvatarImage src={profile.avatar} alt={translateUi(profile.displayName)} />}
             <AvatarFallback className={cn("text-xs", profile.avatarColor)}>
               <LocalizedText text={profile.initials} />
             </AvatarFallback>
@@ -156,20 +163,34 @@ function CreatorAvatarMenu() {
           </div>
         </div>
         <DropdownMenuSeparator />
+        {/* Public profile opens the instructor page on the public marketplace. */}
         <DropdownMenuItem asChild>
-          <Link href={`/instructors/${profile.instructorId}`}><LocalizedText text="Public profile" /></Link>
+          <Link href={`/instructors/${profile.instructorId}`}>
+            <Eye /><LocalizedText text="Public profile" />
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/creator/profile"><LocalizedText text={"Edit instructor profile"} /></Link>
+          <Link href="/creator/profile">
+            <UserRound /><LocalizedText text={"Edit instructor profile"} />
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/creator/settings"><LocalizedText text={"Studio settings"} /></Link>
+          <Link href="/creator/settings">
+            <Settings2 /><LocalizedText text={"Studio settings"} />
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/"><LocalizedText text={"Back to learner experience"} /></Link>
+          <Link href="/">
+            <Compass /><LocalizedText text={"Back to learner experience"} />
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => { signOut(); router.push("/"); }}><LocalizedText text="Sign out" /></DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-destructive focus:bg-red-50 focus:text-destructive [&_svg]:text-destructive"
+          onSelect={() => { signOut(); router.push("/"); }}
+        >
+          <LogOut /><LocalizedText text="Sign out" />
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
