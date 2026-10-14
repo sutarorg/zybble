@@ -22,7 +22,7 @@ import { pt } from "./pt";
 import { fr } from "./fr";
 import { de } from "./de";
 import { ja } from "./ja";
-import { courseText, type TranslatableCourse } from "./courses";
+import type { TranslatableCourse } from "./courses";
 
 export type Dictionary = typeof en;
 
@@ -52,20 +52,11 @@ export function localeOf(code: string | null | undefined): string {
 export type { TranslatableCourse };
 
 /**
- * Return a shallow copy of a course with its catalog copy swapped into the
- * active language. Courses without a translation (for example courses created
- * locally in the creator studio) fall back to their authored text.
+ * Market place content is creator-authored and is never machine-translated, so
+ * this resolves to the course unchanged. It stays as an explicit call site so
+ * the (currently absent) content-translation decision is visible in one place
+ * rather than scattered across cards and chat results.
  */
-export function translateCourse<T extends TranslatableCourse>(course: T, language: string): T {
-  if (!language || language === "en") return course;
-  const text = courseText(course.id, language);
-  if (!text) return course;
-  return {
-    ...course,
-    title: text.title || course.title,
-    subtitle: text.subtitle || course.subtitle,
-    description: text.subtitle || course.description,
-    longDescription: text.about?.length ? text.about : course.longDescription,
-    whatYouLearn: text.learn?.length ? text.learn : course.whatYouLearn,
-  };
+export function translateCourse<T extends TranslatableCourse>(course: T, _language: string): T {
+  return course;
 }

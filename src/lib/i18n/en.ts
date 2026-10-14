@@ -350,7 +350,7 @@ export const en = {
   marketplaceTerms: "Marketplace terms",
   platformCommission: "Platform commission",
   commissionValue: (pct: number) => `${pct}% of gross sales`,
-  payoutThreshold: "Payout threshold (USD)",
+  payoutThreshold: "Payout threshold (INR)",
   thresholdSaved: (amount: string) => `Threshold updated to ${amount}`,
   managePayout: "Manage payout method",
   aboutStudio: "About this studio",

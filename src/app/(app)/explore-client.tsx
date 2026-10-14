@@ -4,13 +4,11 @@ import { LocalizedText, useTranslate } from "@/components/providers/localized-te
 import * as React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CourseFilters, SortOption } from "@/types";
-import { COURSES } from "@/data/mock-data";
+import type { Course, CourseFilters, SortOption } from "@/types";
 import { getCategoryBySlug, sortCourses } from "@/lib/courses";
 import { CategoryChips } from "@/components/courses/category-chips";
 import { CourseBrowser } from "@/components/courses/course-browser";
 import { CourseCarousel } from "@/components/courses/course-carousel";
-import { useCommunityCourses } from "@/components/providers/creator-provider";
 import { useApp } from "@/components/providers/app-providers";
 import { getDictionary } from "@/lib/i18n";
 
@@ -21,12 +19,11 @@ interface Preset {
   filters?: Partial<CourseFilters>;
 }
 
-export function ExploreClient({ q }: { q: string }) {
+export function ExploreClient({ q, courses }: { q: string; courses: Course[] }) {
   const translateUi = useTranslate();
   const router = useRouter();
   const { language } = useApp();
   const dict = getDictionary(language);
-  const community = useCommunityCourses();
   const [category, setCategory] = useState<string | null>(null);
   const [preset, setPreset] = useState<Preset | null>(null);
 
@@ -39,12 +36,13 @@ export function ExploreClient({ q }: { q: string }) {
     if (q) router.replace("/");
   };
 
-  // Static catalog + courses published locally from the creator studio.
-  const pool = React.useMemo(() => [...community, ...COURSES], [community]);
-  const popular = React.useMemo(() => sortCourses(COURSES, "popular").slice(0, 8), []);
-  const newest = React.useMemo(() => sortCourses(pool, "newest").slice(0, 8), [pool]);
-  const topRated = React.useMemo(() => sortCourses(COURSES, "rating").slice(0, 8), []);
-  const free = React.useMemo(() => pool.filter((c) => c.price === 0), [pool]);
+  // Every record here was read from Postgres as a published course; an empty
+  // catalog renders the empty state rather than placeholder content.
+  const pool = React.useMemo(() => courses, [courses]);
+  const popular = React.useMemo(() => sortCourses(courses, "popular").slice(0, 8), [courses]);
+  const newest = React.useMemo(() => sortCourses(courses, "newest").slice(0, 8), [courses]);
+  const topRated = React.useMemo(() => sortCourses(courses, "rating").slice(0, 8), [courses]);
+  const free = React.useMemo(() => courses.filter((c) => c.pricePaise === 0), [courses]);
 
   return (
     <div className="page-container py-7 sm:py-9">

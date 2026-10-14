@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { AdminSidebarContent } from "@/components/admin/admin-sidebar";
-import { useAdmin } from "@/components/providers/admin-provider";
+import { useAdminStudio } from "@/components/providers/admin-studio-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -37,8 +37,8 @@ const KIND_ICON = { moderation: ClipboardCheck, report: Flag, payout: Landmark, 
 function AdminNotificationsMenu() {
   const translateUi = useTranslate();
   const router = useRouter();
-  const { notifications, readNotificationIds, markAllRead, hydrated } = useAdmin();
-  const unread = hydrated ? notifications.filter((n) => !readNotificationIds.includes(n.id)) : [];
+  const { notifications, markAllRead } = useAdminStudio();
+  const unread = notifications.filter((n) => !n.read);
 
   return (
     <DropdownMenu>
@@ -69,15 +69,15 @@ function AdminNotificationsMenu() {
         </div>
         <ul className="max-h-96 overflow-y-auto p-1.5 scrollbar-thin">
           {notifications.map((n) => {
-            const Icon = KIND_ICON[n.kind];
-            const isUnread = hydrated && !readNotificationIds.includes(n.id);
+            const Icon = KIND_ICON[(n.kind ?? "system") as keyof typeof KIND_ICON] ?? Sparkles;
+            const isUnread = !n.read;
             return (
               <li key={n.id}>
                 <button
                   type="button"
                   onClick={() => {
-                    if (!readNotificationIds.includes(n.id)) markAllRead([...readNotificationIds, n.id]);
-                    router.push(n.href);
+                    if (!n.read) markAllRead([n.id]);
+                    if (n.href) router.push(n.href);
                   }}
                   className={cn(
                     "flex w-full cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors hover:bg-muted",
@@ -100,7 +100,7 @@ function AdminNotificationsMenu() {
                     <span className="mt-0.5 line-clamp-2 block text-[12px] leading-snug text-muted-foreground">
                       <LocalizedText text={n.body} />
                     </span>
-                    <span className="mt-1 block text-[11px] text-zinc-400"><LocalizedText text={timeAgo(n.createdAt)} /></span>
+                    <span className="mt-1 block text-[11px] text-zinc-400">{timeAgo(n.createdAt)}</span>
                   </span>
                 </button>
               </li>
@@ -114,7 +114,7 @@ function AdminNotificationsMenu() {
 
 function AdminAvatarMenu() {
   const translateUi = useTranslate();
-  const { adminName } = useAdmin();
+  const { adminName } = useAdminStudio();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -150,7 +150,7 @@ function AdminAvatarMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <div className="px-2.5 py-2 text-[11.5px] leading-relaxed text-zinc-400">
-          <ShieldCheck className="mr-1 inline size-3 align-text-bottom" aria-hidden /><LocalizedText text={"Role preview only — admin changes affect local mock data, never real permissions."} /></div>
+          <ShieldCheck className="mr-1 inline size-3 align-text-bottom" aria-hidden /><LocalizedText text={"Every action here is written to the database and recorded in the audit log."} /></div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/"><LocalizedText text={"Back to storefront"} /></Link>

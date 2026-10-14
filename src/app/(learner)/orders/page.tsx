@@ -1,123 +1,103 @@
-"use client";
-
-import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
-import * as React from "react";
-import { useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { ChevronRight, Compass, CreditCard, Receipt } from "lucide-react";
-import { COURSES } from "@/data/mock-data";
-import { useApp } from "@/components/providers/app-providers";
-import { useCommunityCourses } from "@/components/providers/creator-provider";
-import { formatDate, formatPrice } from "@/lib/format";
+import { CreditCard, Receipt, ShieldCheck } from "lucide-react";
+import { getOrders } from "@/lib/server/learner";
+import { formatInr } from "@/lib/money";
+import { formatDate } from "@/lib/format";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 
-export default function OrdersPage() {
-  const translateUi = useTranslate();
-  const { orders, hydrated } = useApp();
-  const community = useCommunityCourses();
+export const metadata = { title: "Orders" };
+export const dynamic = "force-dynamic";
 
-  const rows = useMemo(() => {
-    const pool = [...community, ...COURSES];
-    return orders.map((order) => ({
-      order,
-      course: pool.find((c) => c.id === order.courseId),
-    }));
-  }, [orders, community]);
+const STATUS_TONE: Record<string, string> = {
+  paid: "bg-emerald-100 text-emerald-700",
+  created: "bg-zinc-100 text-zinc-600",
+  failed: "bg-red-100 text-red-700",
+  cancelled: "bg-zinc-100 text-zinc-600",
+  refunded: "bg-orange-100 text-orange-700",
+  partially_refunded: "bg-orange-100 text-orange-700",
+};
 
-  const stats = useMemo(() => {
-    const paid = orders.filter((o) => o.status === "paid");
-    return {
-      count: orders.length,
-      paidTotal: paid.reduce((a, o) => a + o.total, 0),
-    };
-  }, [orders]);
+export default async function LearnerOrdersPage() {
+  const orders = await getOrders();
+  const paid = orders.filter((order) => order.status === "paid");
+  const totalSpent = paid.reduce((sum, order) => sum + order.totalPaise, 0);
 
   return (
-    <div className="page-container py-7 sm:py-9">
+    <div className="space-y-6 px-4 py-7 sm:px-6 lg:px-9">
       <header>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Purchases"} /></p>
-        <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]"><LocalizedText text={"Order history"} /></h1>
-        <p className="mt-2 text-[14.5px] text-muted-foreground">
-          {<LocalizedText text={hydrated
-            ? orders.length > 0
-              ? `${orders.length} ${orders.length === 1 ? "order" : "orders"} · ${formatPrice(stats.paidTotal)} in simulated purchases.`
-              : "Your simulated purchases will appear here. No real payments, ever."
-            : "Loading orders…"} />}
+        <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Orders</h1>
+        <p className="mt-1.5 text-[14px] text-muted-foreground">
+          {orders.length === 0
+            ? "Your purchases will appear here."
+            : `${orders.length} order${orders.length === 1 ? "" : "s"} · ${formatInr(totalSpent)} paid`}
         </p>
       </header>
 
-      <div className="mt-8">
-        {!hydrated ? (
-          <Skeleton className="h-72 rounded-xl" />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            icon={Receipt}
-            title={translateUi("No orders yet")}
-            description={translateUi("When you enroll in a paid (or free) course through the preview checkout, the mock receipt lands here.")}
-            action={
-              <Button asChild>
-                <Link href="/">
-                  <Compass aria-hidden /><LocalizedText text={"Explore courses"} /></Link>
-              </Button>
-            }
-          />
-        ) : (
-          <>
-            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
-              {/* Header row (desktop) */}
-              <div className="hidden grid-cols-[minmax(0,2fr)_120px_110px_90px_40px] gap-4 border-b border-border bg-muted/50 px-5 py-3 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase md:grid">
-                <span><LocalizedText text={"Course"} /></span>
-                <span><LocalizedText text={"Date"} /></span>
-                <span><LocalizedText text={"Status"} /></span>
-                <span className="text-right"><LocalizedText text={"Amount"} /></span>
-                <span className="sr-only"><LocalizedText text={"Open"} /></span>
-              </div>
-              <ul>
-                {rows.map(({ order, course }) => (
-                  <li key={order.id}>
-                    <Link
-                      href={`/orders/${order.id}`}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-4 transition-colors last:border-0 hover:bg-muted/40 sm:px-5 md:grid-cols-[minmax(0,2fr)_120px_110px_90px_40px] md:gap-4"
+      {orders.length === 0 ? (
+        <EmptyState
+          icon={Receipt}
+          title="No orders yet"
+          description="Buying a course — or enrolling in a free one — creates an order you can always come back to."
+          action={
+            <Button asChild>
+              <Link href="/explore">Browse the catalog</Link>
+            </Button>
+          }
+        />
+      ) : (
+        <ul className="space-y-3">
+          {orders.map((order) => (
+            <li key={order.id} className="rounded-xl border border-border bg-white p-4 shadow-card">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-[12px] text-muted-foreground">{order.publicId}</span>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_TONE[order.status] ?? STATUS_TONE.created}`}
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        {course ? (
-                          <span className="relative hidden aspect-video w-20 shrink-0 overflow-hidden rounded-md border border-border sm:block">
-                            <Image src={course.thumbnail} alt={translateUi("")} fill sizes="80px" className="object-cover" />
-                          </span>
-                        ) : null}
-                        <div className="min-w-0">
-                          <p className="truncate text-[13.5px] font-semibold"><LocalizedText text={course?.title ?? "Course unavailable"} /></p>
-                          <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-400"><LocalizedText text={order.id} /></p>
-                        </div>
-                      </div>
-                      <span className="hidden text-[12.5px] text-muted-foreground md:block">
-                        <LocalizedText text={formatDate(order.createdAt)} />
-                      </span>
-                      <span className="hidden md:block">
-                        {order.status === "paid" ? (
-                          <Badge variant="emerald"><LocalizedText text={"Paid"} /></Badge>
-                        ) : (
-                          <Badge variant="secondary"><LocalizedText text={"Declined"} /></Badge>
-                        )}
-                      </span>
-                      <span className="text-right text-[13.5px] font-semibold tabular-nums md:text-[13px]">
-                        {order.total === 0 ? <span className="text-success"><LocalizedText text={"Free"} /></span> : formatPrice(order.total)}
-                      </span>
-                      <ChevronRight className="hidden size-4 text-zinc-300 md:block" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <p className="mt-3 flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <CreditCard className="size-3.5" aria-hidden /><LocalizedText text={"All transactions are simulated in this preview checkout — no real cards or providers are involved."} /></p>
-          </>
-        )}
-      </div>
+                      {order.status.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {order.items.map((item) => (
+                      <li key={item.courseId} className="text-[13.5px]">
+                        <Link href={`/courses/${item.courseSlug}`} className="font-medium hover:underline">
+                          {item.courseTitle}
+                        </Link>
+                        <span className="ml-2 text-[12.5px] text-muted-foreground tabular-nums">
+                          {item.unitPricePaise === 0 ? "Free" : formatInr(item.unitPricePaise)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-[12px] text-zinc-400">
+                    {formatDate(order.createdAt)} · {order.method}
+                    {order.paidAt ? ` · paid ${formatDate(order.paidAt)}` : ""}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span className="font-display text-[16px] font-bold tabular-nums">
+                    {order.totalPaise === 0 ? "Free" : formatInr(order.totalPaise)}
+                  </span>
+                  <Link
+                    href={`/orders/${order.publicId}`}
+                    className="rounded-lg border border-border px-3 py-1.5 text-[13px] font-medium transition-colors hover:bg-muted/50"
+                  >
+                    View details
+                  </Link>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="flex items-start gap-2 text-[12px] text-zinc-400">
+        <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
+        Access to a course is granted by a verified Razorpay payment or webhook — never by a browser redirect.
+      </p>
     </div>
   );
 }

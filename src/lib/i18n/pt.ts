@@ -347,7 +347,7 @@ export const pt: Dictionary = {
   marketplaceTerms: "Condições do marketplace",
   platformCommission: "Comissão da plataforma",
   commissionValue: (pct) => `${pct}% das vendas brutas`,
-  payoutThreshold: "Limite de pagamento (USD)",
+  payoutThreshold: "Limite de pagamento (INR)",
   thresholdSaved: (amount) => `Limite atualizado para ${amount}`,
   managePayout: "Gerenciar forma de pagamento",
   aboutStudio: "Sobre este estúdio",

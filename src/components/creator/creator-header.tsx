@@ -21,7 +21,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { toast } from "sonner";
 import { Logo } from "@/components/layout/logo";
 import { CreatorSidebarContent } from "@/components/creator/creator-sidebar";
-import { useCreator } from "@/components/providers/creator-provider";
+import { useCreatorStudio } from "@/components/providers/creator-studio-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,11 +41,8 @@ const KIND_ICON = { review: ClipboardCheck, sale: Star, payout: Wallet, system: 
 function CreatorNotificationsMenu() {
   const translateUi = useTranslate();
   const router = useRouter();
-  const { creatorNotifications, readCreatorNotifIds, markAllCreatorNotifsRead, hydrated } =
-    useCreator();
-  const unread = hydrated
-    ? creatorNotifications.filter((n) => !readCreatorNotifIds.includes(n.id))
-    : [];
+  const { notifications, markNotificationsRead } = useCreatorStudio();
+  const unread = notifications.filter((n) => !n.read);
 
   return (
     <DropdownMenu>
@@ -69,24 +66,22 @@ function CreatorNotificationsMenu() {
           <button
             type="button"
             disabled={unread.length === 0}
-            onClick={() => markAllCreatorNotifsRead(creatorNotifications.map((n) => n.id))}
+            onClick={() => markNotificationsRead(notifications.map((n) => n.id))}
             className="flex cursor-pointer items-center gap-1 text-[12px] font-medium text-primary transition-colors hover:text-primary-hover disabled:cursor-not-allowed disabled:text-zinc-400"
           >
             <CheckCheck className="size-3.5" aria-hidden /><LocalizedText text={"Mark all read"} /></button>
         </div>
         <ul className="max-h-96 overflow-y-auto p-1.5 scrollbar-thin">
-          {creatorNotifications.map((n) => {
-            const Icon = KIND_ICON[n.kind];
-            const isUnread = hydrated && !readCreatorNotifIds.includes(n.id);
+          {notifications.map((n) => {
+            const Icon = KIND_ICON[(n.kind ?? "system") as keyof typeof KIND_ICON] ?? Sparkles;
+            const isUnread = !n.read;
             return (
               <li key={n.id}>
                 <button
                   type="button"
                   onClick={() => {
-                    if (!readCreatorNotifIds.includes(n.id)) {
-                      markAllCreatorNotifsRead([...readCreatorNotifIds, n.id]);
-                    }
-                    router.push(n.href);
+                    if (!n.read) markNotificationsRead([n.id]);
+                    if (n.href) router.push(n.href);
                   }}
                   className={cn(
                     "flex w-full cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors hover:bg-muted",
@@ -111,7 +106,7 @@ function CreatorNotificationsMenu() {
                     <span className="mt-0.5 line-clamp-2 block text-[12px] leading-snug text-muted-foreground">
                       <LocalizedText text={n.body} />
                     </span>
-                    <span className="mt-1 block text-[11px] text-zinc-400"><LocalizedText text={timeAgo(n.createdAt)} /></span>
+                    <span className="mt-1 block text-[11px] text-zinc-400">{timeAgo(n.createdAt)}</span>
                   </span>
                 </button>
               </li>
@@ -126,8 +121,8 @@ function CreatorNotificationsMenu() {
 function CreatorAvatarMenu() {
   const translateUi = useTranslate();
   const router = useRouter();
-  const { signOut } = useApp();
-  const { profile } = useCreator();
+  const { user, signOut } = useApp();
+  const { displayName, initials } = useCreatorStudio();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -137,27 +132,23 @@ function CreatorAvatarMenu() {
           className="flex cursor-pointer items-center gap-1.5 rounded-full p-0.5 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
         >
           <Avatar className="size-8.5 ring-1 ring-border">
-            <AvatarFallback className={cn("text-[11px]", profile.avatarColor)}>
-              <LocalizedText text={profile.initials} />
-            </AvatarFallback>
+            <AvatarFallback className="bg-zinc-800 text-[11px] text-white">{initials}</AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <div className="flex items-center gap-3 px-2.5 py-2.5">
           <Avatar className="size-10">
-            <AvatarFallback className={cn("text-xs", profile.avatarColor)}>
-              <LocalizedText text={profile.initials} />
-            </AvatarFallback>
+            <AvatarFallback className="bg-zinc-800 text-xs text-white">{initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="truncate text-[13.5px] font-semibold"><LocalizedText text={profile.displayName} /></p>
-            <p className="truncate text-[12px] text-muted-foreground"><LocalizedText text={profile.headline} /></p>
+            <p className="truncate text-[13.5px] font-semibold">{displayName}</p>
+            <p className="truncate text-[12px] text-muted-foreground">{user?.email}</p>
           </div>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={`/instructors/${profile.instructorId}`}><LocalizedText text="Public profile" /></Link>
+          <Link href="/creator/profile"><LocalizedText text="Public profile" /></Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/creator/profile"><LocalizedText text={"Edit instructor profile"} /></Link>

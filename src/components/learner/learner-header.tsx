@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Menu, Search } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { SearchBox } from "@/components/layout/search-box";
-import { NotificationsMenu } from "@/components/layout/notifications-menu";
+import { NotificationsMenu, type NotificationItem } from "@/components/layout/notifications-menu";
 import { LanguageMenu } from "@/components/layout/language-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { LearnerSidebarContent } from "@/components/learner/learner-sidebar";
@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { IconButton } from "@/components/ui/icon-button";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
-export function LearnerHeader() {
+export function LearnerHeader({ notifications = [] }: { notifications?: NotificationItem[] }) {
   const translateUi = useTranslate();
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -65,7 +65,7 @@ export function LearnerHeader() {
 
         <div className="ml-auto flex items-center gap-0.5 sm:ml-0 sm:gap-1">
           <LanguageMenu />
-          <NotificationsMenu />
+          <NotificationsMenu items={notifications} />
           <div className="mx-1.5 hidden h-5 w-px bg-border sm:block" aria-hidden />
           <UserMenu />
         </div>

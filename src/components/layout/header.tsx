@@ -6,14 +6,14 @@ import { Menu, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { SidebarContent } from "@/components/layout/sidebar";
 import { SearchBox } from "@/components/layout/search-box";
-import { NotificationsMenu } from "@/components/layout/notifications-menu";
+import { NotificationsMenu, type NotificationItem } from "@/components/layout/notifications-menu";
 import { LanguageMenu } from "@/components/layout/language-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { Logo } from "@/components/layout/logo";
 import { IconButton } from "@/components/ui/icon-button";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
-export function Header() {
+export function Header({ notifications = [] }: { notifications?: NotificationItem[] }) {
   const translateUi = useTranslate();
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -67,7 +67,7 @@ export function Header() {
 
         <div className="ml-auto flex items-center gap-0.5 sm:ml-0 sm:gap-1">
           <LanguageMenu />
-          <NotificationsMenu />
+          <NotificationsMenu items={notifications} />
           <div className="mx-1.5 hidden h-5 w-px bg-border sm:block" aria-hidden />
           <UserMenu />
         </div>

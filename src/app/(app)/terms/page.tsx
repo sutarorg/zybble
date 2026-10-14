@@ -15,7 +15,9 @@ export default function TermsPage() {
       description="These terms govern your access to and use of Zybble, including courses, certificates and related services."
       updated="January 15, 2026"
     >
-      <LegalNote><LocalizedText text={"This is a sample document provided for the frontend preview. It is illustrative only and is not legal advice."} /></LegalNote>
+      <LegalNote>
+        <LocalizedText text={"This document states the terms the platform is built to enforce. The commission rate, tax treatment and commercial terms remain under review and are recorded in the launch documentation before public launch; nothing here is legal advice."} />
+      </LegalNote>
 
       <div className="max-w-3xl">
         <LegalSection index={1} title="Acceptance of terms">
@@ -42,7 +44,7 @@ export default function TermsPage() {
         <LegalSection index={4} title="Payments and pricing">
           <LegalList
             items={[
-              "Prices are displayed in USD unless stated otherwise and include applicable taxes.",
+              "All prices are displayed in Indian Rupees (INR, \u20b9) and are charged in INR through Razorpay. Zybble is an India-only marketplace and does not offer any other currency.",
               "Promotional prices are time-limited and apply at the time of purchase only.",
               "You authorize us to charge your selected payment method for each order.",
             ]}
@@ -75,7 +77,7 @@ export default function TermsPage() {
         </LegalSection>
 
         <LegalSection index={9} title="Contact">
-          <p><LocalizedText text={"Questions about these terms? Reach us any time via the Help Center or the Messages page. In this preview, both are simulated locally in your browser."} /></p>
+          <p><LocalizedText text={"Questions about these terms? Reach us through the Help Center or the Messages page; a message is stored as a real conversation on your account and answered by the Zybble team."} /></p>
         </LegalSection>
       </div>
     </InfoPage>

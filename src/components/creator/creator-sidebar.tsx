@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/layout/logo";
-import { useCreator } from "@/components/providers/creator-provider";
+import { useCreatorStudio } from "@/components/providers/creator-studio-context";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -70,8 +70,8 @@ function NavItem({
 export function CreatorSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const translateUi = useTranslate();
   const pathname = usePathname();
-  const { courses, profile } = useCreator();
-  const pending = courses.filter((c) => c.status === "pending" || c.status === "changes_requested").length;
+  const { pendingCount } = useCreatorStudio();
+  const pending = pendingCount;
 
   const groups: { label: string; items: { href: string; icon: React.ComponentType<{ className?: string }>; label: string; exact?: boolean; trailing?: React.ReactNode; accent?: boolean }[] }[] = [
     {

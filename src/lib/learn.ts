@@ -1,172 +1,131 @@
-import { COURSES, INSTRUCTORS } from "@/data/mock-data";
-import type { Course, CurriculumSection, Enrollment, Lesson } from "@/types";
+/**
+ * Learning-session helpers.
+ *
+ * Pure functions over lesson, progress and entitlement records that the server
+ * already fetched and authorised. The browser never decides whether a learner
+ * may watch a lesson — it only renders what the server returned.
+ */
 
-/* -------------------------------------------------------------------------- */
-/* Course resolution & lesson flattening                                        */
-/* -------------------------------------------------------------------------- */
+export interface FlatSection {
+  id: string;
+  title: string;
+  sortOrder: number;
+  lessons: FlatLesson[];
+}
 
 export interface FlatLesson {
-  lesson: Lesson;
-  section: CurriculumSection;
-  sectionIndex: number;
-  lessonIndex: number;
-  /** Position across the whole course (0-based). */
-  globalIndex: number;
-  /** e.g. "2.3" */
-  number: string;
+  id: string;
+  sectionId: string;
+  title: string;
+  description: string;
+  kind: string;
+  sortOrder: number;
+  durationMinutes: number;
+  isPreview: boolean;
+  /** True only when Bunny Stream reports the video finished encoding. */
+  playbackReady: boolean;
+  /** Set when the server could not verify playback rights. */
+  blockedReason?: string | null;
 }
 
-export function flattenLessons(course: Course): FlatLesson[] {
-  const out: FlatLesson[] = [];
-  course.curriculum.forEach((section, sectionIndex) => {
-    section.lessons.forEach((lesson, lessonIndex) => {
-      out.push({
-        lesson,
-        section,
-        sectionIndex,
-        lessonIndex,
-        globalIndex: out.length,
-        number: `${sectionIndex + 1}.${lessonIndex + 1}`,
-      });
-    });
-  });
-  return out;
+interface RawSection extends Omit<FlatSection, "sortOrder"> {
+  sortOrder?: number;
 }
 
-/** Resolve a course by id or slug across the static catalog + community list. */
-export function resolveCourse(idOrSlug: string, community: Course[] = []): Course | undefined {
-  return (
-    COURSES.find((c) => c.id === idOrSlug || c.slug === idOrSlug) ??
-    community.find((c) => c.id === idOrSlug || c.slug === idOrSlug)
-  );
+interface RawLesson extends Omit<FlatLesson, "sectionId" | "sortOrder" | "playbackReady"> {
+  sectionId?: string;
+  sortOrder?: number;
+  bunny_playback_ready?: boolean | null;
+  bunny_status?: string | null;
+  playbackReady?: boolean | null;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Progress                                                                    */
-/* -------------------------------------------------------------------------- */
+/** Flattens the section/lesson tree into the player's lesson rail. */
+export function flattenLessons(sections: RawSection[]): FlatLesson[] {
+  return sections
+    .flatMap((section) =>
+      (section.lessons ?? []).map((lesson: RawLesson) => ({
+        id: lesson.id,
+        sectionId: lesson.sectionId ?? section.id,
+        title: lesson.title,
+        description: lesson.description ?? "",
+        kind: lesson.kind ?? "video",
+        sortOrder: Number(lesson.sortOrder ?? 0),
+        durationMinutes: Number(lesson.durationMinutes ?? 0),
+        isPreview: Boolean(lesson.isPreview),
+        playbackReady: Boolean(lesson.playbackReady ?? lesson.bunny_playback_ready ?? false),
+      }))
+    )
+    .sort((a, b) => a.sectionId.localeCompare(b.sectionId) || a.sortOrder - b.sortOrder);
+}
+
+export interface LessonProgress {
+  completed: boolean;
+  lastPositionSeconds: number;
+  updatedAt: string | null;
+}
 
 export interface CourseProgress {
+  completedLessons: number;
   totalLessons: number;
-  completedCount: number;
   percent: number;
-  isCompleted: boolean;
-  /** Minutes of completed lessons. */
-  completedMinutes: number;
-  /** Index of the lesson to resume at (first incomplete, else last lesson). */
-  resumeIndex: number;
-  resumeLesson: FlatLesson | null;
-  lastVisitedAt: string | null;
+  nextLessonId: string | null;
+  lastLessonId: string | null;
 }
 
-export function progressOf(course: Course, enrollment: Enrollment | undefined): CourseProgress {
-  const flat = flattenLessons(course);
-  const totalLessons = flat.length;
-  const completed = new Set(enrollment?.completedLessons ?? []);
+/** Computes learner progress from real `lesson_progress` rows. */
+export function progressOf(
+  lessons: FlatLesson[],
+  progress: Array<{ lesson_id: string; completed: boolean; position_seconds: number; updated_at: string | null }>
+): CourseProgress {
+  const totalLessons = lessons.length;
+  const byId = new Map(progress.map((row) => [row.lesson_id, row]));
+  const completedLessons = lessons.filter((lesson) => byId.get(lesson.id)?.completed).length;
 
-  // Migration: legacy enrollments only had a percentage.
-  if (enrollment && completed.size === 0 && enrollment.progress > 0 && totalLessons > 0) {
-    const n = Math.round((enrollment.progress / 100) * totalLessons);
-    flat.slice(0, n).forEach((f) => completed.add(f.lesson.id));
-  }
-
-  const completedCount = flat.filter((f) => completed.has(f.lesson.id)).length;
-  const percent = totalLessons === 0 ? 0 : Math.round((completedCount / totalLessons) * 100);
-  const completedMinutes = flat
-    .filter((f) => completed.has(f.lesson.id))
-    .reduce((a, f) => a + f.lesson.durationMinutes, 0);
-
-  const firstIncomplete = flat.find((f) => !completed.has(f.lesson.id));
-  let resume: FlatLesson | null = firstIncomplete ?? flat[flat.length - 1] ?? null;
-  if (enrollment?.lastLessonId) {
-    const known = flat.find((f) => f.lesson.id === enrollment.lastLessonId);
-    if (known && !completed.has(known.lesson.id)) resume = known;
+  const firstIncomplete = lessons.find((lesson) => !byId.get(lesson.id)?.completed);
+  let lastLessonId: string | null = null;
+  let latest = "";
+  for (const lesson of lessons) {
+    const row = byId.get(lesson.id);
+    if (row?.updated_at && row.updated_at > latest) {
+      latest = row.updated_at;
+      lastLessonId = lesson.id;
+    }
   }
 
   return {
+    completedLessons,
     totalLessons,
-    completedCount,
-    percent,
-    isCompleted: totalLessons > 0 && completedCount === totalLessons,
-    completedMinutes,
-    resumeIndex: resume?.globalIndex ?? 0,
-    resumeLesson: resume,
-    lastVisitedAt: enrollment?.lastVisitedAt ?? null,
+    percent: totalLessons === 0 ? 0 : Math.round((completedLessons / totalLessons) * 100),
+    nextLessonId: firstIncomplete?.id ?? lessons[0]?.id ?? null,
+    lastLessonId,
   };
 }
 
-/** Aggregate stats across all enrollments for dashboard cards. */
-export function learnerTotals(
-  pairs: { course: Course; enrollment: Enrollment }[]
-): {
-  enrolledCount: number;
-  completedCourses: number;
-  overallPercent: number;
-  lessonsCompleted: number;
-  minutesLearned: number;
-} {
-  let lessons = 0;
-  let minutes = 0;
-  let percentSum = 0;
-  let completedCourses = 0;
-  for (const { course, enrollment } of pairs) {
-    const p = progressOf(course, enrollment);
-    lessons += p.completedCount;
-    minutes += p.completedMinutes;
-    percentSum += p.percent;
-    if (p.isCompleted) completedCourses++;
-  }
+export function nextLessonOf(lessons: FlatLesson[], currentId: string): FlatLesson | null {
+  const index = lessons.findIndex((lesson) => lesson.id === currentId);
+  return index === -1 ? null : lessons[index + 1] ?? null;
+}
+
+export function prevLessonOf(lessons: FlatLesson[], currentId: string): FlatLesson | null {
+  const index = lessons.findIndex((lesson) => lesson.id === currentId);
+  return index <= 0 ? null : lessons[index - 1];
+}
+
+export interface LessonInstructor {
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+/** Reads the verified course instructor; there is no fallback identity. */
+export function instructorOf(course: { creatorDisplayName: string | null; creatorAvatarUrl: string | null } | null): LessonInstructor {
   return {
-    enrolledCount: pairs.length,
-    completedCourses,
-    overallPercent: pairs.length ? Math.round(percentSum / pairs.length) : 0,
-    lessonsCompleted: lessons,
-    minutesLearned: minutes,
+    displayName: course?.creatorDisplayName ?? "This creator",
+    avatarUrl: course?.creatorAvatarUrl ?? null,
   };
 }
 
-/* -------------------------------------------------------------------------- */
-/* Recommendations                                                             */
-/* -------------------------------------------------------------------------- */
-
-/** Simple, deterministic recommendations: same categories first, then popular. */
-export function recommendedCourses(
-  enrolledIds: Set<string>,
-  community: Course[] = [],
-  count = 4
-): Course[] {
-  const enrolled = COURSES.filter((c) => enrolledIds.has(c.id));
-  const preferredCategories = new Set(enrolled.map((c) => c.category));
-  const all = [...community, ...COURSES].filter((c) => !enrolledIds.has(c.id));
-  const preferred = all
-    .filter((c) => preferredCategories.has(c.category))
-    .sort((a, b) => b.studentsCount - a.studentsCount);
-  const rest = all
-    .filter((c) => !preferredCategories.has(c.category))
-    .sort((a, b) => b.rating - a.rating);
-  return [...preferred, ...rest].slice(0, count);
-}
-
-/* -------------------------------------------------------------------------- */
-/* Misc                                                                        */
-/* -------------------------------------------------------------------------- */
-
-export function instructorOf(course: Course) {
-  return INSTRUCTORS.find((i) => i.id === course.instructorId);
-}
-
-export function formatHoursMinutes(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
-}
-
-export function nextLessonOf(course: Course, current: FlatLesson): FlatLesson | null {
-  const flat = flattenLessons(course);
-  return flat[current.globalIndex + 1] ?? null;
-}
-
-export function prevLessonOf(course: Course, current: FlatLesson): FlatLesson | null {
-  const flat = flattenLessons(course);
-  return flat[current.globalIndex - 1] ?? null;
+/** True when every lesson is completed and the course has at least one lesson. */
+export function hasCompletedCourse(progress: CourseProgress): boolean {
+  return progress.totalLessons > 0 && progress.completedLessons === progress.totalLessons;
 }

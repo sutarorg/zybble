@@ -1,5 +1,3 @@
-import { COURSES } from "@/data/mock-data";
-import { courseText } from "./courses";
 import { en, type Dictionary } from "./en";
 import { getDictionary } from "./index";
 import { EXTRA_TEXT } from "./extra";
@@ -16,22 +14,19 @@ const aliases: Record<string, keyof Dictionary> = {
   "Create. Teach. Earn.": "csEyebrow", "Create a free account": "createFreeAccount",
 };
 
-/** Exact, offline translations: never changes account names or authored input. */
+/**
+ * Exact, offline translations for interface copy.
+ *
+ * Only static interface strings are translated. Course titles, descriptions and
+ * lesson content are authored by creators and are rendered in the language they
+ * were written in — Zybble does not machine-translate marketplace content.
+ * Money is never translated: every locale renders INR (₹).
+ */
 export function translateText(text: string, language: string): string {
   if (language === "en") return text;
   const source = text.trim().replace(/\s+/g, " ");
   const key = sourceKeys.get(source) ?? aliases[source];
   const value = key ? getDictionary(language)[key] : EXTRA_TEXT[source]?.[language];
   if (typeof value === "string") return text.replace(text.trim(), value);
-  for (const course of COURSES) {
-    const localized = courseText(course.id, language);
-    if (!localized) continue;
-    if (source === course.title) return localized.title;
-    if (source === course.subtitle || source === course.description) return localized.subtitle;
-    const learnIndex = course.whatYouLearn.indexOf(source);
-    if (learnIndex >= 0 && localized.learn[learnIndex]) return localized.learn[learnIndex];
-    const aboutIndex = course.longDescription.indexOf(source);
-    if (aboutIndex >= 0 && localized.about[aboutIndex]) return localized.about[aboutIndex];
-  }
   return text;
 }

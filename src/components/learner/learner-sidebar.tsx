@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { getDictionary } from "@/lib/i18n";
 import { Logo } from "@/components/layout/logo";
 import { useApp } from "@/components/providers/app-providers";
+import type { SidebarCounts } from "./learner-counts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
@@ -62,11 +63,23 @@ function NavItem({
   );
 }
 
-export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+export function LearnerSidebarContent({
+  onNavigate,
+  counts,
+}: {
+  onNavigate?: () => void;
+  counts?: SidebarCounts;
+}) {
   const translateUi = useTranslate();
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, wishlist, enrollments, learnerPrefs, certificates, language } = useApp();
+  const { user, signOut, learnerPrefs, language } = useApp();
+  const enrollmentCount = counts?.enrollmentCount ?? 0;
+  const wishlistCount = counts?.wishlistCount ?? 0;
+  const certificateCount = counts?.certificateCount ?? 0;
+  // Counters are read on the server and passed through the sidebar props; the
+  // browser never invents them.
+  const sidebarCounts = counts;
   const dict = getDictionary(language);
 
   const items = [
@@ -77,9 +90,9 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
       label: dict.myLearning,
       active: pathname.startsWith("/my-learning") || pathname.startsWith("/learn"),
       trailing:
-        enrollments.length > 0 ? (
+        enrollmentCount > 0 ? (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-violet-100 px-1 text-[10.5px] font-semibold text-violet-700">
-            {enrollments.length}
+            {enrollmentCount}
           </span>
         ) : undefined,
     },
@@ -89,9 +102,9 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
       label: dict.wishlist,
       active: pathname.startsWith("/wishlist"),
       trailing:
-        wishlist.length > 0 ? (
+        wishlistCount > 0 ? (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-violet-100 px-1 text-[10.5px] font-semibold text-violet-700">
-            {wishlist.length}
+            {wishlistCount}
           </span>
         ) : undefined,
     },
@@ -102,9 +115,9 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
       label: dict.certificates,
       active: pathname.startsWith("/certificates"),
       trailing:
-        certificates.length > 0 ? (
+        certificateCount > 0 ? (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-emerald-100 px-1 text-[10.5px] font-semibold text-emerald-700">
-            {certificates.length}
+            {certificateCount}
           </span>
         ) : undefined,
     },
@@ -194,10 +207,10 @@ export function LearnerSidebarContent({ onNavigate }: { onNavigate?: () => void 
   );
 }
 
-export function LearnerSidebar() {
+export function LearnerSidebar({ counts }: { counts?: SidebarCounts }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-white lg:block">
-      <LearnerSidebarContent />
+      <LearnerSidebarContent counts={counts} />
     </aside>
   );
 }

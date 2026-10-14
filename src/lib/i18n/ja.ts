@@ -346,7 +346,7 @@ export const ja: Dictionary = {
   marketplaceTerms: "マーケットプレイスの条件",
   platformCommission: "プラットフォーム手数料",
   commissionValue: (pct) => `売上総額の${pct}%`,
-  payoutThreshold: "支払い基準額（USD）",
+  payoutThreshold: "支払い基準額（INR）",
   thresholdSaved: (amount) => `基準額を${amount}に更新しました`,
   managePayout: "支払い方法を管理",
   aboutStudio: "このスタジオについて",

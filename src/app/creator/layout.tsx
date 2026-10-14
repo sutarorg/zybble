@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { CreatorShell } from "@/components/creator/creator-shell";
 
 export const metadata: Metadata = {
   title: {
@@ -11,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function CreatorLayout({ children }: { children: ReactNode }) {
-  return <CreatorShell>{children}</CreatorShell>;
+  return children;
 }

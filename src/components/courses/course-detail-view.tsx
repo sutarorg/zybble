@@ -5,7 +5,6 @@ import * as React from "react";
 import Link from "next/link";
 import { Check, FileDown, Globe2, Languages, RefreshCcw, Signal, Sparkles, Users } from "lucide-react";
 import { useApp } from "@/components/providers/app-providers";
-import { useAdmin } from "@/components/providers/admin-provider";
 import type { Course, Instructor, Review } from "@/types";
 import { courseCategory, LEVEL_LABELS } from "@/lib/courses";
 import { formatCount, formatMonthYear } from "@/lib/format";
@@ -50,29 +49,47 @@ function Section({
 export function CourseDetailView({
   course,
   instructor,
+  instructorStats,
   reviews,
   related,
+  category,
+  enrolled,
+  wishlisted,
+  checkoutBlocked = null,
 }: {
   course: Course;
   instructor: Instructor;
+  /** Counted server-side from this creator's published courses and reviews. */
+  instructorStats: { courses: number; students: number; reviews: number; rating: number };
   reviews: Review[];
   related: Course[];
+  category: ReturnType<typeof courseCategory>;
+  /** True when the signed-in learner already holds a live entitlement. */
+  enrolled: boolean;
+  /** True when this course is on the signed-in learner's wishlist. */
+  wishlisted: boolean;
+  /** Set when paid checkout cannot be completed for this course right now. */
+  checkoutBlocked?: string | null;
 }) {
   const translateUi = useTranslate();
-  const category = courseCategory(course);
   const CategoryIcon = categoryIcon(category.icon);
   // NB: rendered via createElement below — assigning the icon to a capitalised
   // local and rendering it as JSX makes the compiler treat it as a
   // "component created during render".
   const isNew = course.ratingsCount === 0;
-  const { recordCourseView } = useApp();
-  const { hiddenReviewIds, hydrated: adminHydrated } = useAdmin();
-  // Admin moderation: hidden reviews are filtered from public course pages (local simulation).
-  const visibleReviews = adminHydrated ? reviews.filter((r) => !hiddenReviewIds.includes(r.id)) : reviews;
+  const { session } = useApp();
+  // Reviews are already filtered server-side by the `reviews_public_read` RLS
+  // policy (published + on a published course), so no client-side trust is needed.
+  const visibleReviews = reviews;
 
-  // Track for the learner dashboard "recently viewed" rail (client, localStorage).
   React.useEffect(() => {
-    recordCourseView(course.id);
+    if (!session) return;
+    // Anonymous visitors get no local history at all.
+    void fetch("/api/learner/recent-view", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ courseId: course.id }),
+    }).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course.id]);
 
@@ -210,7 +227,7 @@ export function CourseDetailView({
 
           {/* Instructor */}
           <Section title={translateUi("Meet your instructor")}>
-            <InstructorCard instructor={instructor} />
+            <InstructorCard instructor={instructor} stats={instructorStats} />
           </Section>
 
           {/* Requirements & audience */}
@@ -263,7 +280,7 @@ export function CourseDetailView({
               />
             ) : (
               <>
-                <ReviewsSummary rating={course.rating} ratingsCount={course.ratingsCount} />
+                <ReviewsSummary rating={course.rating} ratingsCount={course.ratingsCount} reviews={reviews} />
                 <ReviewList reviews={visibleReviews} />
               </>
             )}
@@ -272,7 +289,12 @@ export function CourseDetailView({
 
         {/* ------------------------------ Sticky purchase ----------------------------- */}
         <div className="min-w-0">
-          <EnrollCard course={course} />
+          <EnrollCard
+            course={course}
+            enrolled={enrolled}
+            saved={wishlisted}
+            checkoutBlocked={checkoutBlocked}
+          />
         </div>
       </div>
 

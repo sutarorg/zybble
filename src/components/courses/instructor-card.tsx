@@ -6,14 +6,20 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, Award, BookOpen, Star, Users } from "lucide-react";
 import type { Instructor } from "@/types";
-import { instructorStats } from "@/lib/courses";
+import type { InstructorStats } from "@/lib/courses";
 import { formatCompact } from "@/lib/format";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
-export function InstructorCard({ instructor }: { instructor: Instructor }) {
-  const [expanded, setExpanded] = useState(false);
-  const stats = instructorStats(instructor.id);
+export function InstructorCard({
+  instructor,
+  stats,
+}: {
+  instructor: Instructor;
+  /** Aggregated server-side from this creator's published courses and reviews. */
+  stats: InstructorStats;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
 
   return (
     <div className="rounded-xl border border-border bg-white p-5 sm:p-6">

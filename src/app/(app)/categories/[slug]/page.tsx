@@ -2,8 +2,9 @@ import { LocalizedText } from "@/components/providers/localized-text";
 import * as React from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CATEGORIES } from "@/data/mock-data";
-import { coursesByCategory, getCategoryBySlug } from "@/lib/courses";
+import { CATEGORIES } from "@/lib/config/catalog";
+import { getCategoryBySlug } from "@/lib/courses";
+import { queryPublishedCourses } from "@/lib/server/catalog";
 import { formatCompact } from "@/lib/format";
 import { categoryIcon } from "@/lib/icons";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -38,7 +39,7 @@ export default async function CategoryPage({
   // Rendered with createElement below so the icon lookup is not treated as a
   // component created during render.
   const Icon = categoryIcon(category.icon);
-  const pool = coursesByCategory(slug);
+  const pool = await queryPublishedCourses({ category: slug, limit: 96 });
   const students = pool.reduce((a, c) => a + c.studentsCount, 0);
 
   return (
@@ -73,7 +74,7 @@ export default async function CategoryPage({
           description="We're lining up instructors for this category right now. Check back soon — or explore what's already live."
         />
       ) : (
-        <CategoryPool categorySlug={category.slug} />
+        <CategoryPool pool={pool} />
       )}
     </div>
   );
