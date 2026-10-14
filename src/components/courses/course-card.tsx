@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookmarkButton } from "@/components/courses/bookmark-button";
 import { cn } from "@/lib/utils";
+import { CURRENCY } from "@/lib/money";
 
 const STATUS_BADGE: Record<string, { label: string; variant: "amber" | "violet" | "emerald" }> = {
   bestseller: { label: "Bestseller", variant: "amber" },
@@ -25,9 +26,12 @@ const STATUS_BADGE: Record<string, { label: string; variant: "amber" | "violet" 
 
 export function CourseCard({
   course: authoredCourse,
+  wishlisted = false,
   className,
 }: {
   course: Course;
+  /** Server-read wishlist membership so the icon matches the database. */
+  wishlisted?: boolean;
   className?: string;
 }) {
   const translateUi = useTranslate();
@@ -35,8 +39,13 @@ export function CourseCard({
   const d = getDictionary(language);
   const course = translateCourse(authoredCourse, language);
   const numbers = new Intl.NumberFormat(localeOf(language));
-  const currency = new Intl.NumberFormat(localeOf(language), { style: "currency", currency: "USD" });
-  const instructor = getCourseInstructor(course);
+  // Zybble is INR-only: every interface language formats rupees identically.
+  const currency = new Intl.NumberFormat(localeOf(language), {
+    style: "currency",
+    currency: CURRENCY,
+    maximumFractionDigits: 2,
+  });
+  const instructor = getCourseInstructor(course)!;
   const category = courseCategory(course);
   const CategoryIcon = categoryIcon(category.icon);
   const status = course.badge ? STATUS_BADGE[course.badge] : undefined;
@@ -109,18 +118,18 @@ export function CourseCard({
 
           {/* Price row pinned to bottom for grid alignment */}
           <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
-            {course.price === 0 ? (
-              <span className="font-display text-[15px] font-bold text-success"><LocalizedText text={"Free"} /></span>
+            {course.pricePaise === 0 ? (
+              <span className="font-display text-[15px] font-bold text-success">Free</span>
             ) : (
               <span className="flex items-baseline gap-1.5">
                 <span className="font-display text-[15.5px] font-bold tracking-tight">
-                  <LocalizedText text={currency.format(course.price)} />
+                  {currency.format(course.pricePaise / 100)}
                 </span>
-                {course.compareAtPrice && (
+                {course.compareAtPaise && course.compareAtPaise > course.pricePaise ? (
                   <span className="text-[12px] text-zinc-400 line-through">
-                    <LocalizedText text={currency.format(course.compareAtPrice)} />
+                    {currency.format(course.compareAtPaise / 100)}
                   </span>
-                )}
+                ) : null}
               </span>
             )}
           </div>
@@ -129,7 +138,7 @@ export function CourseCard({
 
       <BookmarkButton
         courseId={course.id}
-        courseTitle={course.title}
+        initialBookmarked={wishlisted}
         className="absolute top-2 right-2 z-10 size-10 sm:top-2.5 sm:right-2.5 sm:size-8"
       />
     </article>

@@ -2,7 +2,12 @@ import * as React from "react";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminHeader } from "@/components/admin/admin-header";
 
-/** Admin portal chrome — operations-focused, same Zybble design system. */
+/**
+ * Admin portal chrome.
+ *
+ * Authorization happens in `src/app/admin/layout.tsx` on the server, so this
+ * component only lays out the sidebar and header.
+ */
 export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh bg-muted/40">

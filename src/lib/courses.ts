@@ -1,4 +1,12 @@
-import { CATEGORIES, COURSES, INSTRUCTORS, REVIEWS } from "@/data/mock-data";
+/**
+ * Client-safe catalog helpers.
+ *
+ * The catalog itself comes from Supabase (see `src/lib/server/catalog.ts`).
+ * This module holds only pure functions that operate on a pool the caller
+ * already fetched, so the same filtering/sorting code runs on the server and in
+ * the browser without importing a database client.
+ */
+
 import type {
   Category,
   Course,
@@ -6,74 +14,12 @@ import type {
   CourseLevel,
   DurationFilter,
   Instructor,
-  Review,
   SortOption,
 } from "@/types";
+import { CATEGORIES } from "@/lib/config/catalog";
 
-/* -------------------------------------------------------------------------- */
-/* Lookups                                                                     */
-/* -------------------------------------------------------------------------- */
-
-export const getCourseBySlug = (slug: string) => COURSES.find((c) => c.slug === slug);
-export const getCourseById = (id: string) => COURSES.find((c) => c.id === id);
-export const getCategoryBySlug = (slug: string) => CATEGORIES.find((c) => c.slug === slug);
-export const getInstructorById = (id: string) => INSTRUCTORS.find((i) => i.id === id);
-export const getInstructorByUsername = (username: string) =>
-  INSTRUCTORS.find((i) => i.username === username);
-
-export function getCourseInstructor(course: Course): Instructor {
-  const instructor = course.instructor ?? getInstructorById(course.instructorId);
-  if (!instructor) throw new Error(`Missing instructor for ${course.slug}`);
-  return instructor;
-}
-
-export function courseCategory(course: Course): Category {
-  const category = getCategoryBySlug(course.category);
-  if (!category) throw new Error(`Missing category for ${course.slug}`);
-  return category;
-}
-
-export const coursesByCategory = (slug: string) => COURSES.filter((c) => c.category === slug);
-export const coursesByInstructor = (instructorId: string) =>
-  COURSES.filter((c) => c.instructorId === instructorId);
-
-export const getReviewsForCourse = (courseId: string): Review[] =>
-  REVIEWS.filter((r) => r.courseId === courseId);
-
-export function relatedCourses(course: Course, count = 3): Course[] {
-  const same = COURSES.filter((c) => c.category === course.category && c.id !== course.id);
-  const others = COURSES.filter((c) => c.category !== course.category && c.id !== course.id);
-  return [...sortCourses(same, "popular"), ...sortCourses(others, "rating")].slice(0, count);
-}
-
-/* -------------------------------------------------------------------------- */
-/* Derived stats                                                               */
-/* -------------------------------------------------------------------------- */
-
-export function instructorStats(instructorId: string) {
-  const courses = coursesByInstructor(instructorId);
-  const students = courses.reduce((acc, c) => acc + c.studentsCount, 0);
-  const reviews = courses.reduce((acc, c) => acc + c.ratingsCount, 0);
-  const rating =
-    courses.length === 0
-      ? 0
-      : Math.round((courses.reduce((acc, c) => acc + c.rating, 0) / courses.length) * 10) / 10;
-  return { courses: courses.length, students, reviews, rating };
-}
-
-export function marketplaceStats() {
-  return {
-    courses: COURSES.length,
-    instructors: INSTRUCTORS.length,
-    students: COURSES.reduce((acc, c) => acc + c.studentsCount, 0),
-    lessons: COURSES.reduce((acc, c) => acc + c.lessonsCount, 0),
-    categories: CATEGORIES.length,
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/* Labels                                                                      */
-/* -------------------------------------------------------------------------- */
+export const getCategoryBySlug = (slug: string): Category | undefined =>
+  CATEGORIES.find((category) => category.slug === slug);
 
 export const LEVEL_LABELS: Record<CourseLevel, string> = {
   beginner: "Beginner",
@@ -81,6 +27,10 @@ export const LEVEL_LABELS: Record<CourseLevel, string> = {
   advanced: "Advanced",
 };
 
+/**
+ * Price filter buckets are INR-only. `free` means a zero-paise course; there is
+ * no currency threshold because there is no second currency.
+ */
 export const SORT_LABELS: Record<SortOption, string> = {
   popular: "Most Popular",
   newest: "Newest",
@@ -97,44 +47,32 @@ export const DEFAULT_FILTERS: CourseFilters = {
   resources: false,
 };
 
-/* -------------------------------------------------------------------------- */
-/* Query engine                                                                */
-/* -------------------------------------------------------------------------- */
-
-function durationBucket(minutes: number): Exclude<DurationFilter, "all"> {
+export function durationBucket(minutes: number): Exclude<DurationFilter, "all"> {
   if (minutes < 180) return "short";
   if (minutes <= 480) return "medium";
   return "long";
 }
 
-export function searchCourses(query: string, pool: Course[] = COURSES): Course[] {
+export function searchCourses(query: string, pool: Course[]): Course[] {
   const q = query.trim().toLowerCase();
   if (!q) return pool;
   const terms = q.split(/\s+/);
   return pool.filter((course) => {
-    const instructor = getCourseInstructor(course);
-    const haystack = [
-      course.title,
-      course.subtitle,
-      course.description,
-      instructor.name,
-      courseCategory(course).name,
-      course.level,
-      ...course.tags,
-    ]
+    const instructor = course.instructor?.name ?? "";
+    const category = getCategoryBySlug(course.category)?.name ?? "";
+    const haystack = [course.title, course.subtitle, course.description, instructor, category, course.level, ...course.tags]
       .join(" ")
       .toLowerCase();
-    return terms.every((t) => haystack.includes(t));
+    return terms.every((term) => haystack.includes(term));
   });
 }
 
-export function filterCourses(filters: CourseFilters, pool: Course[] = COURSES): Course[] {
+export function filterCourses(filters: CourseFilters, pool: Course[]): Course[] {
   return pool.filter((course) => {
-    if (filters.price === "free" && course.price !== 0) return false;
-    if (filters.price === "paid" && course.price === 0) return false;
+    if (filters.price === "free" && course.pricePaise !== 0) return false;
+    if (filters.price === "paid" && course.pricePaise === 0) return false;
     if (filters.level !== "all" && course.level !== filters.level) return false;
-    if (filters.duration !== "all" && durationBucket(course.durationMinutes) !== filters.duration)
-      return false;
+    if (filters.duration !== "all" && durationBucket(course.durationMinutes) !== filters.duration) return false;
     if (filters.language !== "all" && course.language !== filters.language) return false;
     if (filters.resources && course.downloadableResources === 0) return false;
     return true;
@@ -151,9 +89,9 @@ export function sortCourses(courses: Course[], sort: SortOption): Course[] {
     case "rating":
       return list.sort((a, b) => b.rating - a.rating || b.ratingsCount - a.ratingsCount);
     case "price-asc":
-      return list.sort((a, b) => a.price - b.price);
+      return list.sort((a, b) => a.pricePaise - b.pricePaise);
     case "price-desc":
-      return list.sort((a, b) => b.price - a.price);
+      return list.sort((a, b) => b.pricePaise - a.pricePaise);
   }
 }
 
@@ -164,12 +102,12 @@ export interface CourseQuery {
   sort: SortOption;
 }
 
-export function queryCourses({ q, category, filters, sort }: CourseQuery): Course[] {
-  let pool: Course[] = COURSES;
-  if (category) pool = pool.filter((c) => c.category === category);
-  if (q) pool = searchCourses(q, pool);
-  pool = filterCourses(filters, pool);
-  return sortCourses(pool, sort);
+export function queryCourses(pool: Course[], { q, category, filters, sort }: CourseQuery): Course[] {
+  let result = pool;
+  if (category) result = result.filter((course) => course.category === category);
+  if (q) result = searchCourses(q, result);
+  result = filterCourses(filters, result);
+  return sortCourses(result, sort);
 }
 
 /** Did the user change anything away from defaults? Drives curated vs results mode. */
@@ -193,4 +131,31 @@ export function activeFilterCount(filters: CourseFilters): number {
   if (filters.language !== "all") n++;
   if (filters.resources) n++;
   return n;
+}
+
+/** Resolves a course's category from the canonical configuration. */
+/** Instructor snapshot for a course. Always comes from the database. */
+export function getCourseInstructor(course: Course): Instructor | undefined {
+  return course.instructor;
+}
+
+/** Marketplace-wide counters, read from Postgres by the caller. */
+export interface MarketplaceStats {
+  courses: number;
+  instructors: number;
+  students: number;
+  lessons: number;
+  categories: number;
+}
+
+/** Aggregate figures for one creator's public profile. */
+export interface InstructorStats {
+  courses: number;
+  students: number;
+  reviews: number;
+  rating: number;
+}
+
+export function courseCategory(course: Course): Category {
+  return CATEGORIES.find((category) => category.slug === course.category) ?? CATEGORIES[0];
 }

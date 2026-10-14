@@ -6,7 +6,7 @@ import { TeachingCard } from "@/components/layout/teaching-card";
 import { usePathname, useRouter } from "next/navigation";
 import { Compass, GraduationCap, LogOut, ArrowLeft, Presentation } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CATEGORIES } from "@/data/mock-data";
+import { CATEGORIES } from "@/lib/config/catalog";
 import { categoryIcon } from "@/lib/icons";
 import { getDictionary } from "@/lib/i18n";
 import { useApp } from "@/components/providers/app-providers";
@@ -54,11 +54,18 @@ function NavItem({
   );
 }
 
-export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+export function SidebarContent({
+  onNavigate,
+  enrollmentCount = 0,
+}: {
+  onNavigate?: () => void;
+  /** Server-counted enrollments for this learner. 0 when signed out. */
+  enrollmentCount?: number;
+}) {
   const translateUi = useTranslate();
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, language, enrollments } = useApp();
+  const { user, signOut, language } = useApp();
   const dict = getDictionary(language);
 
   // Explore is the site root. Signed-in learners also get My Learning
@@ -78,9 +85,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             label: dict.myLearning,
             active: pathname.startsWith("/my-learning") || pathname.startsWith("/learn"),
             trailing:
-              enrollments.length > 0 ? (
+              enrollmentCount > 0 ? (
                 <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-violet-100 px-1 text-[10.5px] font-semibold text-violet-700">
-                  {enrollments.length}
+                  {enrollmentCount}
                 </span>
               ) : undefined,
           },
@@ -161,10 +168,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ enrollmentCount = 0 }: { enrollmentCount?: number }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-white lg:block">
-      <SidebarContent />
+      <SidebarContent enrollmentCount={enrollmentCount} />
     </aside>
   );
 }

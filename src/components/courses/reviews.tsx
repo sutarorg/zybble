@@ -8,15 +8,27 @@ import { cn } from "@/lib/utils";
 export function ReviewsSummary({
   rating,
   ratingsCount,
+  reviews,
 }: {
   rating: number;
+  /** Total ratings recorded on the course, not just the page of reviews. */
   ratingsCount: number;
+  /** The actual published review rows, used for an honest distribution. */
+  reviews: Review[];
 }) {
-  // Deterministic, plausible distribution for the summary bars (sample data).
-  const dist = [0.72, 0.18, 0.06, 0.03, 0.01].map((base, i) => {
-    const boost = rating >= 4.8 ? [0.06, -0.02, -0.01, -0.02, -0.01][i] : rating >= 4.6 ? [0, 0, 0, 0, 0][i] : [-0.08, 0.04, 0.02, 0.01, 0.01][i];
-    return Math.max(0.01, Math.min(0.97, base + boost));
-  });
+  /**
+   * Counts the real reviews by star value. Nothing here is estimated: when the
+   * breakdown would be misleading (we only loaded a page of reviews), the bars
+   * are hidden rather than extrapolated.
+   */
+  const loaded = reviews.length;
+  const complete = loaded > 0 && loaded === ratingsCount;
+  const counts = [0, 0, 0, 0, 0];
+  for (const review of reviews) {
+    const star = Math.round(review.rating);
+    if (star >= 1 && star <= 5) counts[star - 1] += 1;
+  }
+  const dist = complete && loaded > 0 ? counts.map((count) => count / loaded) : null;
 
   return (
     <div className="mb-6 flex flex-col gap-6 rounded-xl border border-border bg-muted/50 p-5 sm:flex-row sm:items-center sm:gap-10">
@@ -27,7 +39,14 @@ export function ReviewsSummary({
           <LocalizedText text={formatCount(ratingsCount)} /><LocalizedText text={"ratings"} /></p>
       </div>
       <div className="flex-1 space-y-1.5">
-        {dist.map((pct, i) => (
+        {!dist ? (
+          <p className="text-[12.5px] text-muted-foreground">
+            {loaded > 0
+              ? `Showing the ${loaded} most recent of ${ratingsCount} ratings. The star breakdown is published once every rating is loaded.`
+              : "No ratings yet."}
+          </p>
+        ) : null}
+        {dist?.map((pct, i) => (
           <div key={i} className="flex items-center gap-3">
             <span className="w-7 text-right text-[11.5px] text-zinc-400 tabular-nums">{5 - i}★</span>
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200">

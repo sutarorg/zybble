@@ -2,8 +2,8 @@ import { LocalizedText } from "@/components/providers/localized-text";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Award, Hammer, Medal } from "lucide-react";
-import { CATEGORIES } from "@/data/mock-data";
-import { marketplaceStats } from "@/lib/courses";
+import { CATEGORIES } from "@/lib/config/catalog";
+import { marketplaceStats } from "@/lib/server/catalog";
 import { formatCompact } from "@/lib/format";
 import { categoryIcon } from "@/lib/icons";
 import { InfoPage } from "@/components/layout/info-page";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "Zybble is the global marketplace for practical AI skills.",
+  description: "Zybble is India's marketplace for practical AI skills.",
 };
 
 const VALUES = [
@@ -28,16 +28,18 @@ const VALUES = [
   {
     icon: Award,
     title: "Certified at the finish line",
-    text: "Complete a course and Zybble issues a certificate with your name, the course title, your instructor and a verification code — downloadable as a PNG, any time.",
+    text: "Complete every lesson of a course and Zybble issues a certificate with your name, the course title and a verification code you can show anyone.",
   },
 ];
 
-export default function AboutPage() {
-  const stats = marketplaceStats();
+export const dynamic = "force-dynamic";
+
+export default async function AboutPage() {
+  const stats = await marketplaceStats();
   const tiles = [
-    { label: "Learners worldwide", value: formatCompact(stats.students) },
-    { label: "Expert-led courses", value: String(stats.courses) },
-    { label: "Practitioner instructors", value: String(stats.instructors) },
+    { label: "Learners enrolled", value: formatCompact(stats.students) },
+    { label: "Published courses", value: String(stats.courses) },
+    { label: "Creator instructors", value: String(stats.instructors) },
     { label: "Hands-on lessons", value: formatCompact(stats.lessons) },
   ];
 
@@ -45,13 +47,13 @@ export default function AboutPage() {
     <InfoPage
       label="About Zybble"
       title="Practical AI skills, taught by the people who use them."
-      description="Zybble is a global marketplace where builders, creators and operators learn AI the way it should be learned: by doing."
+      description="Zybble is an India-only marketplace where builders, creators and operators learn AI the way it should be learned: by doing."
     >
       {/* Stats band */}
       <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map((tile) => (
           <div key={tile.label} className="rounded-xl border border-border bg-muted/50 p-5">
-            <p className="font-display text-2xl font-bold tracking-tight sm:text-3xl"><LocalizedText text={tile.value} />+</p>
+            <p className="font-display text-2xl font-bold tracking-tight sm:text-3xl"><LocalizedText text={tile.value} /></p>
             <p className="mt-1 text-[12.5px] text-muted-foreground"><LocalizedText text={tile.label} /></p>
           </div>
         ))}
@@ -62,8 +64,8 @@ export default function AboutPage() {
         <h2 className="font-display text-xl font-semibold tracking-tight"><LocalizedText text={"Why we exist"} /></h2>
         <div className="mt-4 space-y-4 text-[14.5px] leading-relaxed text-muted-foreground">
           <p><LocalizedText text={"AI moved faster than education. By the time a textbook ships, the tools have changed three times — and the people who actually understand the new workflows are too busy using them to write one."} /></p>
-          <p><LocalizedText text={"Zybble connects those practitioners directly with learners. Courses are short on theory and long on practice, updated continuously, and priced accessibly for a global audience. Whether you have a weekend or a year, there's a path here for you."} /></p>
-          <p><LocalizedText text={"We're a small, distributed team across six time zones, and every statistic on this page is sample data for this frontend preview."} /></p>
+          <p><LocalizedText text={"Zybble connects those practitioners directly with learners. Courses are short on theory and long on practice, priced in Indian Rupees, and paid through Razorpay. Whether you have a weekend or a year, there is a path here for you."} /></p>
+          <p><LocalizedText text={"Every number on this page is counted from the live marketplace database. When a course is published and a learner enrolls, these figures move — and nothing else does."} /></p>
         </div>
       </section>
 

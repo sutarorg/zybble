@@ -7,9 +7,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { CornerDownLeft, Search, UserRound } from "lucide-react";
-import { INSTRUCTORS } from "@/data/mock-data";
-import { searchCourses } from "@/lib/courses";
-import { useCommunityCourses } from "@/components/providers/creator-provider";
 import { useMounted } from "@/lib/hooks";
 import { useApp } from "@/components/providers/app-providers";
 import { getDictionary } from "@/lib/i18n";
@@ -17,48 +14,45 @@ import { cn } from "@/lib/utils";
 
 type Suggestion =
   | { kind: "course"; id: string; href: string; title: string; meta: string; thumbnail: string }
-  | { kind: "instructor"; id: string; href: string; name: string; headline: string; initials: string; avatarColor: string };
+  | { kind: "instructor"; id: string; href: string; name: string; headline: string; initials: string };
 
-function useSearchResults(query: string) {
-  const communityCourses = useCommunityCourses();
+interface SearchPayload {
+  courses?: Array<{ id: string; href: string; title: string; meta: string; thumbnail: string }>;
+  instructors?: Array<{ id: string; href: string; name: string; headline: string; initials: string }>;
+}
+
+/**
+ * Suggestions come from `/api/catalog/search`, which reads the published
+ * catalog on the server. Nothing is searched in the browser, so the list can
+ * never drift from what a visitor is actually allowed to see.
+ */
+function useSearchResults(query: string): Suggestion[] {
   const trimmed = query.trim();
+  const [results, setResults] = React.useState<Suggestion[]>([]);
 
-  return React.useMemo(() => {
-    if (!trimmed) return [] as Suggestion[];
-    const lower = trimmed.toLowerCase();
-    const pool = [
-      ...searchCourses(trimmed),
-      ...communityCourses.filter((c) =>
-        `${c.title} ${c.subtitle}`.toLowerCase().includes(lower)
-      ),
-    ];
-    const seen = new Set<string>();
-    const courses: Suggestion[] = pool
-      .filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)))
-      .slice(0, 4)
-      .map((course) => ({
-        kind: "course" as const,
-        id: course.id,
-        href: `/courses/${course.slug}`,
-        title: course.title,
-        meta: `${course.price === 0 ? "Free" : `$${course.price}`} · ${course.level}`,
-        thumbnail: course.thumbnail,
-      }));
-    const instructors: Suggestion[] = INSTRUCTORS.filter((i) =>
-      i.name.toLowerCase().includes(lower)
-    )
-      .slice(0, 2)
-      .map((ins) => ({
-        kind: "instructor" as const,
-        id: ins.id,
-        href: `/instructors/${ins.username}`,
-        name: ins.name,
-        headline: ins.headline,
-        initials: ins.initials,
-        avatarColor: ins.avatarColor,
-      }));
-    return [...courses, ...instructors];
-  }, [trimmed, communityCourses]);
+  React.useEffect(() => {
+    if (trimmed.length < 2) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/catalog/search?q=${encodeURIComponent(trimmed)}`, { signal: controller.signal })
+        .then((response) => (response.ok ? (response.json() as Promise<SearchPayload>) : { courses: [], instructors: [] }))
+        .then((payload) => {
+          const courses: Suggestion[] = (payload.courses ?? []).map((course) => ({ kind: "course", ...course }));
+          const instructors: Suggestion[] = (payload.instructors ?? []).map((instructor) => ({ kind: "instructor", ...instructor }));
+          setResults([...courses, ...instructors]);
+        })
+        .catch(() => {
+          /* Aborted or offline: leave the previous list in place. */
+        });
+    }, 220);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [trimmed]);
+
+  return results;
 }
 
 function SuggestionRow({
@@ -99,12 +93,7 @@ function SuggestionRow({
         </>
       ) : (
         <>
-          <span
-            className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
-              suggestion.avatarColor
-            )}
-          >
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
             <LocalizedText text={suggestion.initials} />
           </span>
           <span className="min-w-0 flex-1">
@@ -152,6 +141,13 @@ export function SearchBox({
   const isPanel = mode === "panel";
   const trimmed = query.trim();
   const results = useSearchResults(query);
+  // Reset the highlighted row when the result set changes, during render rather
+  // than in a cascading effect.
+  const [trackedResults, setTrackedResults] = React.useState(results);
+  if (trackedResults !== results) {
+    setTrackedResults(results);
+    if (activeIndex !== -1) setActiveIndex(-1);
+  }
   const showResults = (isPanel || open) && trimmed.length > 0;
 
   // Platform-aware shortcut hint. Resolved after hydration so the server HTML

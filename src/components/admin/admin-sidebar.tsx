@@ -20,8 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/layout/logo";
-import { useAdmin } from "@/components/providers/admin-provider";
-import { useCreator } from "@/components/providers/creator-provider";
+import { useAdminStudio } from "@/components/providers/admin-studio-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 
@@ -67,11 +66,10 @@ function NavItem({
 export function AdminSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const translateUi = useTranslate();
   const pathname = usePathname();
-  const { adminName, reports } = useAdmin();
-  const { courses } = useCreator();
+  const { adminName, pendingReviewCount, openReportCount } = useAdminStudio();
 
-  const pendingReview = courses.filter((c) => c.status === "pending").length;
-  const openReports = reports.filter((r) => r.status === "open" || r.status === "under_review").length;
+  const pendingReview = pendingReviewCount;
+  const openReports = openReportCount;
 
   const groups: {
     label: string;
@@ -167,18 +165,22 @@ export function AdminSidebarContent({ onNavigate }: { onNavigate?: () => void })
         <div className="mx-0.5 mt-6 mb-4 rounded-xl border border-zinc-200 bg-muted/60 p-3.5">
           <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground">
             <ShieldCheck className="size-3.5 text-primary" aria-hidden /><LocalizedText text={"Simulation mode"} /></p>
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground"><LocalizedText text={"Every action in this portal changes local preview state only — nothing touches a server."} /></p>
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground">
+            Every action here runs a server action against Postgres and Razorpay.
+          </p>
         </div>
       </div>
 
       <div className="border-t border-border p-3">
         <div className="flex items-center gap-2.5 rounded-lg p-1.5">
           <Avatar className="size-8.5">
-            <AvatarFallback className="bg-zinc-800 text-[11px] text-white"><LocalizedText text={"NV"} /></AvatarFallback>
+            <AvatarFallback className="bg-zinc-800 text-[11px] text-white">
+              {initialsOf(adminName)}
+            </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-semibold"><LocalizedText text={adminName} /></p>
-            <p className="truncate text-[11.5px] text-muted-foreground"><LocalizedText text={"Marketplace admin · preview"} /></p>
+            <p className="truncate text-[11.5px] text-muted-foreground">Marketplace administrator</p>
           </div>
         </div>
         <Separator className="my-2" />
@@ -197,5 +199,16 @@ export function AdminSidebar() {
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-white lg:block">
       <AdminSidebarContent />
     </aside>
+  );
+}
+
+function initialsOf(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "A"
   );
 }

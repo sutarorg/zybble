@@ -1,12 +1,21 @@
 import { getDictionary } from "./i18n";
-/** Formatting helpers shared across the app. */
+import { formatInr, formatInrOrFree } from "./money";
 
-export function formatPrice(amount: number): string {
-  if (amount === 0) return "Free";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
+/**
+ * Formatting helpers shared across the app.
+ *
+ * Money is ALWAYS INR. `formatPrice` takes integer paise; there is no currency
+ * argument anywhere in Zybble because there is no second currency.
+ */
+
+/** Formats integer paise as an Indian-format rupee amount (₹1,49,900). */
+export function formatPrice(paise: number, locale = "en-IN"): string {
+  return formatInr(paise, locale);
+}
+
+/** Same as {@link formatPrice} but renders "Free" for a zero-paise course. */
+export function formatCoursePrice(paise: number, locale = "en-IN"): string {
+  return formatInrOrFree(paise, locale, getDictionary("en").free ?? "Free");
 }
 
 /** 95 -> "1h 35m", 45 -> "45m", 480 -> "8h" */
@@ -18,18 +27,19 @@ export function formatDuration(minutes: number, language = "en"): string {
   return m === 0 ? d.hours(h) : `${d.hours(h)} ${d.minutes(m)}`;
 }
 
-/** 480 -> "8 hours", 95 -> "1.5 hours" (compact card label) */
+/** 480 -> "8 hours", 90 -> "1.5 hours" (compact card label) */
 export function formatHours(minutes: number): string {
   const hours = Math.round((minutes / 60) * 2) / 2;
   return `${hours} hour${hours === 1 ? "" : "s"}`;
 }
 
+/** Indian digit grouping for plain counts (1,23,456). */
 export function formatCount(n: number): string {
-  return new Intl.NumberFormat("en-US").format(n);
+  return new Intl.NumberFormat("en-IN").format(n);
 }
 
 export function formatCompact(n: number): string {
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  return new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
 /** `2026-01-12` style strings carry no timezone — format them in UTC so the
@@ -47,13 +57,13 @@ function dateOptions(iso: string): Intl.DateTimeFormatOptions {
 }
 
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", dateOptions(iso));
+  return new Date(iso).toLocaleDateString("en-IN", dateOptions(iso));
 }
 
 export function formatMonthYear(iso: string): string {
   const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "long" };
   if (DATE_ONLY.test(iso.trim())) options.timeZone = "UTC";
-  return new Date(iso).toLocaleDateString("en-US", options);
+  return new Date(iso).toLocaleDateString("en-IN", options);
 }
 
 export function timeAgo(iso: string): string {
@@ -69,11 +79,13 @@ export function timeAgo(iso: string): string {
 }
 
 export function initialsOf(name: string): string {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  return (
+    name
+      .split(" ")
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "Z"
+  );
 }

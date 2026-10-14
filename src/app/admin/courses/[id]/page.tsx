@@ -1,367 +1,247 @@
-"use client";
-
-import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
-import * as React from "react";
-import { use, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
-import { toast } from "sonner";
 import {
   ArrowLeft,
-  Ban,
-  Check,
-  ClipboardCheck,
-  Eye,
-  Info,
+  CheckCircle2,
+  EyeOff,
+  FileText,
   MessageSquareWarning,
-  RotateCcw,
-  Send,
+  ShieldAlert,
+  StickyNote,
+  XCircle,
 } from "lucide-react";
-import { CATEGORIES, INSTRUCTORS } from "@/data/mock-data";
-import { getInstructorById } from "@/lib/courses";
-import { useAdmin } from "@/components/providers/admin-provider";
-import { useCreator } from "@/components/providers/creator-provider";
-import { instructorStats } from "@/lib/courses";
-import { formatDate, formatPrice } from "@/lib/format";
-import { LEVEL_LABELS } from "@/lib/courses";
-import { Curriculum } from "@/components/courses/curriculum";
-import { ReviewTimeline } from "@/components/creator/review-timeline";
+import { getAdminCourseDetail } from "@/lib/server/admin";
+import { money } from "@/lib/admin";
+import { imagePath } from "@/lib/image-path";
 import { StatusBadge } from "@/components/creator/status-badge";
-import { ActionButton } from "@/components/admin/action-button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { ReviewTimeline } from "@/components/creator/review-timeline";
+import { CourseDecisionBar } from "./course-decision-bar";
+import { AddModerationNote } from "./add-moderation-note";
 
-export default function CourseReviewPage({ params }: { params: Promise<{ id: string }> }) {
-  const translateUi = useTranslate();
-  const { id } = use(params);
-  const { hydrated } = useAdmin();
-  const {
-    approveCourse,
-    rejectCourse,
-    requestChanges,
-    returnToQueue,
-    moderationNotes,
-    addModerationNote,
-  } = useAdmin();
-  const { getCourse } = useCreator();
-  const course = hydrated ? getCourse(id) : undefined;
+export const metadata = { title: "Course review" };
+export const dynamic = "force-dynamic";
 
-  const [noteDraft, setNoteDraft] = useState("");
-  const [changesNote, setChangesNote] = useState("");
-  const [rejectNote, setRejectNote] = useState("");
-
-  if (!hydrated) {
-    return (
-      <div aria-busy>
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="mt-6 h-96 rounded-xl" />
-      </div>
-    );
-  }
+export default async function AdminCoursePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const course = await getAdminCourseDetail(id);
   if (!course) notFound();
 
-  const instructor = getInstructorById(course.instructorId);
-  const stats = instructor ? instructorStats(instructor.id) : null;
-  const category = CATEGORIES.find((c) => c.slug === course.category);
-  const notes = moderationNotes.filter((n) => n.courseId === course.id);
-
-  /* Moderation checklist: auto-derived readiness signals */
-  const checks: { label: string; ok: boolean; detail: string }[] = [
-    { label: "Complete metadata", ok: course.title.length >= 4 && course.description.length >= 20 && !!course.category, detail: "Title, description and category present" },
-    { label: "Learning outcomes", ok: course.whatYouLearn.length >= 2, detail: `${course.whatYouLearn.length} outcomes listed` },
-    { label: "Curriculum depth", ok: course.lessonsCount >= 5 && course.curriculum.length >= 2, detail: `${course.curriculum.length} sections · ${course.lessonsCount} lessons` },
-    { label: "Total length", ok: course.durationMinutes >= 60, detail: `${Math.round((course.durationMinutes / 60) * 10) / 10} hours of content` },
-    { label: "Pricing valid", ok: course.price === 0 || course.price >= 4.99, detail: course.price === 0 ? "Free course" : `${formatPrice(course.price)} USD` },
-    { label: "Thumbnail present", ok: !!course.thumbnail, detail: "16:9 artwork attached" },
-  ];
-  const okCount = checks.filter((c) => c.ok).length;
-
-  const canDecide = course.status === "pending" || course.status === "changes_requested" || course.status === "rejected";
-  const canRequestChanges = course.status === "pending";
-
-  const submitChanges = () => {
-    if (changesNote.trim().length < 12) {
-      toast.error("Add a note explaining the requested changes (min. 12 characters).");
-      return;
-    }
-    requestChanges(course.id, changesNote.trim());
-    setChangesNote("");
-    toast.success("Changes requested — the creator will see your note in their studio");
-  };
-  const submitReject = () => {
-    if (rejectNote.trim().length < 12) {
-      toast.error("A rejection note is required (min. 12 characters).");
-      return;
-    }
-    rejectCourse(course.id, rejectNote.trim());
-    setRejectNote("");
-  };
-  const saveNote = () => {
-    if (noteDraft.trim().length < 4) {
-      toast.error("Write a slightly longer note first.");
-      return;
-    }
-    addModerationNote(course.id, noteDraft.trim());
-    setNoteDraft("");
-    toast.success("Internal note saved (local)");
-  };
+  const lessons = course.sections.flatMap((section) => section.lessons);
+  const lessonsWithoutVideo = lessons.filter((lesson) => !lesson.hasVideo);
+  const pendingVideos = lessons.filter((lesson) => lesson.hasVideo && !lesson.videoReady);
+  const paidButUnsettleable = course.pricePaise > 0 && course.routeStatus !== "active";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <Button asChild variant="ghost" size="sm" className="-ml-2">
-          <Link href="/admin/courses">
-            <ArrowLeft aria-hidden /><LocalizedText text={"Moderation queue"} /></Link>
-        </Button>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="relative hidden aspect-video w-32 shrink-0 overflow-hidden rounded-lg border border-border sm:block">
-              <Image src={course.thumbnail} alt={translateUi("")} fill sizes="128px" className="object-cover" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge status={course.status} />
-                {category && <Badge variant="secondary"><LocalizedText text={category.name} /></Badge>}
-                <Badge variant="secondary"><LocalizedText text={LEVEL_LABELS[course.level]} /></Badge>
-              </div>
-              <h1 className="font-display mt-2 truncate text-[22px] font-bold tracking-tight sm:text-2xl">
-                <LocalizedText text={course.title} />
-              </h1>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">
-                <LocalizedText text={course.price === 0 ? "Free" : formatPrice(course.price)} /><LocalizedText text={"· updated"} /><LocalizedText text={formatDate(course.lastUpdated)} />
-              </p>
-            </div>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link href="/admin/courses" className="text-[12.5px] text-muted-foreground underline">
+            <ArrowLeft className="inline size-3.5" aria-hidden /> All courses
+          </Link>
+          <h1 className="font-display mt-1 text-[26px] leading-tight font-bold tracking-tight">{course.title}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <StatusBadge status={course.status} />
+            <span className="text-[12.5px] text-muted-foreground">
+              {course.creatorName}
+              {course.creatorUsername ? ` · @${course.creatorUsername}` : ""}
+            </span>
+            <span className="text-[12.5px] text-muted-foreground">
+              {course.categoryName ?? "Uncategorised"} · {course.level} · {course.language}
+            </span>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/courses/${course.slug}`}>
-              <Eye aria-hidden /><LocalizedText text={"Public preview"} /></Link>
-          </Button>
         </div>
-      </div>
+        {course.status === "published" ? (
+          <Link href={`/courses/${course.slug}`} className="text-[13px] font-medium text-primary underline">
+            View the live page
+          </Link>
+        ) : null}
+      </header>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        {/* Left column — course content */}
-        <div className="min-w-0 space-y-4">
-          {/* Description */}
-          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Overview"} /></h2>
-            <p className="mt-1 text-[13.5px] text-muted-foreground"><LocalizedText text={course.subtitle} /></p>
-            <div className="mt-3 space-y-2.5 text-[13.5px] leading-relaxed text-foreground/85">
-              {course.longDescription.map((p, i) => (
-                <p key={i}><LocalizedText text={p} /></p>
-              ))}
-            </div>
-          </section>
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: "Price", value: course.pricePaise === 0 ? "Free" : money(course.pricePaise) },
+          { label: "Lessons", value: String(lessons.length) },
+          { label: "Duration", value: `${course.durationMinutes} min` },
+          { label: "Resources", value: String(course.resources.length) },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl border border-border bg-white px-4 py-3 shadow-card">
+            <dt className="text-[12px] text-muted-foreground">{item.label}</dt>
+            <dd className="mt-1 font-display text-[17px] font-bold tabular-nums">{item.value}</dd>
+          </div>
+        ))}
+      </dl>
 
-          {/* Outcomes */}
-          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Learning outcomes"} /></h2>
-            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-              {course.whatYouLearn.map((o) => (
-                <li key={o} className="flex items-start gap-2 text-[13px]">
-                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                  <LocalizedText text={o} />
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* Curriculum */}
-          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Curriculum"} /></h2>
-              <span className="text-[12px] text-muted-foreground">
-                {course.curriculum.length}<LocalizedText text={"sections ·"} />{course.lessonsCount}<LocalizedText text={"lessons ·"} /><LocalizedText text={" "} />
-                {course.downloadableResources}<LocalizedText text={"resources"} /></span>
-            </div>
-            <p className="mt-1 text-[12px] text-muted-foreground"><LocalizedText text={"Expand sections to preview lesson structure (free-preview lessons are tagged)."} /></p>
-            <div className="mt-4">
-              {course.curriculum.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center text-[13px] text-muted-foreground"><LocalizedText text={"No curriculum yet — this course cannot be approved in its current state."} /></p>
-              ) : (
-                <Curriculum course={course} />
-              )}
-            </div>
-          </section>
-
-          {/* Review history */}
-          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Review history"} /></h2>
-            <div className="mt-4">
-              <ReviewTimeline events={course.reviewHistory} />
-            </div>
-          </section>
+      {paidButUnsettleable ? (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5 text-[13px]">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-700" aria-hidden />
+          <div>
+            <p className="font-medium text-amber-900">This is a paid course that cannot be settled yet</p>
+            <p className="mt-1 text-amber-800">
+              Razorpay reports the creator&apos;s Route account as{" "}
+              <strong>{course.routeStatus ?? "not set up"}</strong>. Zybble cannot approve a paid course until
+              Razorpay marks the linked account active, because a sale could not be paid out to the creator.
+            </p>
+          </div>
         </div>
+      ) : null}
 
-        {/* Right rail — decision tools */}
-        <div className="space-y-4">
-          {/* Decisions */}
+      {lessons.length === 0 || lessonsWithoutVideo.length > 0 || pendingVideos.length > 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3.5 text-[13px] text-amber-900">
+          <p className="font-medium">Curriculum is not ready</p>
+          <ul className="mt-1 list-disc pl-5 text-amber-800">
+            {lessons.length === 0 ? <li>The course has no lessons.</li> : null}
+            {lessonsWithoutVideo.length > 0 ? (
+              <li>
+                {lessonsWithoutVideo.length} lesson{lessonsWithoutVideo.length === 1 ? " has" : "s have"} no
+                uploaded video: {lessonsWithoutVideo.slice(0, 5).map((lesson) => lesson.title).join(", ")}
+                {lessonsWithoutVideo.length > 5 ? "…" : ""}
+              </li>
+            ) : null}
+            {pendingVideos.length > 0 ? (
+              <li>
+                {pendingVideos.length} video{pendingVideos.length === 1 ? " is" : "s are"} still encoding in
+                Bunny Stream.
+              </li>
+            ) : null}
+          </ul>
+        </div>
+      ) : null}
+
+      <CourseDecisionBar
+        courseId={course.id}
+        status={course.status}
+        paid={course.pricePaise > 0}
+        settleable={course.routeStatus === "active"}
+        hasLessons={lessons.length > 0}
+      />
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Moderation decision"} /></h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground"><LocalizedText text={"Decisions update the shared mock store. The creator sees them instantly in their studio on this device."} /></p>
-            <div className="mt-4 space-y-2">
-              <ActionButton
-                label={translateUi("Approve & publish")}
-                icon={ClipboardCheck}
-                className="w-full"
-                disabled={!canDecide || okCount < checks.length - 1}
-                confirmTitle={`Approve “${course.title}”?`}
-                confirmBody="The course is published. If it's a community course, it appears in Explore on this device immediately."
-                confirmLabel="Approve & publish"
-                onAction={() => approveCourse(course.id)}
-                toastText="Course approved and published (simulated)"
-              />
-              {course.status === "published" && (
-                <ActionButton
-                  label={translateUi("Return to queue")}
-                  icon={RotateCcw}
-                  variant="outline"
-                  className="w-full"
-                  confirmTitle="Return to review queue?"
-                  confirmBody="The course moves back to Pending Review and leaves the public catalog if it's a community course."
-                  confirmLabel="Return to queue"
-                  onAction={() => returnToQueue(course.id)}
-                  toastText="Course returned to the queue"
-                />
-              )}
-            </div>
-
-            {/* Request changes */}
-            {canRequestChanges && (
-              <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3.5">
-                <label className="flex items-center gap-1.5 text-[13px] font-semibold" htmlFor="changes-note">
-                  <MessageSquareWarning className="size-4 text-sky-600" aria-hidden /><LocalizedText text={"Request changes"} /></label>
-                <Textarea
-                  id="changes-note"
-                  value={changesNote}
-                  onChange={(e) => setChangesNote(e.target.value)}
-                  placeholder={translateUi("e.g. Please add alt-text guidance to lesson 2.1 and a privacy note about screenshots…")}
-                  className="mt-2 min-h-20 bg-white text-[13px]"
-                />
-                <Button size="sm" className="mt-2 w-full" variant="outline" onClick={submitChanges}><LocalizedText text={"Send change request (note required)"} /></Button>
+            <h2 className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-tight">
+              <FileText className="size-4 text-primary" aria-hidden /> Course copy
+            </h2>
+            <p className="mt-3 text-[13.5px] leading-relaxed whitespace-pre-line">
+              {course.description || "No description provided."}
+            </p>
+            {course.longDescription.length > 0 ? (
+              <div className="mt-3 space-y-2 text-[13.5px] leading-relaxed">
+                {course.longDescription.map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))}
               </div>
-            )}
+            ) : null}
 
-            {/* Reject */}
-            {(course.status === "pending" || course.status === "changes_requested") && (
-              <div className="mt-3 rounded-xl border border-red-200 bg-red-50/60 p-3.5">
-                <label className="flex items-center gap-1.5 text-[13px] font-semibold text-destructive" htmlFor="reject-note">
-                  <Ban className="size-4" aria-hidden /><LocalizedText text={"Reject submission"} /></label>
-                <Textarea
-                  id="reject-note"
-                  value={rejectNote}
-                  onChange={(e) => setRejectNote(e.target.value)}
-                  placeholder={translateUi("Required: explain why the course cannot be published…")}
-                  className="mt-2 min-h-20 bg-white text-[13px]"
-                />
-                <ActionButton
-                  label={translateUi("Reject with note")}
-                  icon={Ban}
-                  variant="destructive"
-                  size="sm"
-                  className="mt-2 w-full"
-                  disabled={rejectNote.trim().length < 12}
-                  confirmTitle={`Reject “${course.title}”?`}
-                  confirmBody="The creator is notified with your note. The course can be resubmitted after fixes."
-                  confirmLabel="Reject submission"
-                  onAction={submitReject}
-                  toastText="Submission rejected with note (simulated)"
-                />
-              </div>
-            )}
-          </section>
-
-          {/* Checklist */}
-          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Quality checklist"} /></h2>
-            <ul className="mt-3 space-y-2.5">
-              {checks.map((c) => (
-                <li key={c.label} className="flex items-start gap-2.5">
-                  {c.ok ? (
-                    <span className="mt-0.5 flex size-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                      <Check className="size-3 text-emerald-600" strokeWidth={3} aria-hidden />
-                    </span>
-                  ) : (
-                    <span className="mt-0.5 size-4.5 shrink-0 rounded-full border-2 border-amber-400" aria-hidden />
-                  )}
-                  <div>
-                    <p className={cn("text-[13px] font-medium", !c.ok && "text-amber-700")}><LocalizedText text={c.label} /></p>
-                    <p className="text-[11.5px] text-zinc-400"><LocalizedText text={c.detail} /></p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-[12px] text-zinc-400">
-              {okCount}/{checks.length}<LocalizedText text={"checks pass — approvals require at most one outstanding item."} /></p>
-          </section>
-
-          {/* Creator */}
-          {instructor && (
-            <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Creator"} /></h2>
-              <div className="mt-3 flex items-center gap-3">
-                <Avatar className="size-11">
-                  <AvatarFallback className={cn("text-[12px]", instructor.avatarColor)}>
-                    <LocalizedText text={instructor.initials} />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <Link href={`/instructors/${instructor.username}`} className="block truncate text-[14px] font-semibold hover:text-primary">
-                    <LocalizedText text={instructor.name} />
-                  </Link>
-                  <p className="truncate text-[12px] text-muted-foreground"><LocalizedText text={instructor.headline} /></p>
+            {[
+              { title: "What learners will be able to do", items: course.whatYouLearn },
+              { title: "Requirements", items: course.requirements },
+              { title: "Who this is for", items: course.audience },
+            ]
+              .filter((section) => section.items.length > 0)
+              .map((section) => (
+                <div key={section.title} className="mt-4">
+                  <h3 className="text-[13px] font-semibold">{section.title}</h3>
+                  <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[13px] text-muted-foreground">
+                    {section.items.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-              {stats && (
-                <dl className="mt-4 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-lg border border-border p-2.5">
-                    <dd className="font-display text-[15px] font-bold tabular-nums">{stats.courses}</dd>
-                    <dt className="text-[10.5px] text-muted-foreground"><LocalizedText text={"Courses"} /></dt>
-                  </div>
-                  <div className="rounded-lg border border-border p-2.5">
-                    <dd className="font-display text-[15px] font-bold tabular-nums"><LocalizedText text={stats.rating.toFixed(1)} /></dd>
-                    <dt className="text-[10.5px] text-muted-foreground"><LocalizedText text={"Rating"} /></dt>
-                  </div>
-                </dl>
-              )}
-            </section>
-          )}
+              ))}
+          </section>
 
-          {/* Internal notes */}
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-            <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Internal notes"} /></h2>
-            <p className="mt-1 flex items-start gap-1 text-[11.5px] text-zinc-400">
-              <Info className="mt-0.5 size-3 shrink-0" aria-hidden /><LocalizedText text={"Visible to admins only (local preview)."} /></p>
-            <div className="mt-3 space-y-2.5">
-              {notes.length === 0 ? (
-                <p className="text-[12.5px] text-zinc-400"><LocalizedText text={"No notes yet for this course."} /></p>
-              ) : (
-                notes.slice(0, 4).map((n, i) => (
-                  <div key={`${n.at}-${i}`} className="rounded-lg border border-border bg-muted/40 p-2.5">
-                    <p className="text-[12.5px] leading-relaxed"><LocalizedText text={n.text} /></p>
-                    <p className="mt-1 text-[10.5px] text-zinc-400">
-                      <LocalizedText text={n.author} /> · <LocalizedText text={formatDate(n.at)} />
-                    </p>
+            <h2 className="font-display text-[15px] font-semibold tracking-tight">Curriculum</h2>
+            {course.sections.length === 0 ? (
+              <p className="mt-3 text-[13px] text-muted-foreground">No sections.</p>
+            ) : (
+              <div className="mt-3 space-y-4">
+                {course.sections.map((section) => (
+                  <div key={section.id}>
+                    <p className="text-[13px] font-semibold">{section.title}</p>
+                    <ul className="mt-1.5 space-y-1">
+                      {section.lessons.map((lesson) => (
+                        <li key={lesson.id} className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                          <span
+                            className={`size-1.5 shrink-0 rounded-full ${
+                              lesson.videoReady ? "bg-emerald-500" : lesson.hasVideo ? "bg-amber-500" : "bg-zinc-300"
+                            }`}
+                            aria-hidden
+                          />
+                          <span className="flex-1 truncate">{lesson.title}</span>
+                          <span className="tabular-nums">{lesson.durationMinutes} min</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                ))
-              )}
-            </div>
-            <div className="mt-3">
-              <Textarea
-                value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
-                placeholder={translateUi("Add an internal note…")}
-                className="min-h-16 text-[13px]"
-                aria-label={translateUi("Internal moderation note")}
-              />
-              <Button size="sm" variant="outline" className="mt-2 w-full" onClick={saveNote}>
-                <Send aria-hidden /><LocalizedText text={"Save note"} /></Button>
-            </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="space-y-4">
+          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+            <h2 className="font-display text-[15px] font-semibold tracking-tight">Creator</h2>
+            <p className="mt-2 text-[13.5px] font-medium">{course.creatorName}</p>
+            <p className="mt-1 text-[12.5px] text-muted-foreground">
+              Razorpay Route: {course.routeStatus ?? "not set up"}
+            </p>
+            {course.creatorBio ? (
+              <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{course.creatorBio}</p>
+            ) : null}
+          </section>
+
+          {course.resources.length > 0 ? (
+            <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+              <h2 className="font-display text-[15px] font-semibold tracking-tight">Resources</h2>
+              <ul className="mt-3 space-y-1.5 text-[13px] text-muted-foreground">
+                {course.resources.map((resource) => (
+                  <li key={resource.id}>
+                    {resource.title}{" "}
+                    <span className="text-zinc-400">
+                      ({Math.round(resource.sizeBytes / 1024)} KB)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+            <h2 className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-tight">
+              <MessageSquareWarning className="size-4 text-primary" aria-hidden /> Review history
+            </h2>
+            <ReviewTimeline
+              events={course.reviewHistory.map((event) => ({
+                id: event.id,
+                at: event.at,
+                status: event.toStatus,
+                actor: event.actorRole,
+                note: event.note,
+              }))}
+            />
+          </section>
+
+          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+            <h2 className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-tight">
+              <StickyNote className="size-4 text-primary" aria-hidden /> Internal notes
+            </h2>
+            {course.moderationNotes.length === 0 ? (
+              <p className="mt-3 text-[13px] text-muted-foreground">No internal notes.</p>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {course.moderationNotes.map((note) => (
+                  <li key={note.id} className="rounded-lg border border-border bg-muted/40 px-3 py-2">
+                    <p className="text-[13px]">{note.text}</p>
+                    <p className="mt-1 text-[11.5px] text-zinc-400">
+                      {note.author ?? "Administrator"} · {new Date(note.createdAt).toLocaleString("en-IN")}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <AddModerationNote courseId={course.id} />
           </section>
         </div>
       </div>

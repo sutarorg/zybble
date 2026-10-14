@@ -66,8 +66,9 @@ export interface Course {
   /** Author snapshot for courses created during this session. */
   instructor?: Instructor;
   thumbnail: string; // path under /images/courses
-  price: number; // USD, 0 = free
-  compareAtPrice?: number;
+  /** Integer paise. 0 = free. INR is the only supported currency. */
+  pricePaise: number;
+  compareAtPaise?: number | null;
   rating: number; // 0–5
   ratingsCount: number;
   studentsCount: number;
@@ -114,10 +115,12 @@ export interface Order {
   courseId: string;
   userId: string | null;
   email: string;
-  total: number;
+  totalPaise: number;
+  currency: "INR";
   createdAt: string; // ISO
-  status: "paid" | "failed";
-  cardLast4: string;
+  status: "paid" | "failed" | "pending" | "refunded";
+  /** Masked instrument label from Razorpay, e.g. "UPI · a•••@okhdfc". Never a card number. */
+  method: string;
 }
 
 export interface Enrollment {
@@ -237,8 +240,6 @@ export interface UploadedMedia {
 export interface CreatorCourse extends Course {
   status: CourseStatus;
   reviewHistory: CourseReviewEvent[];
-  /** Illustrative lifetime gross revenue for analytics demo (USD). */
-  demoRevenue: number;
   /** Frontend-only upload metadata keyed by lesson id. */
   uploads?: Record<string, UploadedMedia[]>;
   /** Course-level downloadable resource entries (metadata only). */
@@ -249,7 +250,7 @@ export interface CreatorResource {
   id: string;
   title: string;
   fileType: "video" | "pdf" | "zip" | "doc" | "file";
-  sizeMb: number;
+  sizeBytes: number;
 }
 
 export interface CourseDraft {
@@ -264,8 +265,8 @@ export interface CourseDraft {
   audience: string[];
   thumbnail: string;
   isFree: boolean;
-  price: number;
-  compareAtPrice: number | null;
+  pricePaise: number;
+  compareAtPaise: number | null;
   sections: CurriculumSection[];
   draftResources: CreatorResource[];
 }
@@ -292,24 +293,31 @@ export interface EarningTransaction {
   courseTitle: string;
   orderRef: string;
   status: "paid" | "pending" | "refunded";
-  gross: number;
-  commission: number;
-  net: number;
+  grossPaise: number;
+  commissionPaise: number;
+  netPaise: number;
 }
 
+/**
+ * Creator payout settings.
+ *
+ * Zybble pays Indian creators by bank transfer through Razorpay Route, so there
+ * is exactly one settlement method. There is no PayPal, no card payout and no
+ * international option.
+ */
 export interface PayoutSettings {
-  method: "bank" | "paypal";
+  method: "bank";
   accountName: string;
-  details: string; // masked display string
-  threshold: number; // USD
+  details: string; // masked display string, e.g. "HDFC •••• 4321"
+  thresholdPaise: number;
 }
 
 export interface PayoutRecord {
   id: string;
   period: string;
-  amount: number;
+  amountPaise: number;
   status: "paid" | "processing";
-  method: string;
+  method: "bank";
   reference: string;
   requestedAt: string; // ISO
 }
@@ -335,7 +343,7 @@ export type AnalyticsRange = "7d" | "30d" | "90d" | "1y";
 
 export interface AnalyticsPoint {
   label: string;
-  revenue: number;
+  revenuePaise: number;
   enrollments: number;
 }
 
@@ -359,7 +367,7 @@ export interface AdminUser {
   status: AdminAccountStatus;
   coursesCreated: number;
   enrollments: number;
-  lifetimeSpend: number; // USD (learners)
+  lifetimeSpendPaise: number; // INR paise (learners)
 }
 
 export interface AdminOrder {
@@ -371,20 +379,20 @@ export interface AdminOrder {
   courseTitle: string;
   creatorId: string;
   creatorName: string;
-  gross: number;
-  commission: number;
-  creatorShare: number;
+  grossPaise: number;
+  commissionPaise: number;
+  creatorSharePaise: number;
   date: string; // ISO
   status: "paid" | "pending" | "refunded" | "failed";
-  method: string; // masked descriptor (demo)
+  method: string; // masked descriptor from Razorpay
 }
 
 export interface AdminPayout {
   id: string;
   creatorId: string;
   creatorName: string;
-  eligibleBalance: number;
-  amount: number;
+  eligibleBalancePaise: number;
+  amountPaise: number;
   status: "requested" | "approved" | "paid" | "rejected";
   reference: string;
   requestedAt: string; // ISO
@@ -438,8 +446,10 @@ export interface ModerationNote {
 export interface AdminSettings {
   marketplaceName: string;
   marketplaceDescription: string;
-  currency: "USD" | "EUR" | "GBP";
-  commissionRate: number; // fraction, default 0.1
+  /** INR is the only supported currency and is not selectable. */
+  currency: "INR";
+  /** Platform commission in basis points (1000 = 10.00%), snapshotted per order item. */
+  commissionBps: number;
   autoApproveFreeCourses: boolean;
   autoApproveReturningCreators: boolean;
   emailReviewDecisions: boolean;

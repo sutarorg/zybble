@@ -2,7 +2,7 @@
 
 import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import { LayoutGrid } from "lucide-react";
-import { CATEGORIES } from "@/data/mock-data";
+import { CATEGORIES } from "@/lib/config/catalog";
 import { categoryIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 

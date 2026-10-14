@@ -1,6 +1,6 @@
 "use client";
 
-import { LocalizedText } from "@/components/providers/localized-text";
+import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -12,23 +12,47 @@ import {
   FileDown,
   GraduationCap,
   Infinity as InfinityIcon,
-  Languages,
+  ShieldCheck,
 } from "lucide-react";
 import type { Course } from "@/types";
 import { formatHours } from "@/lib/format";
+import { formatInr } from "@/lib/money";
 import { useApp } from "@/components/providers/app-providers";
+import { toggleWishlist } from "@/app/(learner)/actions";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-export function EnrollCard({ course }: { course: Course }) {
+/**
+ * Purchase card.
+ *
+ * `enrolled` and `saved` are decided on the server and passed in: the browser
+ * cannot mark itself as owning a course. `checkoutBlocked` is set when paid
+ * checkout is unavailable — for example when the creator's Razorpay Route
+ * account is not active — and the card says so instead of failing at payment.
+ */
+export function EnrollCard({
+  course,
+  enrolled = false,
+  saved = false,
+  checkoutBlocked = null,
+}: {
+  course: Course;
+  enrolled: boolean;
+  saved: boolean;
+  /** Human-readable reason paid checkout is unavailable, or `null`. */
+  checkoutBlocked?: string | null;
+}) {
   const router = useRouter();
-  const { isEnrolled, isWishlisted, toggleWishlist, hydrated } = useApp();
-  const enrolled = hydrated && isEnrolled(course.id);
-  const saved = hydrated && isWishlisted(course.id);
+  const { session } = useApp();
+  const [wishlisted, setWishlisted] = React.useState(saved);
+  const [busy, setBusy] = React.useState(false);
+
+  const isFree = course.pricePaise === 0;
+  const compareAt = course.compareAtPaise ?? null;
   const discount =
-    course.compareAtPrice && course.price > 0
-      ? Math.round((1 - course.price / course.compareAtPrice) * 100)
+    compareAt && course.pricePaise > 0 && compareAt > course.pricePaise
+      ? Math.round((1 - course.pricePaise / compareAt) * 100)
       : 0;
 
   const includes: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
@@ -37,75 +61,104 @@ export function EnrollCard({ course }: { course: Course }) {
     ...(course.downloadableResources > 0
       ? [{ icon: FileDown, label: `${course.downloadableResources} downloadable resources` }]
       : []),
-    { icon: Languages, label: `Captions: ${course.captions.slice(0, 3).join(", ")}${course.captions.length > 3 ? ` +${course.captions.length - 3}` : ""}` },
     { icon: Award, label: "Certificate of completion" },
     { icon: InfinityIcon, label: "Lifetime access" },
   ];
 
   return (
     <div className="sticky top-22 rounded-xl border border-border bg-white p-5 shadow-card">
-      {/* Price */}
       <div className="flex items-baseline gap-2">
-        {course.price === 0 ? (
-          <span className="font-display text-3xl font-bold tracking-tight text-success"><LocalizedText text={"Free"} /></span>
+        {isFree ? (
+          <span className="font-display text-3xl font-bold tracking-tight text-success">Free</span>
         ) : (
           <>
-            <span className="font-display text-3xl font-bold tracking-tight">${course.price}</span>
-            {course.compareAtPrice && (
-              <span className="text-[15px] text-zinc-400 line-through">${course.compareAtPrice}</span>
-            )}
-            {discount > 0 && (
+            <span className="font-display text-3xl font-bold tracking-tight">
+              {formatInr(course.pricePaise)}
+            </span>
+            {compareAt && compareAt > course.pricePaise ? (
+              <span className="text-[15px] text-zinc-400 line-through">{formatInr(compareAt)}</span>
+            ) : null}
+            {discount > 0 ? (
               <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11.5px] font-semibold text-emerald-700">
-                {discount}<LocalizedText text={"% off"} /></span>
-            )}
+                {discount}% off
+              </span>
+            ) : null}
           </>
         )}
       </div>
-      <p className="mt-1 text-[12.5px] text-muted-foreground"><LocalizedText text={"One-time purchase · USD · preview checkout"} /></p>
+      <p className="mt-1 text-[12.5px] text-muted-foreground">
+        {isFree ? "Free to enroll · lifetime access" : `One-time purchase · INR (₹) · paid via Razorpay`}
+      </p>
 
-      {/* Actions */}
       <div className="mt-4 space-y-2">
         {enrolled ? (
           <Button asChild size="lg" className="w-full">
-            <Link href="/my-learning">
-              <GraduationCap aria-hidden /><LocalizedText text={"Go to My Learning"} /></Link>
+            <Link href={`/learn/${course.id}`}>
+              <GraduationCap aria-hidden /> Go to my learning
+            </Link>
           </Button>
-        ) : (
+        ) : session ? (
           <Button
             size="lg"
             className="w-full"
+            disabled={Boolean(checkoutBlocked) && !isFree}
             onClick={() => router.push(`/checkout/${course.id}`)}
           >
-            {course.price === 0 ? "Enroll for free" : "Enroll now"}
+            {isFree ? "Enroll for free" : "Enroll now"}
+          </Button>
+        ) : (
+          <Button asChild size="lg" className="w-full">
+            <Link href={`/login?next=/checkout/${course.id}`}>Sign in to enroll</Link>
           </Button>
         )}
+
         <Button
           variant="outline"
           size="lg"
-          className={cn("w-full", saved && "border-primary/40 text-primary")}
+          className={cn("w-full", wishlisted && "border-primary/40 text-primary")}
+          disabled={!session || busy}
           onClick={() => {
-            const added = toggleWishlist(course.id);
-            if (added) toast.success("Saved to your wishlist");
-            else toast("Removed from wishlist");
+            setBusy(true);
+            void toggleWishlist(course.id)
+              .then((result) => {
+                if (!result.ok) {
+                  toast.error(result.error ?? "Could not update your wishlist");
+                  return;
+                }
+                setWishlisted((previous) => !previous);
+                toast.success(wishlisted ? "Removed from wishlist" : "Saved to your wishlist");
+                router.refresh();
+              })
+              .finally(() => setBusy(false));
           }}
         >
-          <Bookmark className={cn(saved && "fill-primary text-primary")} aria-hidden />
-          {saved ? "Saved to wishlist" : "Add to wishlist"}
+          <Bookmark className={cn(wishlisted && "fill-primary text-primary")} aria-hidden />
+          {wishlisted ? "Saved to wishlist" : "Add to wishlist"}
         </Button>
       </div>
 
+      {checkoutBlocked && !isFree ? (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+          {checkoutBlocked}
+        </p>
+      ) : null}
+
       <Separator className="my-5" />
 
-      {/* Includes */}
-      <p className="mb-3 text-[13px] font-semibold"><LocalizedText text={"This course includes"} /></p>
+      <p className="mb-3 text-[13px] font-semibold">This course includes</p>
       <ul className="space-y-2.5">
         {includes.map((item) => (
           <li key={item.label} className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
             <item.icon className="size-4 shrink-0 text-zinc-400" aria-hidden />
-            <LocalizedText text={item.label} />
+            {item.label}
           </li>
         ))}
       </ul>
+
+      <p className="mt-4 flex items-start gap-1.5 text-[11.5px] text-zinc-400">
+        <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
+        Access is granted only after Razorpay confirms your payment. Zybble publishes no refund policy.
+      </p>
     </div>
   );
 }

@@ -114,8 +114,8 @@ export function FilterPanel({
     onChange({ ...value, [key]: val });
 
   const count = {
-    free: pool.filter((c) => c.price === 0).length,
-    paid: pool.filter((c) => c.price > 0).length,
+    free: pool.filter((c) => c.pricePaise === 0).length,
+    paid: pool.filter((c) => c.pricePaise > 0).length,
     level: (lv: string) => pool.filter((c) => c.level === lv).length,
     dur: (pred: (m: number) => boolean) => pool.filter((c) => pred(c.durationMinutes)).length,
     lang: (lg: string) => pool.filter((c) => c.language === lg).length,

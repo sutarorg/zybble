@@ -1,171 +1,215 @@
 # Zybble
 
-A demo AI-course marketplace built with Next.js. Zybble showcases four complete shells in one app:
+An India-only marketplace for practical AI courses, built on Next.js App Router
+with a real backend: Supabase Postgres + Auth, Razorpay Payments and Route for
+INR settlement, Bunny Stream for video, private Cloudflare R2 for files, Resend
+for transactional email, and OpenRouter for the public course-discovery
+assistant.
 
-| Shell | Base path | What it demonstrates |
+**Read [`LAUNCH_BLOCKERS.md`](./LAUNCH_BLOCKERS.md) before trusting any of this.**
+No provider integration in this repository has been executed against a live
+account. The code is implemented, typechecked and unit-tested; the credentials,
+KYC, DNS and commercial decisions that make it *work* are still outstanding.
+
+---
+
+## What changed from the original demo
+
+The previous build was a client-side prototype: a shared in-memory "document
+session" with mock courses, a simulated card form, a fake chatbot, fake orders
+and a fake certificate renderer. Everything below replaced that.
+
+| Area | Before | Now |
 | --- | --- | --- |
-| Public | `/` (catalog, formerly `/explore`), `/courses/[slug]`, `/instructors/[username]`, `/help`, `/about`, … | Catalog browsing, search, filters, course detail, instructor profiles |
-| Learner certificates | `/certificates` (inside the learner shell) | Earned certificates, opened with the learner sidebar in place |
-| Learner | `/dashboard`, `/my-learning`, `/orders`, `/wishlist`, `/messages`, `/settings`, `/learn/[courseId]` | Enrolled courses, progress, simulated lesson player with notes, resources and completion certificates |
-| Creator | `/creator/*` | Course creation wizard, curriculum editor, pricing, publish flow, analytics, earnings, payouts |
-| Admin | `/admin/*` | Moderation queue, users, orders, payouts, categories, reports, settings |
+| Identity | In-memory session, lost on refresh | Supabase Auth with secure cookies, SSR session refresh, server-side role checks |
+| Catalogue | Hard-coded mock array | Postgres, read under RLS; empty and honest when unconfigured |
+| Checkout | `setTimeout` + a fake card field | Razorpay Checkout; signature **and** captured-payment verification |
+| Entitlement | A local `completedOrder` call | Created only from verified payment or webhook state |
+| Video | A simulated player with a thumbnail | Bunny Stream token URLs, authorised per request |
+| Files | A generated `.txt` in the browser | Private R2, pre-signed URLs after an entitlement check |
+| Email | None | Outbox-backed Resend dispatch |
+| Chatbot | Rule-based, answered locally | OpenRouter, grounded on published courses, slugs re-resolved server-side |
+| Certificates | Rendered in the browser | Server-issued records with verification codes |
+| Earnings | Mock arrays | Snapshotted commission/creator shares and a paise ledger |
+| Search | Client-side over a mock array | `/api/catalog/search` against the published catalog |
 
-Everything is client-side and mock-data driven: there is no storefront API, no auth server and no payment provider. Account state and activity (enrollments, notes, progress, creator drafts, admin settings) live in a shared **in-memory document session**. Client-side navigation keeps them; a refresh starts signed out with a clean learner and creator workspace. Legacy Zybble localStorage account/activity keys are removed on hydration. Only the interface-language preference is saved between refreshes.
+Deliberately **preserved**: the design system, layouts, six interface languages,
+course structure, category set, and the creator content (which is not machine
+translated).
 
-## Requirements
+---
 
-- Node.js 22.17+ (22.x) or 24+; the packaged browser tests require these versions
-- npm (use `npm ci` with the checked-in lockfile)
+## Architecture
+
+```
+Browser
+  │  Next.js App Router (16), React 19, Tailwind
+  │
+  ├─ proxy.ts ──── refreshes the Supabase session on every request
+  │
+  ▼
+Server (Node runtime)
+  ├─ server components ── src/lib/server/{catalog,learner,creator,admin}.ts
+  ├─ server actions    ── src/app/(learner)/actions.ts, creator/, admin/
+  └─ route handlers    ── src/app/api/**
+        │
+        ├─ Supabase (Postgres + RLS + Auth)   ── src/lib/supabase/*
+        ├─ Razorpay Payments + Route          ── src/lib/server/{razorpay,checkout}.ts
+        ├─ Bunny Stream                      ── src/lib/server/bunny.ts
+        ├─ Cloudflare R2 (private)           ── src/lib/server/r2.ts
+        ├─ Resend                            ── src/lib/server/email.ts
+        └─ OpenRouter                        ── src/lib/server/ai.ts
+```
+
+### The four invariants
+
+Everything else follows from these.
+
+1. **The browser is untrusted.** Price, currency, commission and creator share
+   are read from Postgres on every call. Request bodies carry identifiers only.
+2. **A redirect grants nothing.** `/checkout/success` reports what the database
+   already says; entitlement comes from verified payment or webhook state.
+3. **Money is integer paise.** Rupee strings convert decimal-safely. There is no
+   currency picker and no conversion table anywhere in the codebase.
+4. **Absence is stated, never faked.** No provider, no creator, no learner, no
+   course — each renders an honest empty or unavailable state.
+
+---
+
+## Routes
+
+| Shell | Paths |
+| --- | --- |
+| Public | `/`, `/courses/[slug]`, `/categories/[slug]`, `/instructors/[username]`, `/about`, `/help`, `/terms`, `/privacy` |
+| Auth | `/login`, `/signup`, `/forgot-password`, `/auth/update-password`, `/auth/confirm` |
+| Checkout | `/checkout/[courseId]`, `/checkout/success`, `/checkout/failed` |
+| Learner | `/dashboard`, `/my-learning`, `/learn/[courseId]`, `/wishlist`, `/certificates`, `/messages`, `/orders`, `/orders/[orderId]`, `/settings` |
+| Creator | `/creator/signup`, `/creator`, `/creator/onboarding`, `/creator/courses/*`, `/creator/profile`, `/creator/payouts`, `/creator/earnings`, `/creator/analytics`, `/creator/reviews`, `/creator/settings` |
+| Admin | `/admin`, `/admin/courses`, `/admin/users`, `/admin/orders`, `/admin/payouts`, `/admin/categories`, `/admin/reports`, `/admin/reviews`, `/admin/settings`, `/admin/analytics` |
+| API | `/api/health`, `/api/checkout`, `/api/razorpay/webhook`, `/api/webhooks/bunny`, `/api/chat`, `/api/catalog/search`, `/api/learn/[lessonId]/playback`, `/api/media/[kind]`, `/api/media/video/{grant,status}`, `/api/storage`, `/api/learner/*`, `/api/email/outbox` |
+
+---
 
 ## Getting started
 
 ```bash
 npm ci
-npm run dev            # http://localhost:3000
+cp .env.example .env.local     # fill in what you have
+npm run dev                    # http://localhost:3000
 ```
 
-`/` is the full catalog (the former Explore page; `/explore` redirects to `/` and there is no `/home` page). Sign in as a learner, choose **Start teaching**, then complete the profile and review steps at `/creator/signup`. This upgrades the same account to a creator without replacing its identity or learner activity. **Go to Studio** appears in the public/learner surfaces only for creators. The studio is role-gated. Deleting the creator account under `/creator/settings` clears its namespace and returns the same account to learner mode.
+The app **boots with no credentials at all**. Every page renders an honest empty
+or unavailable state, and `GET /api/health` returns a per-integration readiness
+report naming missing variables without revealing any value.
 
-### Zybble AI — public course-discovery chatbot
-
-The bottom-right **Zybble AI** launcher is available only on the catalog (`/`, including
-visits via the `/explore` redirect) and the eight public `/categories/[slug]` pages.
-It is absent from course detail, help, authentication, checkout, learner, creator
-and admin pages. Visibility follows the page, not the signed-in account’s role.
-
-Opening it animates the violet chat panel up out of the corner while the launcher
-fades and shrinks away, so only one of the two occupies the corner at a time;
-closing plays both in reverse and returns focus to the launcher. As with the rest
-of the app, `prefers-reduced-motion: reduce` neutralises the motion while keeping
-the state change visible.
-
-The panel offers three short suggested questions, free-text messages, linked
-course recommendations and common enrollment/account/billing help. The
-suggestions are a **one-time offer**: they are shown with the greeting and
-collapse away as soon as the first answer lands, letting the card settle into the
-conversation layout. They stay hidden while that conversation is preserved
-(closing and reopening) and come back with **Start a new chat** or after a route
-change. The panel searches the static catalog plus courses published in the
-current session. Topic, level, budget and duration preferences carry across
-follow-ups; **Start a new chat** clears them. Category pages initially scope
-recommendations to that category and swap the first suggestion for
-`Explore <category>`. Closing and reopening preserves the conversation; route
-navigation or refresh clears it. Messages are capped at 500 characters and 60
-conversation entries and are not persisted or sent to an external service.
-
-This is an **offline, rule-based catalog assistant**, not an LLM integration or
-human support channel. Chat guidance is currently in English; recommendation
-titles follow the selected catalog language. Unmatched requests offer the Help
-Center rather than invented courses. It cannot access accounts or process
-payments. A non-modal accessible dialog supports Escape, input focus and focus
-return, and fits narrow/mobile viewports.
-
-### Certificates
-
-Finishing every lesson in a course issues a certificate. The parchment artwork in
-`public/certificate-template.jpg` is the template; `src/lib/certificate.ts` paints the learner name,
-course title, instructor name, issue date and verification code onto a 1920×1080 (16:9) canvas at
-runtime. The same painter drives both the on-screen preview and the **Download PNG** button, so what
-you see is exactly what you download. Certificates are stored for the document session and listed at
-`/certificates` (inside the learner shell), where any of them can be re-opened and re-downloaded.
-
-## Scripts
-
-| Script | Purpose |
-| --- | --- |
-| `npm run dev` | Start the dev server (`next dev`) |
-| `npm run build` | Production build (`next build`) |
-| `npm run start` | Serve the production build (`next start`) |
-| `npm run typecheck` | TypeScript, no emit (`tsc --noEmit`) |
-| `npm run lint` | ESLint across the repo (`eslint .`) |
-| `npm test` | Typecheck + lint + offline chatbot unit tests |
-| `npm run test:chatbot` | Discovery-route restrictions, course matching, follow-up filters and help answers |
-
-Recommended pre-PR check:
+To get real data you need a Supabase project:
 
 ```bash
-npm test && npm run build
+supabase link --project-ref <ref>
+supabase db push               # applies supabase/migrations/*.sql
 ```
 
-## Environment
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full sequence.
 
-No environment variables are required to run the UI. The only optional one is:
+---
 
-| Variable | Effect |
-| --- | --- |
-| `DATABASE_URL` | Enables the Postgres pool used by `/api/health`. If it is unset, the pool is never created and `/api/health` returns `500` with a “database not configured” payload. This is expected in the demo, not a bug. |
+## Money and payouts
 
-## Project structure
+- **INR only.** `₹` everywhere, integer paise underneath.
+- **Commission** is a server setting (`marketplace_settings.commission_bps`),
+  currently defaulting to **1000 bps = 10%** as a *planned* default, and is
+  **snapshotted onto every order item** so a later change cannot rewrite history.
+- **The split always reconciles:** `creator_paise = gross_paise − commission_paise`,
+  so the halves sum back to the gross exactly.
+- **Paid publication is blocked** unless Razorpay reports the creator's Route
+  linked account as `active`. Enforced in the checkout, the creator submit flow
+  and the moderation approval flow.
+- **No tax logic is invented.** Razorpay's reported `fee` and `tax` are stored
+  verbatim. GST/TDS treatment is an open question recorded in
+  `LAUNCH_BLOCKERS.md` §3.
+- **There is no refund policy and no refund flow.** Provider reversals are
+  handled as accounting corrections.
+
+Full detail: [`PAYMENT_FLOW.md`](./PAYMENT_FLOW.md).
+
+---
+
+## Zybble AI
+
+The launcher appears only on `/`, `/explore` and `/categories/[slug]` — public
+discovery, never on course detail, checkout, learner, creator or admin routes.
+
+Requests go to `POST /api/chat`, which:
+
+1. rate-limits per client,
+2. reads **only published courses** from the `published_courses` view,
+3. sends that as the *entire* catalog context to OpenRouter,
+4. re-resolves every slug the model returns against that same list — **an
+   invented slug is dropped, never rendered**,
+5. clamps any link to a small same-origin allowlist,
+6. falls back to an honest "temporarily unavailable" message rather than
+   guessing when OpenRouter is unconfigured or fails.
+
+It cannot see accounts, orders or progress.
+
+---
+
+## Testing
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # ESLint, incl. React Compiler rules
+npm run test:unit   # money + AI contract tests (node:test)
+npm test            # all three
+npm run build       # production build
+npm run test:e2e    # Playwright walkthrough — STALE, see below
+```
+
+**Status on this branch:** typecheck 0 errors · lint 0 errors / 0 warnings ·
+production build succeeds · `test:unit` 23/23 passing.
+
+**`npm run test:e2e` is not part of `npm test` and will fail.** The Playwright
+suite still drives the removed demo UI. It must be rewritten against seeded test
+data. Listed honestly in `LAUNCH_BLOCKERS.md` §6, along with the missing
+database/RLS, authorization, webhook-replay and upload tests.
+
+Test fixtures stay isolated from production data; no live credentials belong in
+CI.
+
+---
+
+## Accessibility and languages
+
+Six interface languages (English, Hindi, Spanish, French, Japanese, Portuguese)
+cover chrome and product copy. **Creator-authored content is not machine
+translated** — a course description is the author's words in their language.
+The lesson player, curriculum rail and checkout honour
+`prefers-reduced-motion`, keyboard navigation and labelled controls.
+
+---
+
+## Repository layout
 
 ```
 src/
   app/
-    (app)/         public catalog routes (`/` is the catalog; `/explore` redirects to `/`)
-    (auth)/        login / signup routes
-    (learner)/     learner dashboard, my learning, orders, messages, settings
-    creator/       creator studio routes
-    admin/         admin console routes
-    learn/[courseId]/   lesson player
-    checkout/      simulated checkout, success and failure screens
-    api/health/    DB connectivity probe
-  components/
-    ui/            design-system primitives (button, dialog, sheet, tabs, …)
-    layout/        headers, footers, sidebars, search
-    courses/       catalog cards, carousels, filters, detail view
-    certificate/   canvas-backed certificate preview + completion dialog
-    learn/         player, curriculum list
-    creator/, admin/, learner/   shell-specific building blocks
-    providers/     document-session state (learning, creator, admin, notifications)
-  data/mock-data.ts    seeded catalog, users, orders, payouts, reports
-  lib/                 utilities, hooks, formatting, domain helpers
-  lib/certificate.ts   16:9 certificate painter + PNG export
-  db/                  Drizzle/Postgres client used only by /api/health
-public/certificate-template.jpg   generated certificate artwork (template only, no text)
+    (app)/          public storefront        (auth)/        authentication
+    (learner)/      learner area + actions   creator/       studio + actions
+    admin/          moderation portal        api/           route handlers
+    checkout/       purchase flow            learn/         lesson player
+  components/       design system + product components
+  lib/
+    server/         catalog, learner, creator, admin, checkout,
+                    razorpay, bunny, r2, email, ai, session
+    supabase/       browser, SSR, service-role, cookie clients
+    i18n/           six interface dictionaries
+  proxy.ts          Next 16 session refresh
+supabase/migrations/  schema, RLS + grants, category-only seed
+tests/                unit and contract suites
 ```
 
-## Responsive & accessibility notes
+---
 
-- Layouts are mobile-first and designed to work from **320 px** through **2560 px**, including landscape phones, short-height viewports and 200 % zoom.
-- Shell pages share the `page-container` utility (`src/app/globals.css`), which widens the inline gutter from 1rem → 1.5rem → 2.5rem → 3rem so content never butts up against the fixed sidebar, and every card, carousel and heading sits on one shared left edge.
-- Data-dense admin/creator tables keep their own bounded horizontal scroller (the page itself never scrolls sideways) and every table is wrapped in an `overflow-x-auto` region with a keyboard-reachable scroll area.
-- Course thumbnails are uniformly 16:9 (`1280×720`) and rendered with fixed aspect containers so images never reflow the layout.
-- Interactive controls use a ~44 px touch target on touch breakpoints and shrink to ~36–40 px on pointer/desktop breakpoints.
-- Keyboard support: visible focus rings everywhere, `Esc`-dismissable overlays, a `⌘K` / `Ctrl+K` search shortcut, and sidebars that become off-canvas drawers with focus traps on small screens.
-- `prefers-reduced-motion: reduce` disables animation and transition effects.
+## License
 
-## Known limitations
-
-- Authentication is a frontend-only credential-checked walkthrough, not a secure auth service. There is one preconfigured learner account; credentials are supplied outside the UI. Signups create temporary accounts for the current document session. There is no payment provider or server-backed account persistence. Refreshing or signing out clears account/activity state.
-- There is no AI Tutor: the feature was removed from the product surface (sidebar promo, Explore banner, lesson player panel, course badges, filters, help/legal copy) and its mock engine (`src/lib/tutor.ts`) is gone.
-- Certificates are generated in the browser and are illustrative — the verification code is not resolvable publicly.
-- `/api/health` returns `500` unless `DATABASE_URL` is configured.
-- Browser regression tests cover credential rejection, full-screen signup, learner-to-creator conversion, creator deletion/cancellation, learner wishlist preservation, legacy state cleanup, refresh reset, all six catalog languages, the Zybble AI chatbot (open/close motion, one-time suggestions, route allowlist) and 320px responsiveness.
-
-## Browser verification
-
-```bash
-npm test
-npm run build
-npm run start -- --hostname 0.0.0.0  # in a separate terminal
-npm run test:e2e                    # against http://localhost:3000
-```
-
-`E2E_URL` can point the browser tests at another running instance. The browser is
-packaged as a development dependency, so the suite does not download a browser
-from an external CDN. Its runtime libraries are extracted to the system temp
-directory, not checked into Git.
-
-## Localization
-
-English, Spanish, Portuguese, French, German and Japanese use typed interface
-dictionaries. React-rendered text, navigation, controls, onboarding and catalog
-cards respond to the language preference. Cards localize their titles, subtitles,
-levels, badges, lesson counts, duration, numbers and prices. Interface copy is
-resolved offline without a translation service or DOM mutation. The language
-control is available on mobile, authentication and studio headers too.
-
-Translations are curated: unknown strings and locally authored course content
-retain their original text rather than being guessed. Lesson/curriculum content,
-reviews and some long-form/legal copy are not yet fully translated. Spanish also
-includes course descriptions and learning outcomes; expanding that content
-coverage to every locale remains follow-up work.
+See `package.json`. Creator content belongs to the creators who wrote it.

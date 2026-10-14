@@ -1,366 +1,197 @@
-"use client";
-
-import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
-import * as React from "react";
-import { useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowRight,
-  BadgeCheck,
   BookOpen,
   Clock,
-  Compass,
   Flame,
   GraduationCap,
-  ListChecks,
-  Lock,
-  Medal,
-  Play,
-  Rocket,
+  PlayCircle,
+  Sparkles,
   Target,
-  Wallet,
-  Zap,
 } from "lucide-react";
-import type { Course, Enrollment } from "@/types";
-import { COURSES } from "@/data/mock-data";
-import { useApp } from "@/components/providers/app-providers";
-import { useCommunityCourses } from "@/components/providers/creator-provider";
 import {
-  learnerTotals,
-  instructorOf,
-  progressOf,
-  recommendedCourses,
-  resolveCourse,
-} from "@/lib/learn";
+  getEnrollments,
+  getRecentViews,
+  getOrders,
+  getWishlist,
+} from "@/lib/server/learner";
+import { requireSession } from "@/lib/server/session";
+import { formatInr } from "@/lib/money";
 import { timeAgo } from "@/lib/format";
-import { CourseCard } from "@/components/courses/course-card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/creator/stat-card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { ProgressBar } from "@/components/learner/progress-bar";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { imagePath } from "@/lib/image-path";
 
-/* ------------------------------ achievements ------------------------------- */
+export const metadata = { title: "Overview" };
+export const dynamic = "force-dynamic";
 
-function useAchievements(
-  pairs: { course: Course; enrollment: Enrollment }[],
-  recentCount: number,
-  lessonsTotal: number
-) {
-  return useMemo(() => {
-    const anyHalf = pairs.some(({ course, enrollment }) => progressOf(course, enrollment).percent >= 50);
-    const anyDone = pairs.some(({ course, enrollment }) => progressOf(course, enrollment).isCompleted);
-    return [
-      { id: "first-enroll", icon: Rocket, label: "First enrollment", earned: pairs.length > 0 },
-      { id: "first-lesson", icon: Zap, label: "First lesson done", earned: lessonsTotal > 0 },
-      { id: "ten-lessons", icon: Target, label: "10 lessons complete", earned: lessonsTotal >= 10 },
-      { id: "halfway", icon: Medal, label: "Half-way hero", earned: anyHalf },
-      { id: "graduate", icon: GraduationCap, label: "Course completed", earned: anyDone },
-      { id: "curious", icon: Compass, label: "Explored 5 courses", earned: recentCount >= 5 },
-    ];
-  }, [pairs, recentCount, lessonsTotal]);
-}
+export default async function LearnerDashboardPage() {
+  const session = await requireSession();
+  const [enrollments, recentViews, orders, wishlist] = await Promise.all([
+    getEnrollments(),
+    getRecentViews(),
+    getOrders(),
+    getWishlist(),
+  ]);
 
-/* -------------------------------- dashboard -------------------------------- */
-
-export default function DashboardPage() {
-  const translateUi = useTranslate();
-  const { enrollments, hydrated, user, recentViews, activity } = useApp();
-  const community = useCommunityCourses();
-
-  const pairs = useMemo(() => {
-    const pool = [...community, ...COURSES];
-    return enrollments
-      .map((enrollment) => ({ enrollment, course: pool.find((c) => c.id === enrollment.courseId) }))
-      .filter((x): x is { enrollment: Enrollment; course: Course } => !!x.course);
-  }, [enrollments, community]);
-
-  const totals = useMemo(() => learnerTotals(pairs), [pairs]);
-  const achievements = useAchievements(pairs, recentViews.length, totals.lessonsCompleted);
-
-  const lastPair = useMemo(() => {
-    return [...pairs].sort(
-      (a, b) =>
-        +new Date(b.enrollment.lastVisitedAt ?? b.enrollment.enrolledAt) -
-        +new Date(a.enrollment.lastVisitedAt ?? a.enrollment.enrolledAt)
-    )[0];
-  }, [pairs]);
-
-  const recommended = useMemo(
-    () => recommendedCourses(new Set(enrollments.map((e) => e.courseId)), community, 4),
-    [enrollments, community]
+  const inProgress = enrollments.filter((enrollment) => enrollment.progressPercent > 0 && enrollment.progressPercent < 100);
+  const completed = enrollments.filter((enrollment) => enrollment.progressPercent >= 100);
+  const minutesLearned = enrollments.reduce(
+    (sum, enrollment) => sum + Math.round((enrollment.course.durationMinutes * enrollment.progressPercent) / 100),
+    0
   );
-
-  const recentCourses = useMemo(() => {
-    const pool = [...community, ...COURSES];
-    return recentViews
-      .map((v) => pool.find((c) => c.id === v.courseId))
-      .filter((c): c is Course => !!c)
-      .slice(0, 4);
-  }, [recentViews, community]);
-
-  const activityFeed = useMemo(() => {
-    return activity.slice(0, 6).map((a) => {
-      const course = resolveCourse(a.courseId, community);
-      return { ...a, course };
-    });
-  }, [activity, community]);
-
-  const firstName = user?.name.split(" ")[0] ?? "learner";
-  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-
-  if (!hydrated) {
-    return (
-      <div className="page-container py-7" aria-busy>
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="mt-3 h-9 w-64" />
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))}
-        </div>
-        <Skeleton className="mt-6 h-64 rounded-xl" />
-      </div>
-    );
-  }
+  const totalSpent = orders
+    .filter((order) => order.status === "paid")
+    .reduce((sum, order) => sum + order.totalPaise, 0);
+  const firstName = session.fullName.split(" ")[0] ?? session.fullName;
 
   return (
-    <div className="page-container py-7 sm:py-9">
-      {/* Greeting */}
-      <header className="flex flex-wrap items-end justify-between gap-4">
+    <div className="space-y-6 px-4 py-7 sm:px-6 lg:px-9">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={today} /></p>
-          <h1 className="font-display mt-2 text-[26px] font-bold tracking-tight sm:text-[34px]"><LocalizedText text={"Welcome back"} /><LocalizedText text={user ? `, ${firstName}` : ""} />.
+          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">
+            Welcome back, {firstName}
           </h1>
-          <p className="mt-2 text-[14.5px] text-muted-foreground">
-            {pairs.length > 0
-              ? "Pick up exactly where you left off — your progress is saved on this device."
-              : "Your learning journey starts with one course. Let's find it."}
+          <p className="mt-1.5 text-[14px] text-muted-foreground">
+            Pick up where you left off, or explore what other Indian creators are teaching.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5">
-          <Flame className="size-4 text-amber-600" aria-hidden />
-          <span className="text-[12.5px] font-semibold text-amber-700"><LocalizedText text={"4-day streak · simulated"} /></span>
-        </div>
+        <Button asChild>
+          <Link href="/explore">
+            Explore courses <ArrowRight className="ml-1 size-4" aria-hidden />
+          </Link>
+        </Button>
       </header>
 
-      {pairs.length === 0 ? (
-        /* ------------------------------- Empty state ------------------------------ */
-        <div className="mt-8">
-          <div className="relative overflow-hidden rounded-2xl border border-violet-200/70 bg-accent p-8 sm:p-10">
-            <div className="pointer-events-none absolute -top-16 -right-10 size-56 rounded-full bg-violet-300/25 blur-2xl" aria-hidden />
-            <div className="relative max-w-lg">
-              <p className="font-display text-2xl font-bold tracking-tight text-violet-950"><LocalizedText text={"Start learning AI the practical way"} /></p>
-              <p className="mt-2 text-[14.5px] leading-relaxed text-violet-950/60"><LocalizedText text={"Enroll in a free course in seconds — no card needed. Your dashboard fills with progress, milestones and recommendations as you learn."} /></p>
-            </div>
-          </div>
-          <h2 className="font-display mt-10 mb-4 text-lg font-semibold"><LocalizedText text={"Recommended to start with"} /></h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {recommendedCourses(new Set(), community, 4).map((c) => (
-              <CourseCard key={c.id} course={c} />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Stats */}
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              icon={Target}
-              label={translateUi("Overall progress")}
-              value={`${totals.overallPercent}%`}
-              hint={`${totals.completedCourses} of ${totals.enrolledCount} completed`}
-            />
-            <StatCard icon={BookOpen} label={translateUi("Enrolled courses")} value={String(totals.enrolledCount)} hint="total" />
-            <StatCard
-              icon={Clock}
-              label={translateUi("Hours learned")}
-              value={(totals.minutesLearned / 60).toFixed(1)}
-              hint="simulated playback"
-            />
-            <StatCard icon={ListChecks} label={translateUi("Lessons completed")} value={String(totals.lessonsCompleted)} hint="all courses" />
+      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={GraduationCap}
+          label="Courses enrolled"
+          value={String(enrollments.length)}
+          hint={`${completed.length} completed`}
+        />
+        <StatCard icon={Clock} label="Minutes learned" value={String(minutesLearned)} />
+        <StatCard icon={Target} label="In progress" value={String(inProgress.length)} />
+        <StatCard
+          icon={Flame}
+          label="Total spent"
+          value={formatInr(totalSpent)}
+          hint={`${orders.length} orders`}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <section className="rounded-xl border border-border bg-white p-5 shadow-card lg:col-span-2">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-[15px] font-semibold tracking-tight">Continue learning</h2>
+            <Link href="/my-learning" className="text-[13px] font-medium text-primary underline">
+              All courses
+            </Link>
           </div>
 
-          {/* Continue learning + activity rail */}
-          <div className="mt-6 grid gap-4 xl:grid-cols-3">
-            {/* Continue learning */}
-            {lastPair && (
-              <section className="overflow-hidden rounded-xl border border-border bg-white shadow-card xl:col-span-2">
-                <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-                  <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Continue learning"} /></h2>
-                  <Link href="/my-learning" className="group flex items-center gap-1 text-[13px] font-medium text-primary hover:text-primary-hover"><LocalizedText text={"All courses"} /><ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                  </Link>
-                </div>
-                {(() => {
-                  const p = progressOf(lastPair.course, lastPair.enrollment);
-                  const instructor = instructorOf(lastPair.course);
-                  return (
-                    <div className="flex flex-col gap-5 p-5 sm:flex-row">
-                      <Link
-                        href={`/learn/${lastPair.course.id}`}
-                        className="group relative block aspect-video w-full shrink-0 overflow-hidden rounded-lg bg-muted sm:w-64"
-                      >
-                        <Image
-                          src={lastPair.course.thumbnail}
-                          alt={translateUi(lastPair.course.title)}
-                          fill
-                          sizes="256px"
-                          className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                        />
-                        <span className="absolute inset-0 flex items-center justify-center bg-zinc-950/0 transition-colors group-hover:bg-zinc-950/25">
-                          <span className="flex size-12 items-center justify-center rounded-full bg-white/95 shadow-lg opacity-0 transition-opacity group-hover:opacity-100">
-                            <Play className="ml-0.5 size-5 fill-foreground text-foreground" aria-hidden />
-                          </span>
-                        </span>
-                      </Link>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="size-5">
-                            <AvatarFallback className={cn("text-[8px]", instructor?.avatarColor)}>
-                              {instructor?.initials}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-[12px] text-muted-foreground">{instructor?.name}</span>
-                        </div>
-                        <h3 className="font-display mt-1.5 text-[17px] font-semibold tracking-tight">
-                          <LocalizedText text={lastPair.course.title} />
-                        </h3>
-                        {p.resumeLesson && (
-                          <p className="mt-1 text-[13px] text-muted-foreground"><LocalizedText text={"Next up:"} /><span className="font-medium text-foreground"><LocalizedText text={p.resumeLesson.number} /> — <LocalizedText text={p.resumeLesson.lesson.title} /></span>
-                          </p>
-                        )}
-                        <div className="mt-3">
-                          <div className="flex justify-between text-[11.5px] text-muted-foreground">
-                            <span>{p.completedCount}<LocalizedText text={"of"} />{p.totalLessons}<LocalizedText text={"lessons"} /></span>
-                            <span className="tabular-nums">{p.percent}%</span>
-                          </div>
-                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-                            <div className="h-full rounded-full bg-primary" style={{ width: `${p.percent}%` }} />
-                          </div>
-                        </div>
-                        <div className="mt-4 flex items-center gap-2">
-                          <Button asChild>
-                            <Link href={`/learn/${lastPair.course.id}`}>
-                              <Play aria-hidden />
-                              {p.isCompleted ? "Review course" : "Resume lesson"}
-                            </Link>
-                          </Button>
-                          <Button asChild variant="outline">
-                            <Link href={`/courses/${lastPair.course.slug}`}><LocalizedText text={"Course details"} /></Link>
-                          </Button>
-                        </div>
-                      </div>
+          {inProgress.length === 0 ? (
+            <EmptyState
+              className="mt-4"
+              icon={BookOpen}
+              title={enrollments.length === 0 ? "You are not enrolled in anything yet" : "Nothing in progress"}
+              description={
+                enrollments.length === 0
+                  ? "Free preview lessons let you try a course before you buy it."
+                  : "Every enrolled course is already complete. Nice work."
+              }
+              action={
+                <Button asChild>
+                  <Link href="/explore">Browse the catalog</Link>
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {inProgress.slice(0, 5).map((enrollment) => (
+                <li key={enrollment.course.id} className="flex gap-3.5 rounded-xl border border-border p-3">
+                  {enrollment.course.thumbnailKey ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imagePath("thumbnails", enrollment.course.thumbnailKey)}
+                      alt=""
+                      className="h-16 w-28 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-28 shrink-0 items-center justify-center rounded-lg bg-muted text-zinc-400">
+                      <BookOpen className="size-5" aria-hidden />
                     </div>
-                  );
-                })()}
-              </section>
-            )}
-
-            {/* Activity timeline */}
-            <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Learning activity"} /></h2>
-              {activityFeed.length === 0 ? (
-                <p className="mt-4 text-[13px] text-muted-foreground"><LocalizedText text={"Your activity appears here as you enroll and complete lessons."} /></p>
-              ) : (
-                <ul className="mt-4 space-y-3.5">
-                  {activityFeed.map((a) => (
-                    <li key={a.id} className="flex items-start gap-2.5">
-                      <span
-                        className={cn(
-                          "mt-0.5 flex size-6.5 shrink-0 items-center justify-center rounded-lg",
-                          a.kind === "enroll" && "bg-violet-100 text-violet-700",
-                          a.kind === "lesson" && "bg-emerald-100 text-emerald-700",
-                          a.kind === "order" && "bg-sky-100 text-sky-700"
-                        )}
-                      >
-                        {a.kind === "enroll" ? (
-                          <GraduationCap className="size-3.5" aria-hidden />
-                        ) : a.kind === "lesson" ? (
-                          <BadgeCheck className="size-3.5" aria-hidden />
-                        ) : (
-                          <Wallet className="size-3.5" aria-hidden />
-                        )}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-[12.5px] font-medium">
-                          {a.course ? (
-                            <Link href={`/courses/${a.course.slug}`} className="hover:text-primary">
-                              <LocalizedText text={a.course.title} />
-                            </Link>
-                          ) : (
-                            "Course"
-                          )}
-                        </p>
-                        <p className="text-[11.5px] text-zinc-400">
-                          <LocalizedText text={a.text} /> · <LocalizedText text={timeAgo(a.at)} />
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="mt-4 border-t border-border pt-3 text-[11px] text-zinc-400"><LocalizedText text={"Activity is simulated locally on this device."} /></p>
-            </section>
-          </div>
-
-          {/* Achievements */}
-          <section className="mt-6 rounded-xl border border-border bg-white p-5 shadow-card">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Milestones"} /></h2>
-              <Badge variant="secondary"><LocalizedText text={"Simulated"} /></Badge>
-            </div>
-            <ul className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-6 sm:gap-3">
-              {achievements.map((a) => (
-                <li
-                  key={a.id}
-                  className={cn(
-                    "flex flex-col items-center gap-2 rounded-xl border p-2.5 text-center transition-colors sm:p-3.5",
-                    a.earned ? "border-violet-200 bg-accent" : "border-border bg-muted/40 opacity-60"
                   )}
-                >
-                  <span
-                    className={cn(
-                      "flex size-9 items-center justify-center rounded-full",
-                      a.earned ? "bg-primary text-white shadow-sm" : "bg-white text-zinc-300 shadow-card border border-border"
-                    )}
-                  >
-                    {a.earned ? <a.icon className="size-4.5" aria-hidden /> : <Lock className="size-4" aria-hidden />}
-                  </span>
-                  <span className={cn("text-[11px] leading-tight font-medium", a.earned ? "text-accent-foreground" : "text-zinc-400")}>
-                    <LocalizedText text={a.label} />
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold">{enrollment.course.title}</p>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      {enrollment.course.creatorName} · {enrollment.totalLessons} lessons
+                    </p>
+                    <ProgressBar className="mt-2.5" percent={enrollment.progressPercent} />
+                    <p className="mt-1.5 text-[11.5px] text-zinc-400">
+                      {enrollment.completedCount} of {enrollment.totalLessons} lessons complete
+                    </p>
+                  </div>
+                  <Button asChild size="sm" className="shrink-0 self-center">
+                    <Link href={`/learn/${enrollment.course.id}`}>
+                      <PlayCircle className="size-4" aria-hidden /> Resume
+                    </Link>
+                  </Button>
                 </li>
               ))}
             </ul>
-          </section>
-
-          {/* Recommended */}
-          <section className="mt-8">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold"><LocalizedText text={"Recommended AI courses"} /></h2>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {recommended.map((c) => (
-                <CourseCard key={c.id} course={c} />
-              ))}
-            </div>
-          </section>
-
-          {/* Recently viewed */}
-          {recentCourses.length > 0 && (
-            <section className="mt-10">
-              <h2 className="font-display mb-4 text-lg font-semibold"><LocalizedText text={"Recently viewed"} /></h2>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {recentCourses.map((c) => (
-                  <CourseCard key={c.id} course={c} />
-                ))}
-              </div>
-            </section>
           )}
-        </>
-      )}
+        </section>
+
+        <div className="space-y-4">
+          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+            <h2 className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-tight">
+              <Sparkles className="size-4 text-primary" aria-hidden /> Recently viewed
+            </h2>
+            {recentViews.length === 0 ? (
+              <p className="mt-3 text-[13px] text-muted-foreground">
+                Courses you open are listed here so you can come back to them.
+              </p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {recentViews.slice(0, 5).map((view) => (
+                  <li key={view.course.id}>
+                    <Link href={`/courses/${view.course.slug}`} className="group block">
+                      <p className="truncate text-[13.5px] font-medium group-hover:underline">
+                        {view.course.title}
+                      </p>
+                      <p className="mt-0.5 text-[11.5px] text-zinc-400">{timeAgo(view.viewedAt)}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+            <h2 className="font-display text-[15px] font-semibold tracking-tight">Wishlist</h2>
+            {wishlist.length === 0 ? (
+              <p className="mt-3 text-[13px] text-muted-foreground">
+                Your wishlist is empty. Bookmark a course to save it here.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {wishlist.slice(0, 5).map((course) => (
+                  <li key={course.id}>
+                    <Link href={`/courses/${course.slug}`} className="text-[13px] font-medium hover:underline">
+                      {course.title}
+                    </Link>
+                    <span className="ml-2 text-[12px] text-muted-foreground tabular-nums">
+                      {course.pricePaise === 0 ? "Free" : formatInr(course.pricePaise)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

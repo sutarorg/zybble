@@ -1,200 +1,120 @@
-"use client";
-
-import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
-import * as React from "react";
-import { useMemo, useState } from "react";
-import {
-  Ban,
-  Check,
-  CircleAlert,
-  Clock3,
-  Landmark,
-  Wallet,
-} from "lucide-react";
-import type { AdminPayout } from "@/types";
-import { useAdmin } from "@/components/providers/admin-provider";
-import { formatDate } from "@/lib/format";
-import { money, moneyExact } from "@/lib/creator";
-import { StatCard } from "@/components/creator/stat-card";
-import { ActionButton } from "@/components/admin/action-button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Landmark, Download } from "lucide-react";
+import { getAdminTransfers } from "@/lib/server/admin";
+import { money } from "@/lib/admin";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { INSTRUCTORS } from "@/data/mock-data";
-import { cn } from "@/lib/utils";
+import { ExportTransfersCsv } from "./export-transfers-csv";
 
-function PayoutStatusBadge({ status }: { status: AdminPayout["status"] }) {
-  if (status === "requested") return <Badge variant="amber"><LocalizedText text={"Requested"} /></Badge>;
-  if (status === "approved") return <Badge variant="sky"><LocalizedText text={"Approved"} /></Badge>;
-  if (status === "paid") return <Badge variant="emerald"><LocalizedText text={"Paid"} /></Badge>;
-  return <Badge className="border-red-200 bg-red-50 text-red-600"><LocalizedText text={"Rejected"} /></Badge>;
-}
+export const metadata = { title: "Payouts" };
+export const dynamic = "force-dynamic";
 
-export default function AdminPayoutsPage() {
-  const translateUi = useTranslate();
-  const { hydrated, payouts, setPayoutStatus, settings } = useAdmin();
-  const [statusFilter, setStatusFilter] = useState("all");
+const TONE: Record<string, string> = {
+  processed: "text-emerald-700",
+  queued: "text-amber-700",
+  pending: "text-amber-700",
+  created: "text-amber-700",
+  failed: "text-red-700",
+  reversed: "text-red-700",
+  partially_reversed: "text-orange-700",
+};
 
-  const stats = useMemo(() => {
-    return {
-      requested: payouts.filter((p) => p.status === "requested").reduce((a, p) => a + p.amount, 0),
-      approved: payouts.filter((p) => p.status === "approved").reduce((a, p) => a + p.amount, 0),
-      paidCount: payouts.filter((p) => p.status === "paid").length,
-      paidTotal: payouts.filter((p) => p.status === "paid").reduce((a, p) => a + p.amount, 0),
-    };
-  }, [payouts]);
+export default async function AdminPayoutsPage() {
+  const transfers = await getAdminTransfers();
 
-  const filtered = useMemo(
-    () =>
-      payouts
-        .filter((p) => statusFilter === "all" || p.status === statusFilter)
-        .sort((a, b) => +new Date(b.requestedAt) - +new Date(a.requestedAt)),
-    [payouts, statusFilter]
+  const totals = transfers.reduce(
+    (acc, transfer) => {
+      acc.transferred += transfer.status === "processed" ? transfer.amountPaise : 0;
+      acc.settled += transfer.settlementStatus === "processed" ? transfer.amountPaise : 0;
+      acc.reversed += transfer.reversedPaise;
+      acc.failed += transfer.status === "failed" ? transfer.amountPaise : 0;
+      return acc;
+    },
+    { transferred: 0, settled: 0, reversed: 0, failed: 0 }
   );
-
-  if (!hydrated) return <Skeleton className="h-96 rounded-xl" />;
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase"><LocalizedText text={"Marketplace"} /></p>
-        <h1 className="font-display mt-1.5 text-[26px] font-bold tracking-tight sm:text-3xl"><LocalizedText text={"Payout overview"} /></h1>
-        <p className="mt-1.5 max-w-2xl text-[14px] text-muted-foreground"><LocalizedText text={"Creator payout requests. Approve or reject in this simulation — no real money can move. This portal deliberately does not edit payment credentials."} /></p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Route payouts</h1>
+          <p className="mt-1.5 text-[14px] text-muted-foreground">
+            Every row is a transfer Razorpay actually created through Route. A transfer is only shown as settled
+            once Razorpay reports the settlement.
+          </p>
+        </div>
+        <ExportTransfersCsv transfers={transfers} />
+      </header>
+
+      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Transferred", value: totals.transferred },
+          { label: "Settled by Razorpay", value: totals.settled },
+          { label: "Reversed", value: totals.reversed },
+          { label: "Failed transfers", value: totals.failed },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl border border-border bg-white px-4 py-3 shadow-card">
+            <p className="text-[12px] text-muted-foreground">{item.label}</p>
+            <p className="mt-1 font-display text-[18px] font-bold tabular-nums">{money(item.value)}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard icon={Clock3} label={translateUi("Requested balance")} value={moneyExact(stats.requested)} hint={`${payouts.filter((p) => p.status === "requested").length} awaiting decision`} />
-        <StatCard icon={Check} label={translateUi("Approved (processing)")} value={moneyExact(stats.approved)} hint="clearing in preview days" />
-        <StatCard icon={Wallet} label={translateUi("Paid out (all time)")} value={money(stats.paidTotal)} hint={`${stats.paidCount} payouts`} />
-      </div>
-
-      <div className="flex items-center justify-between">
-        <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Payout requests"} /></h2>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8.5 w-40 text-[12.5px]" aria-label={translateUi("Filter by status")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value="all"><LocalizedText text={"All statuses"} /></SelectItem>
-            <SelectItem value="requested"><LocalizedText text={"Requested"} /></SelectItem>
-            <SelectItem value="approved"><LocalizedText text={"Approved"} /></SelectItem>
-            <SelectItem value="paid"><LocalizedText text={"Paid"} /></SelectItem>
-            <SelectItem value="rejected"><LocalizedText text={"Rejected"} /></SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {filtered.length === 0 ? (
+      {transfers.length === 0 ? (
         <EmptyState
           icon={Landmark}
-          title={translateUi("No payouts in this state")}
-          description={translateUi("When creators request payouts, they appear here for review (simulated).")}
+          title="No Route transfers yet"
+          description="Transfers are created automatically when a paid order is verified through Razorpay. Nothing is simulated here."
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-200 text-left">
-              <thead>
-                <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                  <th className="py-3 pr-4 pl-5"><LocalizedText text={"Creator"} /></th>
-                  <th className="px-4 py-3 text-right"><LocalizedText text={"Requested"} /></th>
-                  <th className="px-4 py-3 text-right"><LocalizedText text={"Eligible balance"} /></th>
-                  <th className="px-4 py-3"><LocalizedText text={"Reference"} /></th>
-                  <th className="px-4 py-3"><LocalizedText text={"Requested"} /></th>
-                  <th className="px-4 py-3"><LocalizedText text={"Status"} /></th>
-                  <th className="py-3 pr-5 pl-4 text-right"><LocalizedText text={"Decision"} /></th>
+        <div className="overflow-x-auto rounded-xl border border-border bg-white shadow-card">
+          <table className="w-full min-w-[900px] text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-border bg-muted/40 text-[12px] text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Transfer</th>
+                <th className="px-4 py-3 font-medium">Creator</th>
+                <th className="px-4 py-3 font-medium">Order</th>
+                <th className="px-4 py-3 text-right font-medium">Amount</th>
+                <th className="px-4 py-3 text-right font-medium">Reversed</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Settlement</th>
+                <th className="px-4 py-3 font-medium">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {transfers.map((transfer) => (
+                <tr key={transfer.transferId}>
+                  <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
+                    {transfer.transferId}
+                    <p className="mt-0.5 text-[10.5px]">{transfer.routeAccountId}</p>
+                  </td>
+                  <td className="px-4 py-3 font-medium">{transfer.creatorName}</td>
+                  <td className="px-4 py-3 font-mono text-[11px]">{transfer.orderPublicId ?? "—"}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{money(transfer.amountPaise)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-red-600">
+                    {transfer.reversedPaise > 0 ? money(transfer.reversedPaise) : "—"}
+                  </td>
+                  <td className={`px-4 py-3 ${TONE[transfer.status] ?? "text-muted-foreground"}`}>{transfer.status}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {transfer.settlementStatus ?? "not reported yet"}
+                    {transfer.settledAt ? (
+                      <span className="block text-[11px]">
+                        {new Date(transfer.settledAt).toLocaleDateString("en-IN")}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {new Date(transfer.createdAt).toLocaleDateString("en-IN")}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => {
-                  const ins = INSTRUCTORS.find((i) => i.id === p.creatorId);
-                  const insufficient = p.amount > p.eligibleBalance;
-                  return (
-                    <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                      <td className="max-w-48 py-3 pr-4 pl-5">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar className="size-8">
-                            <AvatarFallback className={cn("text-[10px]", ins?.avatarColor ?? "bg-zinc-200 text-zinc-600")}>
-                              <LocalizedText text={ins?.initials ?? "??"} />
-                            </AvatarFallback>
-                          </Avatar>
-                          <p className="truncate text-[13px] font-semibold"><LocalizedText text={p.creatorName} /></p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-[13px] font-semibold tabular-nums"><LocalizedText text={moneyExact(p.amount)} /></td>
-                      <td className="px-4 py-3 text-right text-[12.5px] tabular-nums">
-                        <span className={cn(insufficient && "font-medium text-red-600")}>
-                          <LocalizedText text={moneyExact(p.eligibleBalance)} />
-                        </span>
-                        {insufficient && (
-                          <span title={translateUi("Requested amount exceeds eligible balance")}>
-                            <CircleAlert className="ml-1 inline size-3.5 text-red-500" aria-label={translateUi("Exceeds balance")} />
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-[11.5px] text-zinc-500"><LocalizedText text={p.reference} /></td>
-                      <td className="px-4 py-3 text-[12px] whitespace-nowrap text-muted-foreground"><LocalizedText text={formatDate(p.requestedAt)} /></td>
-                      <td className="px-4 py-3"><PayoutStatusBadge status={p.status} /></td>
-                      <td className="py-3 pr-5 pl-4">
-                        <div className="flex items-center justify-end gap-1">
-                          {p.status === "requested" && (
-                            <>
-                              <ActionButton
-                                label={translateUi("Approve")}
-                                icon={Check}
-                                size="sm"
-                                confirmTitle={`Approve ${moneyExact(p.amount)} for ${p.creatorName}?`}
-                                confirmBody="The request moves to “approved/processing” in this preview. No bank transfer is initiated."
-                                confirmLabel="Approve payout"
-                                onAction={() => setPayoutStatus(p.id, "approved")}
-                                toastText="Payout approved (simulated)"
-                              />
-                              <ActionButton
-                                label={translateUi("Reject")}
-                                icon={Ban}
-                                variant="outline"
-                                danger
-                                size="sm"
-                                confirmTitle={`Reject ${moneyExact(p.amount)} for ${p.creatorName}?`}
-                                confirmBody="The request is marked rejected in the mock state. The creator keeps their balance."
-                                confirmLabel="Reject payout"
-                                onAction={() => setPayoutStatus(p.id, "rejected")}
-                                toastText="Payout rejected (simulated)"
-                              />
-                            </>
-                          )}
-                          {p.status === "approved" && (
-                            <ActionButton
-                              label={translateUi("Mark paid")}
-                              icon={Check}
-                              size="sm"
-                              confirmTitle={`Mark ${moneyExact(p.amount)} as paid?`}
-                              confirmBody="Bookkeeping only in this simulation — no real money moves."
-                              confirmLabel="Mark as paid"
-                              onAction={() => setPayoutStatus(p.id, "paid")}
-                              toastText="Payout marked paid (simulated)"
-                            />
-                          )}
-                          {(p.status === "paid" || p.status === "rejected") && (
-                            <span className="text-[11.5px] text-zinc-400">
-                              <LocalizedText text={p.processedAt ? `Resolved ${formatDate(p.processedAt)}` : "Resolved"} />
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] leading-relaxed text-amber-900/80">
-        <span className="font-semibold"><LocalizedText text={"Simulation guardrail:"} /></span><LocalizedText text={"decisions here only relabel mock payouts. Creator payout credentials (from their own Settings) are redacted and never editable from the admin portal."} /></p>
+      <p className="flex items-center gap-2 text-[12px] text-zinc-400">
+        <Download className="size-3.5" aria-hidden /> Exports contain only figures already stored in Postgres, plus
+        the Razorpay ids needed to reconcile against the provider.
+      </p>
     </div>
   );
 }

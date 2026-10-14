@@ -1,20 +1,14 @@
 "use client";
 
-import * as React from "react";
-import type { Category, Course } from "@/types";
-import { coursesByCategory } from "@/lib/courses";
-import { useCommunityCourses } from "@/components/providers/creator-provider";
+import type { Course } from "@/types";
 import { CourseBrowser } from "@/components/courses/course-browser";
 
 /**
- * Client wrapper that merges locally published creator courses into the
- * (server-provided) static category pool before browsing.
+ * Client wrapper around the category browser.
+ *
+ * The pool is passed in from the server, which read it from Supabase under RLS,
+ * so only published courses are ever offered here.
  */
-export function CategoryPool({ categorySlug }: { categorySlug: Category["slug"] | string }) {
-  const community = useCommunityCourses();
-  const pool = React.useMemo(
-    () => [...community.filter((c) => c.category === categorySlug), ...coursesByCategory(categorySlug)],
-    [community, categorySlug]
-  );
+export function CategoryPool({ pool }: { pool: Course[] }) {
   return <CourseBrowser pool={pool} defaultSort="popular" className="mt-8" />;
 }

@@ -1,107 +1,171 @@
 "use client";
 
-import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Banknote, Info, Lock, ShieldCheck } from "lucide-react";
-import type { Course, Order } from "@/types";
-import { getCourseInstructor } from "@/lib/courses";
-import { useApp } from "@/components/providers/app-providers";
+import { ArrowLeft, Info, Lock, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
+import type { Course } from "@/types";
+import { formatInr } from "@/lib/money";
 import { Logo } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 
-const FAIL_CARD = "4000000000000002";
-const COUNTRIES = ["United States", "United Kingdom", "Germany", "France", "Spain", "Portugal", "Brazil", "Nigeria", "India", "Japan", "Australia", "Canada"];
-
-function formatCardNumber(v: string) {
-  return v.replace(/\D/g, "").slice(0, 19).replace(/(\d{4})(?=\d)/g, "$1 ");
+/**
+ * Razorpay Checkout, mounted from the official checkout.js bundle.
+ *
+ * The bundle is loaded from Razorpay's own CDN and is only ever given the
+ * public key id, the order id and a display name. No secret key, no signed
+ * payload and no PII beyond what the checkout form itself asks for is placed in
+ * the browser.
+ */
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, handler: (payload: Record<string, string>) => void) => void;
+    };
+  }
 }
 
-function formatExpiry(v: string) {
-  const digits = v.replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-}
+const RAZORPAY_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
+let scriptPromise: Promise<boolean> | null = null;
 
-export function CheckoutClient({ course }: { course: Course }) {
-  const translateUi = useTranslate();
-  const router = useRouter();
-  const { user, completeOrder, isEnrolled, hydrated } = useApp();
-  const instructor = getCourseInstructor(course);
-  const free = course.price === 0;
+function loadRazorpay(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (window.Razorpay) return Promise.resolve(true);
+  if (scriptPromise) return scriptPromise;
 
-  /* `null` = untouched, so the signed-in user's details prefill the form
-     without an effect once the session hydrates. */
-  const [emailDraft, setEmailDraft] = useState<string | null>(null);
-  const [cardNameDraft, setCardNameDraft] = useState<string | null>(null);
-  const email = emailDraft ?? user?.email ?? "";
-  const cardName = cardNameDraft ?? user?.name ?? "";
-  const setEmail = setEmailDraft;
-  const setCardName = setCardNameDraft;
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
-  const [country, setCountry] = useState("United States");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [processing, setProcessing] = useState(false);
-
-  const enrolled = hydrated && isEnrolled(course.id);
-
-  const buildOrder = (status: Order["status"]): Order => ({
-    id: `zyb_${Math.random().toString(36).slice(2, 10)}`,
-    courseId: course.id,
-    userId: user?.id ?? null,
-    email: email.trim().toLowerCase(),
-    total: course.price,
-    createdAt: new Date().toISOString(),
-    status,
-    cardLast4: free ? "FREE" : cardNumber.replace(/\s/g, "").slice(-4),
-  });
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const next: Record<string, string> = {};
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = "Enter a valid email address.";
-    if (!free) {
-      if (cardName.trim().length < 2) next.cardName = "Enter the name on the card.";
-      const digits = cardNumber.replace(/\s/g, "");
-      if (digits.length < 15) next.cardNumber = "Enter a valid card number.";
-      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) next.expiry = "Use MM/YY.";
-      if (!/^\d{3,4}$/.test(cvc)) next.cvc = "3–4 digits.";
+  scriptPromise = new Promise<boolean>((resolve) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${RAZORPAY_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(Boolean(window.Razorpay)));
+      existing.addEventListener("error", () => resolve(false));
+      return;
     }
-    setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    const script = document.createElement("script");
+    script.src = RAZORPAY_SCRIPT;
+    script.async = true;
+    script.onload = () => resolve(Boolean(window.Razorpay));
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+  return scriptPromise;
+}
 
-    setProcessing(true);
-    window.setTimeout(() => {
-      const failed = !free && cardNumber.replace(/\s/g, "") === FAIL_CARD;
-      if (failed) {
-        completeOrder(buildOrder("failed"));
-        router.push(`/checkout/failed?course=${course.slug}`);
+interface StartCheckoutResponse {
+  orderId: string;
+  publicId: string;
+  amountPaise: number;
+  isFree?: boolean;
+  keyId?: string;
+  checkoutOptions?: Record<string, unknown>;
+  error?: string;
+}
+
+export function CheckoutClient({
+  course,
+  enrolled,
+  checkoutBlocked,
+  buyerEmail,
+  buyerName,
+}: {
+  course: Course;
+  /** Server-confirmed entitlement. */
+  enrolled: boolean;
+  /** Set when Razorpay cannot take this purchase right now. */
+  checkoutBlocked: string | null;
+  buyerEmail: string;
+  buyerName: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  const free = course.pricePaise === 0;
+  const instructor = course.instructor;
+  const compareAt = course.compareAtPaise ?? null;
+
+  async function start() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId: course.id, mode: free ? "free" : "auto" }),
+      });
+      const payload = (await response.json()) as StartCheckoutResponse;
+
+      if (!response.ok) {
+        toast.error(payload.error ?? "Checkout is unavailable");
+        setBusy(false);
         return;
       }
-      const order = buildOrder("paid");
-      completeOrder(order);
-      router.push(`/checkout/success?order=${order.id}&course=${course.slug}`);
-    }, 1600);
-  };
+
+      // Free courses are authorised entirely on the server and are already
+      // settled — there is nothing for Razorpay to do.
+      if (free || payload.isFree || !payload.keyId || !payload.checkoutOptions) {
+        router.push(`/checkout/success?order=${encodeURIComponent(payload.publicId)}`);
+        return;
+      }
+
+      const loaded = await loadRazorpay();
+      if (!loaded || !window.Razorpay) {
+        toast.error("Razorpay Checkout could not be loaded. Check your connection.");
+        setBusy(false);
+        return;
+      }
+
+      const razorpay = new window.Razorpay({
+        ...payload.checkoutOptions,
+        key: payload.keyId,
+        modal: {
+          ondismiss: () => {
+            setBusy(false);
+            router.push(`/checkout/failed?course=${course.slug}&reason=dismissed`);
+          },
+        },
+        handler: async (result: Record<string, string>) => {
+          try {
+            const confirmation = await fetch("/api/checkout", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                publicOrderId: payload.publicId,
+                razorpayOrderId: String(result.razorpay_order_id ?? ""),
+                razorpayPaymentId: String(result.razorpay_payment_id ?? ""),
+                razorpaySignature: String(result.razorpay_signature ?? ""),
+              }),
+            });
+            const confirmed = (await confirmation.json()) as { status?: string; error?: string };
+            if (!confirmation.ok || confirmed.status !== "paid") {
+              toast.error(confirmed.error ?? "We could not verify the payment yet");
+              router.push(`/checkout/failed?course=${course.slug}&reason=verification`);
+              return;
+            }
+            router.push(`/checkout/success?order=${encodeURIComponent(payload.publicId)}`);
+          } catch {
+            toast.error("We could not verify the payment yet. Email support if this persists.");
+            router.push(`/checkout/failed?course=${course.slug}&reason=verification`);
+          }
+        },
+      });
+
+      razorpay.open();
+    } catch {
+      toast.error("Checkout is temporarily unavailable. Please try again.");
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="min-h-dvh bg-muted/40">
-      {/* Minimal checkout chrome */}
       <header className="sticky top-0 z-20 border-b border-border bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Logo />
-          <p className="hidden items-center gap-1.5 text-[13px] text-muted-foreground sm:flex">
-            <Lock className="size-3.5 text-success" aria-hidden /><LocalizedText text={"Secure checkout"} /></p>
-          <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700"><LocalizedText text={"No real payment is processed"} /></span>
+          <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+            <Lock className="size-3.5 text-success" aria-hidden /> Secure checkout · Razorpay
+          </p>
         </div>
       </header>
 
@@ -110,194 +174,106 @@ export function CheckoutClient({ course }: { course: Course }) {
           href={`/courses/${course.slug}`}
           className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
-          <ArrowLeft className="size-4" aria-hidden /><LocalizedText text={"Back to course"} /></Link>
+          <ArrowLeft className="size-4" aria-hidden /> Back to course
+        </Link>
 
         {enrolled ? (
           <div className="mx-auto mt-10 max-w-md rounded-2xl border border-border bg-white p-8 text-center shadow-card">
             <ShieldCheck className="mx-auto size-10 text-success" aria-hidden />
-            <h1 className="font-display mt-4 text-xl font-bold tracking-tight"><LocalizedText text={"You already own this course"} /></h1>
-            <p className="mt-2 text-[14px] text-muted-foreground">
-              “<LocalizedText text={course.title} /><LocalizedText text={"” is in your library. Time to keep learning."} /></p>
+            <h1 className="font-display mt-4 text-xl font-bold tracking-tight">You already own this course</h1>
+            <p className="mt-2 text-[14px] text-muted-foreground">{course.title} is in your library.</p>
             <Button asChild size="lg" className="mt-6 w-full">
-              <Link href="/my-learning"><LocalizedText text={"Go to My Learning"} /></Link>
+              <Link href="/my-learning">Go to my learning</Link>
             </Button>
           </div>
         ) : (
           <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
-            {/* Payment form */}
             <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight"><LocalizedText text={"Checkout"} /></h1>
-              <p className="mt-1 text-[14px] text-muted-foreground"><LocalizedText text={"Enroll in"} /><span className="font-medium text-foreground"><LocalizedText text={course.title} /></span>
+              <h1 className="font-display text-2xl font-bold tracking-tight">Checkout</h1>
+              <p className="mt-1 text-[14px] text-muted-foreground">
+                Enrolling in <span className="font-medium text-foreground">{course.title}</span>
               </p>
 
-              <form onSubmit={submit} noValidate className="mt-6 space-y-6">
+              <div className="mt-6 space-y-6">
                 <section className="rounded-xl border border-border bg-white p-5 sm:p-6">
-                  <h2 className="font-display text-[15px] font-semibold"><LocalizedText text={"Contact"} /></h2>
-                  <div className="mt-4 space-y-1.5">
-                    <Label htmlFor="ck-email"><LocalizedText text={"Email for course access"} /></Label>
-                    <Input
-                      id="ck-email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder={translateUi("you@example.com")}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      aria-invalid={!!errors.email}
-                    />
-                    {errors.email && <p className="text-[12px] text-destructive"><LocalizedText text={errors.email} /></p>}
-                  </div>
+                  <h2 className="font-display text-[15px] font-semibold">Who is buying</h2>
+                  <p className="mt-2 text-[13.5px] text-muted-foreground">
+                    Receipts, course access and account notices go to{" "}
+                    <span className="font-medium text-foreground">{buyerEmail}</span>
+                    {buyerName ? ` (${buyerName})` : ""}. Change it in{" "}
+                    <Link href="/settings" className="font-medium text-primary hover:underline">
+                      settings
+                    </Link>
+                    .
+                  </p>
                 </section>
 
-                {!free && (
-                  <section className="rounded-xl border border-border bg-white p-5 sm:p-6">
-                    <div className="flex items-center justify-between">
-                      <h2 className="font-display text-[15px] font-semibold"><LocalizedText text={"Payment"} /></h2>
-                      <div className="flex gap-1.5" aria-hidden>
-                        {["VISA", "MC", "AMEX"].map((b) => (
-                          <span key={b} className="rounded border border-border bg-muted px-1.5 py-0.5 text-[9.5px] font-bold text-zinc-500">
-                            <LocalizedText text={b} />
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="mt-4 space-y-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="ck-name"><LocalizedText text={"Name on card"} /></Label>
-                        <Input
-                          id="ck-name"
-                          autoComplete="cc-name"
-                          placeholder={translateUi("Jordan Ellis")}
-                          value={cardName}
-                          onChange={(e) => setCardName(e.target.value)}
-                          aria-invalid={!!errors.cardName}
-                        />
-                        {errors.cardName && <p className="text-[12px] text-destructive"><LocalizedText text={errors.cardName} /></p>}
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="ck-number"><LocalizedText text={"Card number"} /></Label>
-                        <Input
-                          id="ck-number"
-                          inputMode="numeric"
-                          autoComplete="cc-number"
-                          placeholder={translateUi("4242 4242 4242 4242")}
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                          aria-invalid={!!errors.cardNumber}
-                        />
-                        {errors.cardNumber && <p className="text-[12px] text-destructive"><LocalizedText text={errors.cardNumber} /></p>}
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="ck-exp"><LocalizedText text={"Expiry"} /></Label>
-                          <Input
-                            id="ck-exp"
-                            inputMode="numeric"
-                            autoComplete="cc-exp"
-                            placeholder={translateUi("MM/YY")}
-                            value={expiry}
-                            onChange={(e) => setExpiry(formatExpiry(e.target.value))}
-                            aria-invalid={!!errors.expiry}
-                          />
-                          {errors.expiry && <p className="text-[12px] text-destructive"><LocalizedText text={errors.expiry} /></p>}
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="ck-cvc"><LocalizedText text={"CVC"} /></Label>
-                          <Input
-                            id="ck-cvc"
-                            inputMode="numeric"
-                            autoComplete="cc-csc"
-                            placeholder={translateUi("123")}
-                            value={cvc}
-                            onChange={(e) => setCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                            aria-invalid={!!errors.cvc}
-                          />
-                          {errors.cvc && <p className="text-[12px] text-destructive"><LocalizedText text={errors.cvc} /></p>}
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="ck-country"><LocalizedText text={"Country"} /></Label>
-                        <Select value={country} onValueChange={setCountry}>
-                          <SelectTrigger id="ck-country">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {COUNTRIES.map((c) => (
-                              <SelectItem key={c} value={c}>
-                                <LocalizedText text={c} />
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                <section className="rounded-xl border border-border bg-white p-5 sm:p-6">
+                  <h2 className="font-display text-[15px] font-semibold">Payment</h2>
+                  <p className="mt-2 text-[13.5px] text-muted-foreground">
+                    {free
+                      ? "This course is free. Enrolling creates a real entitlement on your account immediately — no payment provider is involved."
+                      : "Razorpay Checkout opens next. It accepts UPI, cards, netbanking, wallets and EMI as configured on your Razorpay account. Zybble never sees or stores your card or UPI credentials."}
+                  </p>
+                </section>
 
-                      <div className="flex items-start gap-2.5 rounded-lg border border-violet-200 bg-accent p-3">
-                        <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                        <p className="text-[12px] leading-relaxed text-violet-950/70"><LocalizedText text={"Test cards: any formatted number succeeds — except"} /><LocalizedText text={" "} />
-                          <code className="rounded bg-white px-1 font-mono text-[11px] text-violet-900">
-                            4000 0000 0000 0002
-                          </code><LocalizedText text={", which simulates a decline."} /></p>
-                      </div>
-                    </div>
-                  </section>
+                {checkoutBlocked && !free ? (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+                    {checkoutBlocked}
+                  </p>
+                ) : (
+                  <Button size="lg" className="w-full sm:w-auto" loading={busy} onClick={() => void start()}>
+                    {free ? "Complete free enrollment" : `Pay ${formatInr(course.pricePaise)}`}
+                  </Button>
                 )}
 
-                <Button type="submit" size="lg" className="w-full sm:w-auto" loading={processing}>
-                  {<LocalizedText text={processing
-                    ? "Processing…"
-                    : free
-                      ? "Complete free enrollment"
-                      : `Pay $${course.price.toFixed(2)}`} />}
-                </Button>
-                <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                  <Lock className="size-3.5" aria-hidden /><LocalizedText text={"This is a simulated checkout. No payment is processed and no card data leaves your browser."} /></p>
-              </form>
+                <div className="flex items-start gap-2.5 rounded-lg border border-border bg-white p-3">
+                  <Info className="mt-0.5 size-4 shrink-0 text-zinc-400" aria-hidden />
+                  <p className="text-[12px] leading-relaxed text-muted-foreground">
+                    Access is granted only after Razorpay confirms the payment was captured — never because you reached
+                    the success page. Zybble publishes no refund policy; if a payment is reversed by your bank or by
+                    Razorpay, the ledger is corrected automatically and access ends.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Order summary */}
             <aside className="h-fit lg:sticky lg:top-24">
               <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
                 <div className="relative aspect-video w-full bg-muted">
-                  <Image
-                    src={course.thumbnail}
-                    alt={translateUi(course.title)}
-                    fill
-                    sizes="380px"
-                    className="object-cover"
-                  />
+                  {course.thumbnail ? (
+                    <Image src={course.thumbnail} alt="" fill sizes="380px" className="object-cover" />
+                  ) : null}
                 </div>
                 <div className="p-5">
-                  <h2 className="font-display text-[15px] leading-snug font-semibold tracking-tight">
-                    <LocalizedText text={course.title} />
-                  </h2>
-                  <p className="mt-1 text-[12.5px] text-muted-foreground"><LocalizedText text={"by"} /><LocalizedText text={instructor.name} /></p>
+                  <h2 className="font-display text-[15px] leading-snug font-semibold tracking-tight">{course.title}</h2>
+                  {instructor ? (
+                    <p className="mt-1 text-[12.5px] text-muted-foreground">by {instructor.name}</p>
+                  ) : null}
 
                   <Separator className="my-4" />
 
                   <dl className="space-y-2 text-[13.5px]">
                     <div className="flex justify-between">
-                      <dt className="text-muted-foreground"><LocalizedText text={"Price"} /></dt>
-                      <dd className="tabular-nums">
-                        <LocalizedText text={free ? "Free" : `$${(course.compareAtPrice ?? course.price).toFixed(2)}`} />
-                      </dd>
+                      <dt className="text-muted-foreground">Course price</dt>
+                      <dd className="tabular-nums">{free ? "Free" : formatInr(compareAt && compareAt > course.pricePaise ? compareAt : course.pricePaise)}</dd>
                     </div>
-                    {course.compareAtPrice && !free && (
+                    {compareAt && compareAt > course.pricePaise && !free ? (
                       <div className="flex justify-between text-success">
-                        <dt><LocalizedText text={"Discount"} /></dt>
-                        <dd className="tabular-nums">
-                          −$<LocalizedText text={(course.compareAtPrice - course.price).toFixed(2)} />
-                        </dd>
+                        <dt>Discount</dt>
+                        <dd className="tabular-nums">−{formatInr(compareAt - course.pricePaise)}</dd>
                       </div>
-                    )}
+                    ) : null}
                     <div className="flex justify-between border-t border-border pt-2.5 font-semibold">
-                      <dt><LocalizedText text={"Total"} /></dt>
-                      <dd className="font-display text-[16px] tabular-nums">
-                        <LocalizedText text={free ? "Free" : `$${course.price.toFixed(2)}`} />
-                      </dd>
+                      <dt>Total payable</dt>
+                      <dd className="font-display text-[16px] tabular-nums">{free ? "Free" : formatInr(course.pricePaise)}</dd>
                     </div>
                   </dl>
 
-                  <p className="mt-2 flex items-center gap-2 text-[12px] text-muted-foreground">
-                    <Banknote className="size-4 shrink-0 text-zinc-400" aria-hidden /><LocalizedText text={"Taxes included. Charged in USD ."} /></p>
+                  <p className="mt-3 text-[11.5px] text-zinc-400">
+                    Amounts are in Indian Rupees. Zybble publishes no refund policy and does not invent tax treatment —
+                    your receipt is the Razorpay payment record.
+                  </p>
                 </div>
               </div>
             </aside>

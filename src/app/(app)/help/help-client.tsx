@@ -29,16 +29,16 @@ const FAQ_GROUPS = [
 ];
 
 const FAQS: Faq[] = [
-  { group: "courses", q: "How do Zybble courses work?", a: "Courses are self-paced and project-based. You get lifetime access to all video lessons, downloadable resources and quizzes. Progress syncs on your device in this preview." },
-  { group: "courses", q: "Do I get a certificate?", a: "Yes. The moment you mark the last lesson complete, Zybble issues a personalised certificate with the course title, your name, your instructor and a certificate ID. Preview it in the completion dialog, download it as a PNG, and re-open it any time from Certificates." },
-  { group: "courses", q: "Are courses updated?", a: "Continuously. AI tools change fast, so instructors refresh lessons monthly. The 'last updated' date on every course page shows the latest revision." },
-  { group: "courses", q: "Can I download lessons for offline viewing?", a: "Lessons marked with a download icon include offline resources like templates, checklists and code. Video downloads depend on each instructor's settings." },
-  { group: "billing", q: "What payment methods do you accept?", a: "In this preview, checkout is fully simulated — no real payment is processed. The production platform would support major cards, PayPal and regional methods." },
-  { group: "billing", q: "Why did my payment fail?", a: "In the preview, the test card 4000 0000 0000 0002 always simulates a decline so you can preview the failure flow. Any other formatted card number succeeds." },
-  { group: "account", q: "Where do I find my certificates?", a: "Open Certificates in the sidebar. Every finished course is listed there with a download button — and you can regenerate the PNG as often as you like." },
-  { group: "account", q: "Is the certificate verified?", a: "Each certificate carries a unique certificate ID and the issue date. In production, that code would resolve to a public verification page." },
-  { group: "account", q: "Where is my data stored?", a: "In this frontend preview, everything (sign-in, wishlist, enrollments, progress) lives in your browser's localStorage. Clearing site data resets the preview." },
-  { group: "account", q: "How do I change the interface language?", a: "Use the globe icon in the header. Your preference is saved on this device. Course captions are listed on each course page." },
+  { group: "courses", q: "How do Zybble courses work?", a: "Courses are self-paced. You get access to every video lesson, downloadable resource and quiz that the creator published. Your progress is stored on your Zybble account, so it follows you between devices." },
+  { group: "courses", q: "Do I get a certificate?", a: "When you complete every lesson of a course, Zybble issues a certificate with the course title, your name and a verification code. You can view it any time from Certificates." },
+  { group: "courses", q: "Can I try a course before buying it?", a: "Creators can mark lessons as free previews. You can watch those without buying the course." },
+  { group: "courses", q: "Where is my data stored?", a: "In your Zybble account, which is backed by PostgreSQL with row-level security. Your progress, orders and certificates are tied to your verified account, not to a single browser." },
+  { group: "billing", q: "What payment methods do you accept?", a: "Razorpay Checkout, which supports UPI, cards and netbanking for Indian customers. Zybble is an India-only marketplace and prices everything in Indian Rupees." },
+  { group: "billing", q: "Who receives the money?", a: "When you buy a paid course, Razorpay Route splits the payment between the creator's own verified bank account and Zybble's commission. The split is recorded on your order before you pay." },
+  { group: "billing", q: "Can I get a refund?", a: "Zybble does not publish a refund policy, so there is no self-service refund flow. If something has gone wrong, contact support and we will look at it case by case." },
+  { group: "account", q: "Where do I find my certificates?", a: "Open Certificates in the sidebar. Each certificate carries a verification code." },
+  { group: "account", q: "How do I change the interface language?", a: "Use the globe icon in the header. Zybble supports English, Spanish, Portuguese, French, German and Japanese. Prices always stay in rupees." },
+  { group: "account", q: "How do I become a creator?", a: "Open Creator Studio from the sidebar and complete the profile step. You keep your learner account, purchases and progress." },
 ];
 
 export function HelpClient() {

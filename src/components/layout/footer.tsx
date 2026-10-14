@@ -3,7 +3,7 @@
 import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { ZybbleMark } from "@/components/layout/logo";
-import { CATEGORIES } from "@/data/mock-data";
+import { CATEGORIES } from "@/lib/config/catalog";
 import { getDictionary } from "@/lib/i18n";
 import { useApp } from "@/components/providers/app-providers";
 

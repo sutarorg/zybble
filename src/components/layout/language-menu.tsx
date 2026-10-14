@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LANGUAGES } from "@/data/mock-data";
+import { LANGUAGES } from "@/lib/config/catalog";
 import { useApp } from "@/components/providers/app-providers";
 import { getDictionary } from "@/lib/i18n";
 
