@@ -126,9 +126,10 @@ Honest accounting of what passed, on this branch:
 | `npx tsc --noEmit` | **0 errors** across the whole repository |
 | `npm run lint` (ESLint, incl. the React Compiler rules) | **0 errors, 0 warnings** |
 | `npm run build` (Next.js 16 production build) | **Succeeded**; all routes compile |
-| `npm run test:unit` (money + AI contract) | **23/23 passing** |
+| `npm run test:unit` (4 suites) | **76/76 passing** — 12 money · 11 chatbot · 21 security · 32 RLS/authorization |
 | Client-bundle secret scan | No server secret is referenced from any `"use client"` module |
 | Currency scan | No USD, EUR, GBP or PayPal reference remains in `src/` |
+| Mutation check of `tests/rls.mjs` | Fifteen deliberate regressions injected (including restoring the exact Route-identifier leak this branch fixed); **all fifteen were caught**, and the suite returned to 32/32 on restore |
 
 That is a compile-time and unit-test guarantee only. It is **not** a claim that
 the product works against Supabase, Razorpay, Bunny, R2, Resend or OpenRouter.
@@ -139,27 +140,94 @@ the product works against Supabase, Razorpay, Bunny, R2, Resend or OpenRouter.
 
 These are real holes, not oversights:
 
-1. **No database/RLS integration test.** Needs a live (or ephemeral) Postgres.
-   Every policy in `supabase/migrations/*_rls.sql` should be tested as three
-   roles: anonymous, learner A, learner B. Learner B must never read learner A's
-   orders, notes, progress, entitlements or wishlist.
-2. **No authorization test for server actions.** `src/app/(learner)/actions.ts`,
-   `src/app/creator/actions.ts` and `src/app/admin/actions.ts` re-check the
-   session server-side, but no automated test asserts that a learner calling a
-   creator action, or a creator calling an admin action, is rejected.
+1. **No live database/RLS integration test.** This is now the *most important*
+   open gap, because static analysis already found two defects it could not have
+   missed (below). `tests/rls.mjs` proves the SQL has the *shape* of correct
+   authorization; it cannot prove a policy returns the right rows. It needs a
+   live or ephemeral Postgres with the migrations applied, exercised as three
+   sessions: **anonymous**, **learner A**, **learner B**. Learner B must never
+   read or write learner A's orders, notes, progress, entitlements, wishlist or
+   resume state, and neither must be able to write `profiles.role`. The
+   anonymous session must also be confirmed to return **zero columns** for
+   `creator_profiles` — including `route_account_id` — and to see only the
+   curated columns through `creator_public_profiles`.
+   Until that runs, the RLS layer is *unverified*, not *verified*.
+2. **No authorization test that actually executes a server action.** The static
+   suite in `tests/rls.mjs` asserts that each action calls a session guard and
+   that the guard precedes the first write, and that every course mutation calls
+   `assertOwnsCourse`. It does not prove that a learner *calling* a creator
+   action is actually rejected at runtime. That needs a test harness with three
+   real sessions.
 3. **No webhook replay/ordering test.** Razorpay does not guarantee event order;
    `applyWebhookEvent` must be shown to converge regardless of arrival order.
-4. **No upload test.** Malicious content types, oversize files, path traversal in
-   file names, and cross-course key access are all unexercised.
+4. **No upload test against the real providers.** `tests/security.mjs` exercises
+   the validation and key-construction functions directly. It has not exercised
+   a real TUS upload, a real R2 multipart upload, or a real protected download.
 5. **The E2E walkthrough is stale.** `tests/walkthrough.mjs` drives the old demo
    (localStorage accounts, a fake checkout). It must be rewritten against seeded
    test data before it can be trusted.
 6. **No live Razorpay test-mode run.** The full path — create order, pay,
    capture, webhook, entitlement, Route transfer, reconciliation — has never
    executed end to end.
+7. **No live Razorpay Route transfer or settlement.** Transfer creation,
+   reversal and settlement states have only been reasoned about.
 
 Test fixtures must stay isolated from production data. No live credentials may
 appear in CI.
+
+---
+
+## 6a. Two security defects found by static review — fixed here, but it shows the gap is real
+
+`tests/rls.mjs` was written to assert grant/policy parity and immediately failed
+on eight tables that were granted to `authenticated` while RLS was globally
+enabled **with no policies at all**. Postgres resolves that to *deny* — the grant
+is meaningless without a policy — so applying the migrations would have made
+entitlements, progress, notes, resume state, wishlist, preferences, recent views
+and notifications silently return nothing for every learner, with no error
+anywhere to explain why.
+
+Fixed in `supabase/migrations/20260101000500_learner_rls_policies.sql` with
+`user_id = auth.uid()` owner policies. Entitlements and notifications remain
+**select/update only**, so a browser can read and dismiss its own rows but cannot
+mint a paid entitlement or fabricate a notification.
+
+The same review then found a **live data leak**. `creator_profiles` holds both a
+creator's public profile *and* their Razorpay Route onboarding state. It was
+granted `select` to `anon` with a `using (true)` policy — and because RLS
+filters rows rather than columns, anonymous visitors could enumerate
+`route_account_id`, `route_settlement_verified` and `route_error` for **every
+creator in the marketplace**. `route_account_id` is a live Razorpay
+linked-account identifier tied to a real, KYC'd entity. Nothing in the UI ever
+needed it publicly; it was exposed because the grant was written for the
+*public* half of the row and RLS cannot separate the two halves.
+
+Fixed by splitting the read path: `anon` has **no grant** on `creator_profiles`,
+`authenticated` may read only its own row, and public fields are served from a
+new `creator_public_profiles` view (`security_invoker = false`, granted to
+`anon`) — the same pattern already used for `published_courses`. The instructor
+page, catalogue search and creator count were moved to the view.
+
+Three smaller findings from the same pass, all fixed:
+
+- `published_courses` — readable by `anon`, exempt from RLS — was exposing the
+  creator's internal `user_id`. Removed; nothing read it.
+- The privilege-escalation guard on `profiles.role` had only one of the two
+  layers its own comment claimed. The column-level `revoke` is now present
+  alongside the trigger.
+- `getRouteOnboardingState()` persisted a freshly verified Razorpay status
+  through a **session** client, whose `update` the grants already block — so
+  verified provider state was silently never saved. Now written through the
+  service role. It is still untestable without Razorpay credentials (item 6/7
+  above), which is exactly why it went unnoticed.
+
+**The point for launch purposes:** the first defect is invisible until the
+migrations are applied to a real database and a real user tries to use the
+product. The second was invisible until someone read the grants carefully — the
+app worked fine, and the catalogue rendered correctly. Static review found both
+by luck of coverage. Any *other* unpolicied table or over-broad grant added later
+would still get through. That is why item 1 above is a blocker and not a
+nice-to-have.
 
 ---
 

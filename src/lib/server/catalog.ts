@@ -287,8 +287,11 @@ export const getPublishedReviews = cache(async (courseId: string): Promise<Revie
 export const getInstructorByUsername = cache(async (username: string) => {
   if (!isSupabaseConfigured()) return null;
   const supabase = await createServerClient();
+  // `creator_public_profiles`, not `creator_profiles`. The table also holds the
+  // creator's Razorpay Route account identifier, which must stay private; this
+  // view is the public half and is readable by signed-out visitors.
   const { data } = await supabase
-    .from("creator_profiles")
+    .from("creator_public_profiles")
     .select("user_id, username, display_name, headline, bio, avatar_key, country_code, languages, created_at")
     .eq("username", username)
     .maybeSingle();
@@ -320,7 +323,10 @@ export const marketplaceStats = cache(async () => {
   const [courses, lessons, instructors] = await Promise.all([
     supabase.from("courses").select("id, students_count", { count: "exact", head: true }).eq("status", "published"),
     supabase.from("lessons").select("id", { count: "exact", head: true }),
-    supabase.from("creator_profiles").select("user_id", { count: "exact", head: true }),
+    // Counted through the public view: `creator_profiles` itself is not readable
+    // by anonymous sessions any more, and an authenticated session may only see
+    // its own row, so either table would report "1".
+    supabase.from("creator_public_profiles").select("user_id", { count: "exact", head: true }),
   ]);
   const { data: rows } = await supabase
     .from("courses")

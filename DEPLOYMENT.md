@@ -72,17 +72,37 @@ supabase link --project-ref <project-ref>
 supabase db push
 ```
 
-Four migrations, in order:
+Five migrations, in order:
 
 | File | Contents |
 | --- | --- |
 | `20260101000100_extensions_and_enums.sql` | extensions, enums, `assert_inr()` |
 | `20260101000200_schema.sql` | every table, index and constraint |
-| `20260101000300_rls.sql` | row-level security, grants, triggers |
+| `20260101000300_rls.sql` | row-level security, grants, triggers, `published_courses` view |
 | `20260101000400_seed_configuration.sql` | **categories only** |
+| `20260101000500_learner_rls_policies.sql` | owner-scoped policies for the eight learner-owned tables |
+
+The fifth migration is **not optional**. `20260101000300_rls.sql` grants those
+tables to `authenticated` while enabling RLS globally, but originally shipped no
+policies for them. Postgres treats *granted + RLS enabled + no matching policy*
+as **deny**, so without migration 5 the application runs without errors and every
+learner silently sees an empty wishlist, no progress, no notes, no resume
+position and no entitlements.
+
+`npm run test:rls` asserts grant/policy parity so this cannot silently recur: if
+you add a table to the grants without giving it a policy, the suite fails.
 
 The seed deliberately contains **categories and nothing else** — no courses, no
 users, no reviews. Shipping demo business records would mean shipping fake ones.
+
+**After applying, verify against a real database.** Static checks cannot prove
+RLS behaviour. With migrations applied, open three sessions and confirm: an
+anonymous session cannot read any learner row; a learner session cannot read
+another learner's entitlements, notes or progress; neither can write
+`profiles.role`; and an anonymous session gets **no columns at all** from
+`creator_profiles` — the Razorpay `route_account_id` in particular must not be
+reachable. This three-session check is an unclosed launch blocker —
+`LAUNCH_BLOCKERS.md` §6.
 
 ### 3.4 Promote the first admin
 

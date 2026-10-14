@@ -8,7 +8,7 @@
 
 import "server-only";
 import { cache } from "react";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerClient, createServiceClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { requireCreator, requireSession, AuthorizationError } from "@/lib/server/session";
 import { formatCommissionPercent } from "@/lib/money";
@@ -464,15 +464,23 @@ export async function getRouteOnboardingState(): Promise<RouteOnboardingState> {
     const statuses = await fetchLinkedAccountStatuses([accountId]);
     const live = statuses[accountId];
     if (live && live.status !== "unreachable") {
-      await supabase
-        .from("creator_profiles")
-        .update({
-          route_account_status: live.status,
-          route_settlement_verified: live.status === "active",
-          route_last_checked_at: new Date().toISOString(),
-          route_error: null,
-        })
-        .eq("user_id", session.id);
+      // Persisted through the service role, not the caller's session. Route
+      // fields are provider-owned and `revoke update on creator_profiles from
+      // authenticated` means a session client cannot write them — the previous
+      // session-client write here was silently rejected, so verified provider
+      // state was never actually stored.
+      const service = createServiceClient();
+      if (service) {
+        await service
+          .from("creator_profiles")
+          .update({
+            route_account_status: live.status,
+            route_settlement_verified: live.status === "active",
+            route_last_checked_at: new Date().toISOString(),
+            route_error: null,
+          })
+          .eq("user_id", session.id);
+      }
       return {
         hasAccount: true,
         accountId,

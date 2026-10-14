@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       .or(`title.ilike.${like},description.ilike.${like}`)
       .limit(6),
     supabase
-      .from("creator_profiles")
+      .from("creator_public_profiles")
       .select("user_id, username, display_name, headline")
       .or(`display_name.ilike.${like},headline.ilike.${like}`)
       .limit(3),

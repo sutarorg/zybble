@@ -33,7 +33,7 @@ grant  select on public.courses to anon, authenticated;
 grant  select on public.course_sections to anon, authenticated;
 grant  select on public.lessons to anon, authenticated;
 grant  select on public.reviews to anon, authenticated;
-grant  select on public.creator_profiles to anon, authenticated;
+grant  select on public.creator_profiles to authenticated;
 
 grant  select, insert, update, delete on public.entitlements to authenticated;
 grant  select, insert, update, delete on public.wishlist to authenticated;
@@ -128,11 +128,25 @@ create policy profiles_admin_all on public.profiles
 -- ===========================================================================
 -- creator_profiles
 -- ===========================================================================
+--
+-- This table mixes a creator's public profile with their Razorpay Route
+-- onboarding state. `route_account_id` is a live financial-account identifier
+-- belonging to a real, KYC'd entity — it must not be world-readable, and RLS
+-- cannot filter it out because RLS filters rows, not columns.
+--
+-- So the split is:
+--   * `anon` gets NO grant on this table at all.
+--   * `authenticated` may read only its OWN row (a creator needs their own Route
+--     state to render the onboarding screen).
+--   * Public profile fields are served from the `creator_public_profiles`
+--     view further down, which is granted to `anon` and `authenticated`.
+
+revoke select on public.creator_profiles from anon;
 
 drop policy if exists creator_profiles_public_read on public.creator_profiles;
-create policy creator_profiles_public_read on public.creator_profiles
-  for select to anon, authenticated
-  using (true);
+create policy creator_profiles_own_read on public.creator_profiles
+  for select to authenticated
+  using (user_id = auth.uid());
 
 drop policy if exists creator_profiles_self_write on public.creator_profiles;
 create policy creator_profiles_self_write on public.creator_profiles
@@ -463,7 +477,18 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- Privilege-escalation guard. Even if a column grant is ever widened, a role or
+-- Privilege-escalation guard, layer 1 of 2: column-level grants.
+--
+-- `role` and `status` are removed from the browser roles entirely, so a client
+-- cannot even attempt to write them. Layer 2 is the `guard_profile_privileges`
+-- trigger below, which rejects the write regardless of how the grant arrives
+-- (API, SQL console, or a direct connection).
+revoke update (role) on public.profiles from authenticated;
+revoke update (status) on public.profiles from authenticated;
+revoke insert (role) on public.profiles from anon, authenticated;
+revoke insert (status) on public.profiles from anon, authenticated;
+
+-- Layer 2: even if a column grant is ever widened, a role or
 -- status change from a non-service session is rejected outright.
 create or replace function public.guard_profile_privileges()
 returns trigger
@@ -611,7 +636,6 @@ select
   c.published_at,
   cat.slug as category_slug,
   cat.name as category_name,
-  cp.user_id as creator_id,
   cp.username as creator_username,
   cp.display_name as creator_display_name,
   cp.headline as creator_headline,
@@ -622,3 +646,36 @@ join public.creator_profiles cp on cp.user_id = c.creator_id
 where c.status = 'published';
 
 grant select on public.published_courses to anon, authenticated;
+
+-- ===========================================================================
+-- creator_public_profiles — the publicly presentable half of creator_profiles
+-- ===========================================================================
+--
+-- Same pattern as `published_courses`: a `security_invoker = false` view, so the
+-- column list below *is* the access rule. RLS on the base table does not apply,
+-- which is precisely why the list is deliberately short and why `tests/rls.mjs`
+-- asserts it never grows a `route_*` or identity column.
+--
+-- This is what anonymous visitors read for the instructor page and catalogue
+-- search. Everything a creator needs beyond these fields — Route status, topics,
+-- website, onboarding state — stays behind the authenticated self-read policy.
+
+drop view if exists public.creator_public_profiles;
+create view public.creator_public_profiles
+with (security_invoker = false)
+as
+select
+  cp.user_id,
+  cp.username,
+  cp.display_name,
+  cp.headline,
+  cp.bio,
+  cp.country_code,
+  cp.languages,
+  cp.topics,
+  cp.website,
+  cp.avatar_key,
+  cp.created_at
+from public.creator_profiles cp;
+
+grant select on public.creator_public_profiles to anon, authenticated;

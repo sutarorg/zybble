@@ -157,21 +157,82 @@ It cannot see accounts, orders or progress.
 ## Testing
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm run lint        # ESLint, incl. React Compiler rules
-npm run test:unit   # money + AI contract tests (node:test)
-npm test            # all three
-npm run build       # production build
-npm run test:e2e    # Playwright walkthrough — STALE, see below
+npm run typecheck     # tsc --noEmit
+npm run lint          # ESLint, incl. React Compiler rules
+npm run test:unit     # all four node:test suites below
+npm test              # typecheck + lint + test:unit
+npm run build         # production build
+
+npm run test:money     # INR paise, conversion, formatting, commission
+npm run test:chatbot   # grounded catalogue assistant, fail-closed
+npm run test:security  # payment/Bunny/upload/object-key primitives
+npm run test:rls       # migration + authorization static contracts
+npm run test:e2e       # Playwright walkthrough — STALE, see below
 ```
 
 **Status on this branch:** typecheck 0 errors · lint 0 errors / 0 warnings ·
-production build succeeds · `test:unit` 23/23 passing.
+production build succeeds · `test:unit` **76/76 passing** (12 money · 11
+chatbot · 21 security · 32 RLS/authorization).
+
+### What each suite actually proves
+
+| Suite | Proves | Does **not** prove |
+| --- | --- | --- |
+| `test:money` | Paise arithmetic, decimal-safe conversion, INR-only rejection, commission snapshot | That Razorpay ever charged the right amount |
+| `test:chatbot` | Grounded answers, slug resolution, allowlist, fail-closed on unconfigured OpenRouter | That OpenRouter ever returned a token |
+| `test:security` | HMAC verification, Route eligibility rules, Bunny encode-state mapping, playback-token shape, upload limits, object-key isolation, malformed-signature handling | That any provider signed anything |
+| `test:rls` | Grant/policy parity, RLS enablement, privilege-escalation guards, tautology-free predicates, no Route identifiers reachable by `anon`, session guards and ownership checks in every server action | **Live database behaviour — see below** |
+
+### Two security defects this branch found and fixed
+
+Writing `test:rls` surfaced two real bugs that nothing else would have caught.
+
+**1. Eight learner tables were granted but had no policy.** `entitlements`,
+`wishlist`, `lesson_progress`, `lesson_notes`, `course_resume`,
+`learner_preferences`, `recent_course_views` and `notifications` were granted to
+`authenticated` while RLS was enabled globally, **but had no policies at all**.
+Postgres resolves that combination to *deny*: the grant is irrelevant without a
+matching policy. Applying the migrations would have silently emptied
+entitlements, progress, notes, resume state, the wishlist, preferences, recent
+views and notifications for every learner, with no error anywhere.
+
+`supabase/migrations/20260101000500_learner_rls_policies.sql` adds
+`user_id = auth.uid()` owner policies. Entitlements and notifications are
+**select/update only** — the browser can read and dismiss what it owns, but
+cannot mint a paid entitlement or fabricate a notification; those stay
+service-role-only.
+
+**2. Every creator's Razorpay Route account ID was world-readable.**
+`creator_profiles` mixes a creator's public profile with their Route onboarding
+state, was granted `select` to `anon`, and had a `using (true)` read policy. RLS
+filters *rows*, not columns, so anyone could enumerate `route_account_id`,
+`route_settlement_verified` and `route_error` for every creator in the country —
+a live financial-account identifier belonging to a real KYC'd entity.
+
+Fixed by splitting the table: `anon` now has **no grant** on
+`creator_profiles`, `authenticated` may read only its own row, and the public
+fields are served from a new `creator_public_profiles` view — the same
+`security_invoker = false` pattern already used for `published_courses`, where
+the column list *is* the access rule. Public reads (instructor page, catalogue
+search, creator count) were moved to the view.
+
+Two smaller findings came out of the same review: `published_courses` exposed
+the creator's internal `user_id` to anonymous readers (removed — nothing read
+it), and the privilege-escalation guard on `profiles.role` had only one of the
+two layers its own comment claimed (the column-level `revoke` is now present
+alongside the trigger). A verified Route status was also being persisted through
+a session client whose write the grants already blocked, so it silently never
+saved — that now goes through the service role.
+
+**This is static analysis, not proof.** Parsing SQL cannot show that a policy
+behaves correctly against a live database. The three-session test — anonymous,
+learner A, learner B, against a real Postgres with the migrations applied — is
+still unrun and remains a launch blocker. See `LAUNCH_BLOCKERS.md` §6.
 
 **`npm run test:e2e` is not part of `npm test` and will fail.** The Playwright
 suite still drives the removed demo UI. It must be rewritten against seeded test
 data. Listed honestly in `LAUNCH_BLOCKERS.md` §6, along with the missing
-database/RLS, authorization, webhook-replay and upload tests.
+live-database RLS tests.
 
 Test fixtures stay isolated from production data; no live credentials belong in
 CI.
