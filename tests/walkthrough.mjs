@@ -48,7 +48,7 @@ async function upgrade(page) {
   await page.waitForURL("**/creator/signup");
   assert.equal(await page.locator('aside a[href="/creator"]').count(), 0, "No studio sidebar on signup");
   await page.getByLabel("Headline", { exact: true }).fill("AI workflow educator");
-  await page.getByRole("button", { name: "AI Automation", exact: true }).click();
+  await page.getByRole("button", { name: "Automation", exact: true }).click();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Create creator account", exact: true }).click();

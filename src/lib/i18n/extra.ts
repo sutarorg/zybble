@@ -6,26 +6,12 @@ export const EXTRA_TEXT: Record<string, Record<string, string>> = {
     "de": "Alle",
     "ja": "すべて"
   },
-  "AI Automation": {
-    "es": "Automatización IA",
-    "pt": "Automação com IA",
-    "fr": "Automatisation IA",
-    "de": "KI-Automatisierung",
-    "ja": "AI自動化"
-  },
   "Automation": {
     "es": "Automatización",
     "pt": "Automação",
     "fr": "Automatisation",
     "de": "Automatisierung",
     "ja": "自動化"
-  },
-  "AI Development": {
-    "es": "Desarrollo IA",
-    "pt": "Desenvolvimento de IA",
-    "fr": "Développement IA",
-    "de": "KI-Entwicklung",
-    "ja": "AI開発"
   },
   "Development": {
     "es": "Desarrollo",
@@ -41,26 +27,12 @@ export const EXTRA_TEXT: Record<string, Record<string, string>> = {
     "de": "Generative KI",
     "ja": "生成AI"
   },
-  "AI Creation": {
-    "es": "Creación con IA",
-    "pt": "Criação com IA",
-    "fr": "Création IA",
-    "de": "KI-Kreation",
-    "ja": "AI制作"
-  },
   "Creation": {
     "es": "Creación",
     "pt": "Criação",
     "fr": "Création",
     "de": "Kreation",
     "ja": "制作"
-  },
-  "AI Marketing": {
-    "es": "Marketing IA",
-    "pt": "Marketing com IA",
-    "fr": "Marketing IA",
-    "de": "KI-Marketing",
-    "ja": "AIマーケティング"
   },
   "Marketing": {
     "es": "Marketing",
@@ -76,26 +48,12 @@ export const EXTRA_TEXT: Record<string, Record<string, string>> = {
     "de": "Datenwissenschaft",
     "ja": "データサイエンス"
   },
-  "AI Business": {
-    "es": "Negocios IA",
-    "pt": "Negócios com IA",
-    "fr": "Business IA",
-    "de": "KI-Business",
-    "ja": "AIビジネス"
-  },
   "Business": {
     "es": "Negocios",
     "pt": "Negócios",
     "fr": "Business",
     "de": "Business",
     "ja": "ビジネス"
-  },
-  "AI Productivity": {
-    "es": "Productividad IA",
-    "pt": "Produtividade com IA",
-    "fr": "Productivité IA",
-    "de": "KI-Produktivität",
-    "ja": "AI生産性向上"
   },
   "Productivity": {
     "es": "Productividad",

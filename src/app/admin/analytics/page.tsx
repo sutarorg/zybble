@@ -86,7 +86,7 @@ export default function AdminAnalyticsPage() {
   const topCategories = useMemo(() => {
     return CATEGORIES.map((cat) => {
       const students = COURSES.filter((c) => c.category === cat.slug).reduce((a, c) => a + c.studentsCount, 0);
-      return { id: cat.slug, label: cat.name, value: students, sub: `${COURSES.filter((c) => c.category === cat.slug).length} courses` };
+      return { id: cat.slug, label: cat.name, icon: cat.icon, value: students, sub: `${COURSES.filter((c) => c.category === cat.slug).length} courses` };
     }).sort((a, b) => b.value - a.value);
   }, []);
 
@@ -210,7 +210,7 @@ export default function AdminAnalyticsPage() {
           <h2 className="font-display text-[15.5px] font-semibold"><LocalizedText text={"Categories by enrollment"} /></h2>
           <ul className="mt-4 space-y-3">
             {topCategories.map((cat) => {
-              const Icon = categoryIcon(cat.id);
+              const Icon = categoryIcon(cat.icon);
               return (
                 <li key={cat.id} className="flex items-center gap-3">
                   <span className="flex size-8.5 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">

@@ -282,17 +282,6 @@ export const de: Dictionary = {
   csPanelStat2Value: "70 %",
   csPanelStat3: "Median-Auszahlung im 1. Monat",
   csPanelStat3Value: "1.200 $",
-  csTopicOptions: [
-    "KI-Automatisierung",
-    "KI-Entwicklung",
-    "Generative KI",
-    "KI-Video & Audio",
-    "KI-Marketing",
-    "Data Science",
-    "KI-Business",
-    "Produktivität",
-    "Prompting",
-  ],
   csLanguageOptions: [
     "Englisch",
     "Spanisch",

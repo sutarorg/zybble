@@ -281,17 +281,6 @@ export const ja: Dictionary = {
   csPanelStat2Value: "70%",
   csPanelStat3: "初月の支払い額（中央値）",
   csPanelStat3Value: "$1,200",
-  csTopicOptions: [
-    "AI自動化",
-    "AI開発",
-    "生成AI",
-    "AI動画・音声",
-    "AIマーケティング",
-    "データサイエンス",
-    "AIビジネス",
-    "生産性向上",
-    "プロンプト",
-  ],
   csLanguageOptions: ["英語", "スペイン語", "ポルトガル語", "フランス語", "ドイツ語", "日本語", "イタリア語"],
 
   /* ---------------------------------------------------------- creator studio */
