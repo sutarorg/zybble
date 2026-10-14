@@ -26,21 +26,32 @@ npm run dev            # http://localhost:3000
 
 `/` is the full catalog (the former Explore page; `/explore` redirects to `/` and there is no `/home` page). Sign in as a learner, choose **Start teaching**, then complete the profile and review steps at `/creator/signup`. This upgrades the same account to a creator without replacing its identity or learner activity. **Go to Studio** appears in the public/learner surfaces only for creators. The studio is role-gated. Deleting the creator account under `/creator/settings` clears its namespace and returns the same account to learner mode.
 
-### Public course-discovery chatbot
+### Zybble AI — public course-discovery chatbot
 
-The bottom-right **Zybble guide** is available only on the catalog (`/`, including
+The bottom-right **Zybble AI** launcher is available only on the catalog (`/`, including
 visits via the `/explore` redirect) and the eight public `/categories/[slug]` pages.
 It is absent from course detail, help, authentication, checkout, learner, creator
 and admin pages. Visibility follows the page, not the signed-in account’s role.
 
-The violet chat panel offers three short suggested questions, free-text messages,
-linked course recommendations and common enrollment/account/billing help. It
-searches the static catalog plus courses published in the current session. Topic,
-level, budget and duration preferences carry across follow-ups; **Start a new
-chat** clears them. Category pages initially scope recommendations to that
-category. Closing and reopening preserves the conversation; route navigation or
-refresh clears it. Messages are capped at 500 characters and 60 conversation
-entries and are not persisted or sent to an external service.
+Opening it animates the violet chat panel up out of the corner while the launcher
+fades and shrinks away, so only one of the two occupies the corner at a time;
+closing plays both in reverse and returns focus to the launcher. As with the rest
+of the app, `prefers-reduced-motion: reduce` neutralises the motion while keeping
+the state change visible.
+
+The panel offers three short suggested questions, free-text messages, linked
+course recommendations and common enrollment/account/billing help. The
+suggestions are a **one-time offer**: they are shown with the greeting and
+collapse away as soon as the first answer lands, letting the card settle into the
+conversation layout. They stay hidden while that conversation is preserved
+(closing and reopening) and come back with **Start a new chat** or after a route
+change. The panel searches the static catalog plus courses published in the
+current session. Topic, level, budget and duration preferences carry across
+follow-ups; **Start a new chat** clears them. Category pages initially scope
+recommendations to that category and swap the first suggestion for
+`Explore <category>`. Closing and reopening preserves the conversation; route
+navigation or refresh clears it. Messages are capped at 500 characters and 60
+conversation entries and are not persisted or sent to an external service.
 
 This is an **offline, rule-based catalog assistant**, not an LLM integration or
 human support channel. Chat guidance is currently in English; recommendation
@@ -128,7 +139,7 @@ public/certificate-template.jpg   generated certificate artwork (template only, 
 - There is no AI Tutor: the feature was removed from the product surface (sidebar promo, Explore banner, lesson player panel, course badges, filters, help/legal copy) and its mock engine (`src/lib/tutor.ts`) is gone.
 - Certificates are generated in the browser and are illustrative — the verification code is not resolvable publicly.
 - `/api/health` returns `500` unless `DATABASE_URL` is configured.
-- Browser regression tests cover credential rejection, full-screen signup, learner-to-creator conversion, creator deletion/cancellation, learner wishlist preservation, legacy state cleanup, refresh reset, all six catalog languages and 320px responsiveness.
+- Browser regression tests cover credential rejection, full-screen signup, learner-to-creator conversion, creator deletion/cancellation, learner wishlist preservation, legacy state cleanup, refresh reset, all six catalog languages, the Zybble AI chatbot (open/close motion, one-time suggestions, route allowlist) and 320px responsiveness.
 
 ## Browser verification
 
