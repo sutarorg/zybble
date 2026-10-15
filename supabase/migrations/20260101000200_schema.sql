@@ -28,6 +28,40 @@ comment on table public.profiles is 'One row per authenticated user. `role` is t
 create index if not exists profiles_role_idx on public.profiles (role);
 create index if not exists profiles_email_idx on public.profiles (lower(email));
 
+comment on column public.profiles.role is 'authoritative access role; only admins and the service role may write it';
+
+-- SECURITY DEFINER so it can read profiles without re-triggering RLS.
+-- `role` is taken from the profiles row, never from client-writable
+-- user_metadata, so a user cannot promote themselves by editing metadata.
+create or replace function public.current_role()
+returns public.app_role
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select role from public.profiles where id = auth.uid()),
+    'learner'::public.app_role
+  );
+$$;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+as $$
+  select public.current_role() in ('admin'::public.app_role, 'moderator'::public.app_role);
+$$;
+
+create or replace function public.is_creator()
+returns boolean
+language sql
+stable
+as $$
+  select public.current_role() in ('admin'::public.app_role, 'moderator'::public.app_role, 'creator'::public.app_role);
+$$;
+
 create table if not exists public.creator_profiles (
   user_id        uuid primary key references public.profiles (id) on delete cascade,
   username       text unique,
