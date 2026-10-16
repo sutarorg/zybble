@@ -135,7 +135,7 @@ export default async function CreatorDashboardPage({
                 className="border-0 bg-muted/30 py-10"
               />
             ) : (
-              <AreaChart data={chartData} formatValue={(value) => money(value)} />
+              <AreaChart data={chartData} valueFormat="money" />
             )}
           </div>
         </section>
@@ -147,7 +147,7 @@ export default async function CreatorDashboardPage({
               Publish a course to start seeing enrollment numbers here.
             </p>
           ) : (
-            <BarList className="mt-5" data={topCourses} formatValue={(value) => String(value)} />
+            <BarList className="mt-5" data={topCourses} />
           )}
         </section>
       </div>

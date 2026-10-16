@@ -3,7 +3,22 @@
 import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import * as React from "react";
 import { useMemo, useState } from "react";
+import { formatInr } from "@/lib/money";
 import { cn } from "@/lib/utils";
+
+/**
+ * How a chart value is rendered in the hover readout and rows.
+ *
+ * This is a serialisable marker, not a function: these components are Client
+ * Components and a Server Component cannot hand a function across the RSC
+ * boundary ("Functions cannot be passed directly to Client Components").
+ */
+export type ChartValueFormat = "money" | "count";
+
+function formatChartValue(value: number, format: ChartValueFormat): string {
+  // `money` matches the studio's `money()` helper exactly — INR, en-IN grouping.
+  return format === "money" ? formatInr(value) : String(value);
+}
 
 /* ------------------------------- Area chart -------------------------------- */
 
@@ -18,12 +33,12 @@ interface AreaDatum {
 export function AreaChart({
   data,
   height = 240,
-  formatValue = (v: number) => String(v),
+  valueFormat = "count",
   className,
 }: {
   data: AreaDatum[];
   height?: number;
-  formatValue?: (v: number) => string;
+  valueFormat?: ChartValueFormat;
   className?: string;
 }) {
   const translateUi = useTranslate();
@@ -124,7 +139,7 @@ export function AreaChart({
       {hover !== null && points[hover] && (
         <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 rounded-lg border border-border bg-white px-3 py-1.5 text-center shadow-pop">
           <p className="font-display text-[13px] font-bold whitespace-nowrap tabular-nums">
-            <LocalizedText text={formatValue(points[hover].value)} />
+            <LocalizedText text={formatChartValue(points[hover].value, valueFormat)} />
           </p>
           <p className="text-[10.5px] whitespace-nowrap text-zinc-400"><LocalizedText text={points[hover].label} /></p>
         </div>
@@ -144,11 +159,11 @@ export interface BarDatum {
 
 export function BarList({
   data,
-  formatValue = (v: number) => String(v),
+  valueFormat = "count",
   className,
 }: {
   data: BarDatum[];
-  formatValue?: (v: number) => string;
+  valueFormat?: ChartValueFormat;
   className?: string;
 }) {
   const max = Math.max(...data.map((d) => d.value), 1);
@@ -158,7 +173,7 @@ export function BarList({
         <li key={d.id}>
           <div className="flex items-baseline justify-between gap-3">
             <p className="truncate text-[13px] font-medium"><LocalizedText text={d.label} /></p>
-            <p className="shrink-0 text-[13px] font-semibold tabular-nums"><LocalizedText text={formatValue(d.value)} /></p>
+            <p className="shrink-0 text-[13px] font-semibold tabular-nums"><LocalizedText text={formatChartValue(d.value, valueFormat)} /></p>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
             <div

@@ -72,7 +72,7 @@ export default async function AdminAnalyticsPage({
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
             <h2 className="font-display text-[15px] font-semibold tracking-tight">Gross volume</h2>
-            <AreaChart className="mt-4" data={grossChart} formatValue={(value) => money(value)} />
+            <AreaChart className="mt-4" data={grossChart} valueFormat="money" />
           </section>
           <section className="rounded-xl border border-border bg-white p-5 shadow-card">
             <h2 className="font-display text-[15px] font-semibold tracking-tight">Paid orders</h2>
