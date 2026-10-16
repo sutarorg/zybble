@@ -80,7 +80,7 @@ export default async function AdminUsersPage({
                 <th className="px-4 py-3 font-medium">User</th>
                 <th className="px-4 py-3 font-medium">Role</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Route</th>
+                <th className="px-4 py-3 font-medium">Payout destination</th>
                 <th className="px-4 py-3 text-right font-medium">Courses</th>
                 <th className="px-4 py-3 text-right font-medium">Enrollments</th>
                 <th className="px-4 py-3 text-right font-medium">Lifetime spend</th>

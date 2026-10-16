@@ -29,7 +29,7 @@ const TOGGLES: Array<{ key: keyof Settings & ("autoApproveFreeCourses" | "autoAp
   {
     key: "autoApproveReturningCreators",
     label: "Auto-approve returning creators",
-    hint: "Publishes submissions from creators who already have a published course. Paid courses still need an active Route account.",
+    hint: "Publishes submissions from creators who already have a published course.",
   },
   {
     key: "emailReviewDecisions",
@@ -38,8 +38,8 @@ const TOGGLES: Array<{ key: keyof Settings & ("autoApproveFreeCourses" | "autoAp
   },
   {
     key: "requirePayoutApproval",
-    label: "Require payout approval before transfers",
-    hint: "Held routes can batch transfers manually instead of releasing them immediately.",
+    label: "Require admin approval before manual payouts",
+    hint: "Every creator payout request is reviewed by an administrator and confirmed with a bank/UPI UTR reference.",
   },
 ];
 

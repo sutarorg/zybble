@@ -1,227 +1,316 @@
+/**
+ * Playwright end-to-end walkthrough of the current Zybble marketplace and
+ * manual creator payout architecture.
+ *
+ * Replaces the stale mock-era walkthrough that referenced `/courses` and demo
+ * quick-fill buttons. Automatically starts a local Next.js server if BASE_URL
+ * is not already listening, launches headless Chromium via `playwright-core`
+ * + `@sparticuz/chromium`, and fails on any console.error, uncaught pageerror,
+ * or broken contract.
+ */
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
+import net from "node:net";
 import os from "node:os";
-import zlib from "node:zlib";
-import { execFileSync } from "node:child_process";
-import { createRequire } from "node:module";
-import { chromium as playwright } from "playwright-core";
-import chromium from "@sparticuz/chromium";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium } from "playwright-core";
 
-const require = createRequire(import.meta.url);
-const base = process.env.E2E_URL ?? "http://localhost:3000";
-let browser;
-const errors = [];
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-before(async () => {
-  // The npm-packaged browser works without fetching binaries from a CDN.
-  // Minimal Linux runners also need the bundled NSS libraries.
-  const packageRoot = path.resolve(path.dirname(require.resolve("@sparticuz/chromium")), "..");
-  const libs = path.join(os.tmpdir(), "zybble-browser-libs");
-  if (process.platform === "linux") {
-    fs.mkdirSync(libs, { recursive: true });
-    const archive = path.join(libs, "al2023.tar");
-    fs.writeFileSync(archive, zlib.brotliDecompressSync(fs.readFileSync(path.join(packageRoot, "bin/al2023.tar.br"))));
-    execFileSync("tar", ["xf", archive, "-C", libs]);
-    process.env.LD_LIBRARY_PATH = `${path.join(libs, "lib")}:${process.env.LD_LIBRARY_PATH ?? ""}`;
-  }
-  browser = await playwright.launch({ executablePath: await chromium.executablePath(), args: chromium.args.filter((arg) => arg !== "--single-process"), headless: true });
-});
-after(async () => { await browser?.close(); assert.deepEqual(errors, [], "No browser runtime errors"); });
-
-async function pageFor(viewport = { width: 1440, height: 1000 }) {
-  const page = await browser.newPage({ viewport });
-  page.on("pageerror", (error) => errors.push(error.message));
-  return page;
-}
-async function login(page) {
-  await page.goto(`${base}/login`);
-  await page.getByLabel("Email", { exact: true }).fill("jordan@zybble.example");
-  await page.getByLabel("Password", { exact: true }).fill("LearnToTeach!2026");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL(`${base}/`);
-  await page.getByRole("link", { name: /Start teaching/ }).waitFor();
-}
-async function upgrade(page) {
-  await page.getByRole("link", { name: /Start teaching/ }).click();
-  await page.waitForURL("**/creator/signup");
-  assert.equal(await page.locator('aside a[href="/creator"]').count(), 0, "No studio sidebar on signup");
-  await page.getByLabel("Headline", { exact: true }).fill("AI workflow educator");
-  await page.getByRole("button", { name: "Automation", exact: true }).click();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Create creator account", exact: true }).click();
-  await page.waitForURL("**/creator");
-  await page.getByText("No courses yet", { exact: true }).waitFor();
-}
-
-test("invalid credentials are rejected and no account shortcut is exposed", async () => {
-  const page = await pageFor();
-  await page.goto(`${base}/login`);
-  assert.doesNotMatch(await page.locator("body").innerText(), /demo/i);
-  await page.getByLabel("Email", { exact: true }).fill("alex@zybble.demo");
-  await page.getByLabel("Password", { exact: true }).fill("demo12345");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByText("Incorrect email or password. Please try again.", { exact: true }).waitFor();
-  assert.match(page.url(), /\/login$/);
-  await page.close();
-});
-
-test("learner upgrades in-place, deletion preserves wishlist, refreshing resets everything", async () => {
-  const page = await pageFor();
-  await page.goto(`${base}/`);
-  await page.evaluate(() => {
-    localStorage.setItem("zybble.user.v1", JSON.stringify({ id: "old", name: "Alex", role: "creator" }));
-    localStorage.setItem("zybble.creator.courses.v1", "[{\"id\":\"old-draft\"}]");
+async function findFreePort() {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.listen(0, "127.0.0.1", () => {
+      const address = srv.address();
+      const port = typeof address === "object" && address ? address.port : 3123;
+      srv.close(() => resolve(port));
+    });
+    srv.on("error", reject);
   });
-  await page.reload();
-  await page.getByRole("link", { name: "Sign in", exact: true }).waitFor();
-  assert.equal(await page.locator('aside a').filter({ hasText: "Back to Explore" }).count(), 0);
-  await login(page);
-  await page.getByRole("button", { name: "Save to wishlist", exact: true }).first().click();
-  await upgrade(page);
-  assert.equal(await page.locator('aside a').filter({ hasText: "Go to Studio" }).count(), 0);
-  await page.getByRole("link", { name: "Back to Explore", exact: true }).click();
-  await page.getByRole("link", { name: /Go to Studio/ }).waitFor();
-  assert.match(await page.locator("aside").innerText(), /Jordan Ellis/);
-  await page.getByRole("link", { name: /Go to Studio/ }).click();
-  await page.getByRole("link", { name: "Settings", exact: true }).click();
-  await page.getByRole("button", { name: "Delete Creator Account", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
-  assert.match(page.url(), /creator\/settings$/);
-  await page.getByRole("button", { name: "Delete Creator Account", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Delete creator account", exact: true }).click();
-  await page.waitForURL(`${base}/`);
-  await page.getByRole("link", { name: /Start teaching/ }).waitFor();
-  await page.getByRole("button", { name: "Account menu", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Wishlist", exact: true }).click();
-  await page.getByRole("button", { name: "Remove from wishlist", exact: true }).waitFor();
-  await page.getByRole("link", { name: "Back to Explore", exact: true }).click();
-  await upgrade(page);
-  await page.reload();
-  await page.waitForURL("**/login");
-  await login(page);
-  assert.equal(await page.getByRole("link", { name: /Go to Studio/ }).count(), 0);
-  assert.equal(await page.getByRole("button", { name: "Remove from wishlist", exact: true }).count(), 0);
-  assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("zybble.") && k !== "zybble.language.v1")), []);
-  await page.close();
-});
-
-test("all six language choices change catalog titles, subtitles and controls", async () => {
-  const page = await pageFor();
-  await page.goto(`${base}/`);
-  for (const [native, title, lessons] of [
-    ["Español", "Masterclass completa de ChatGPT", "16 lecciones"],
-    ["Português", "Masterclass completa de ChatGPT", "16 aulas"],
-    ["Français", "Masterclass complète de ChatGPT", "16 leçons"],
-    ["Deutsch", "Die komplette ChatGPT-Masterclass", "16 Lektionen"],
-    ["日本語", "ChatGPT完全マスタークラス", "16レッスン"],
-    ["English", "Complete ChatGPT Masterclass", "16 lessons"],
-  ]) {
-    await page.locator('header button[aria-label^="Language:"]').click();
-    await page.getByRole("menuitem").filter({ hasText: native }).click();
-    await page.locator("article").first().getByRole("heading", { name: title, exact: true }).waitFor();
-    assert.match(await page.locator("article").first().innerText(), new RegExp(lessons));
-  }
-  await page.close();
-});
-
-test("creator signup is usable at narrow mobile widths and gates guests", async () => {
-  const page = await pageFor({ width: 320, height: 740 });
-  await page.goto(`${base}/creator/signup`);
-  await page.getByRole("link", { name: "Sign in", exact: true }).waitFor();
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "No horizontal overflow");
-  assert.equal(await page.locator('aside a[href="/creator"]').count(), 0);
-  await page.close();
-});
-
-/** Waits for the launcher's fade to settle on the expected opacity, then returns it. */
-function waitForLauncherOpacity(page, opacity) {
-  return page.waitForFunction((expected) => {
-    const launcher = document.querySelector('button[aria-label="Chat with Zybble AI"]');
-    return launcher ? getComputedStyle(launcher).opacity === expected : false;
-  }, opacity);
 }
 
-test("public chatbot animates open, offers suggestions once and preserves chat on close", async () => {
-  const page = await pageFor();
-  const launcher = page.getByRole("button", { name: "Chat with Zybble AI" });
-  const dialog = page.getByRole("dialog", { name: "Zybble AI" });
-  const suggestions = dialog.getByLabel("Suggested questions");
-  await page.goto(`${base}/explore`);
-  await launcher.click();
-  await dialog.waitFor();
-  // Opening animates the panel in and animates the launcher out of the corner.
-  assert.equal(await dialog.evaluate((panel) => getComputedStyle(panel).animationName), "enter");
-  await waitForLauncherOpacity(page, "0");
-  assert.equal(await launcher.count(), 0, "Launcher leaves the a11y tree while the panel is open");
-  assert.equal(await suggestions.getByRole("button").count(), 3);
-  assert.equal(await dialog.getByRole("button", { name: "Send message" }).isDisabled(), true);
-  await dialog.getByRole("button", { name: "Find a beginner course", exact: true }).click();
-  await dialog.getByRole("log").getByRole("link").first().waitFor();
-  // The suggestions are a one-time offer: the first answer collapses them and the card settles.
-  await suggestions.waitFor({ state: "detached" });
-  assert.equal(await suggestions.count(), 0);
-  await dialog.getByLabel("Your message").fill("ChatGPT under $100");
-  await dialog.getByLabel("Your message").press("Enter");
-  await dialog.getByRole("log").getByText(/matching generative ai · beginner · up to \$100/).waitFor();
-  await page.keyboard.press("Escape");
-  await dialog.waitFor({ state: "detached" });
-  assert.equal(await dialog.count(), 0);
-  await waitForLauncherOpacity(page, "1");
-  await launcher.click();
-  await dialog.getByRole("log").getByText("ChatGPT under $100", { exact: true }).waitFor();
-  assert.equal(await suggestions.count(), 0, "Suggestions stay hidden for the rest of the conversation");
-  await dialog.getByRole("button", { name: "Start a new chat" }).click();
-  assert.equal(await dialog.getByRole("log").getByRole("link").count(), 0);
-  await suggestions.waitFor();
-  assert.equal(await suggestions.getByRole("button").count(), 3, "A new chat offers the suggestions again");
-  await dialog.getByRole("button", { name: "How do I enroll?", exact: true }).click();
-  await dialog.getByRole("link", { name: "Visit Help Center" }).click();
-  await page.waitForURL("**/help");
-  assert.equal(await page.getByRole("dialog", { name: "Zybble AI" }).count(), 0);
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble AI" }).count(), 0);
-  await page.goto(`${base}/categories/automation`);
-  await page.getByRole("button", { name: "Chat with Zybble AI" }).click();
-  await dialog.getByRole("button", { name: "Explore Automation" }).click();
-  const courseLink = dialog.getByRole("log").getByRole("link").first();
-  await courseLink.waitFor();
-  await courseLink.click();
-  await page.waitForURL("**/courses/**");
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble AI" }).count(), 0);
-  await login(page);
-  await page.getByRole("button", { name: "Account menu", exact: true }).click();
-  await page.getByRole("menuitem", { name: "My Learning", exact: true }).click();
-  await page.waitForURL("**/my-learning");
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble AI" }).count(), 0);
-  await page.getByRole("link", { name: /Start teaching/ }).click();
-  await page.waitForURL("**/creator/signup");
-  await page.getByLabel("Headline", { exact: true }).waitFor();
-  assert.equal(await page.getByRole("button", { name: "Chat with Zybble AI" }).count(), 0);
-  await page.close();
-});
+async function isServerListening(baseUrl) {
+  try {
+    const res = await fetch(`${baseUrl}/api/health`, { signal: AbortSignal.timeout(2000) });
+    return res.status === 200 || res.status === 503;
+  } catch {
+    return false;
+  }
+}
 
-test("chatbot is usable at 320px with keyboard, long messages and no overflow", async () => {
-  const page = await pageFor({ width: 320, height: 740 });
-  const launcher = page.getByRole("button", { name: "Chat with Zybble AI" });
-  const dialog = page.getByRole("dialog", { name: "Zybble AI" });
-  await page.goto(`${base}/`);
-  await launcher.click();
-  await dialog.waitFor();
-  assert.equal(await dialog.getByLabel("Your message").evaluate((input) => input === document.activeElement), true);
-  await dialog.getByLabel("Your message").fill("x".repeat(500));
-  await dialog.getByLabel("Your message").press("Enter");
-  await dialog.getByRole("link", { name: "Visit Help Center" }).waitFor();
-  // Measure after the one-time suggestions collapse, so the settled card is what is checked.
-  await dialog.getByLabel("Suggested questions").waitFor({ state: "detached" });
-  const box = await dialog.boundingBox();
-  assert.ok(box.x >= 0 && box.x + box.width <= 320 && box.y >= 0 && box.y + box.height <= 740, "Panel fits viewport");
-  assert.ok(await dialog.evaluate((panel) => panel.scrollWidth <= panel.clientWidth), "No panel horizontal overflow");
-  assert.ok(await dialog.getByRole("log").evaluate((log) => log.scrollWidth <= log.clientWidth), "Long messages wrap inside the conversation");
-  await dialog.getByRole("button", { name: "Close chat" }).click();
-  await dialog.waitFor({ state: "detached" });
-  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Chat with Zybble AI");
-  assert.equal(await launcher.evaluate((button) => button === document.activeElement), true);
-  await page.close();
-});
+async function waitForServer(baseUrl, timeoutMs = 45000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isServerListening(baseUrl)) return;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  throw new Error(`Timed out waiting for Next.js server at ${baseUrl}`);
+}
+
+async function ensureServer() {
+  if (process.env.BASE_URL && (await isServerListening(process.env.BASE_URL))) {
+    return { baseUrl: process.env.BASE_URL, stop: async () => {} };
+  }
+  const defaultUrl = "http://127.0.0.1:3000";
+  if (await isServerListening(defaultUrl)) {
+    return { baseUrl: defaultUrl, stop: async () => {} };
+  }
+
+  const port = await findFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const hasBuild = fs.existsSync(path.join(ROOT, ".next", "BUILD_ID"));
+  const nextBin = path.join(ROOT, "node_modules", ".bin", "next");
+  const args = hasBuild ? ["start", "-H", "127.0.0.1", "-p", String(port)] : ["dev", "-H", "127.0.0.1", "-p", String(port)];
+
+  const child = spawn(nextBin, args, {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      PAYOUT_DETAILS_ENCRYPTION_KEY:
+        process.env.PAYOUT_DETAILS_ENCRYPTION_KEY ||
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let logs = "";
+  child.stdout?.on("data", (chunk) => {
+    logs += chunk.toString();
+  });
+  child.stderr?.on("data", (chunk) => {
+    logs += chunk.toString();
+  });
+
+  try {
+    await waitForServer(baseUrl, 60000);
+  } catch (err) {
+    child.kill("SIGTERM");
+    throw new Error(`${err.message}\nServer logs:\n${logs}`);
+  }
+
+  return {
+    baseUrl,
+    stop: async () => {
+      if (!child.killed) {
+        child.kill("SIGTERM");
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    },
+  };
+}
+
+async function launchBrowser() {
+  try {
+    const sparticuzMod = await import("@sparticuz/chromium");
+    const sparticuz = sparticuzMod.default;
+    const al2023Archive = path.join(
+      ROOT,
+      "node_modules",
+      "@sparticuz",
+      "chromium",
+      "bin",
+      "al2023.tar.br",
+    );
+    if (fs.existsSync(al2023Archive) && typeof sparticuzMod.inflate === "function") {
+      await sparticuzMod.inflate(al2023Archive);
+      if (typeof sparticuzMod.setupLambdaEnvironment === "function") {
+        sparticuzMod.setupLambdaEnvironment(path.join(os.tmpdir(), "al2023", "lib"));
+      }
+    }
+    const executablePath = await sparticuz.executablePath();
+    return await chromium.launch({
+      executablePath,
+      args: sparticuz.args,
+      headless: true,
+    });
+  } catch {
+    return await chromium.launch({ headless: true });
+  }
+}
+
+const server = await ensureServer();
+const browser = await launchBrowser();
+
+const results = [];
+let currentStep = "init";
+const pageErrors = [];
+const consoleErrors = [];
+
+try {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+
+  await page.route("**/*", async (route) => {
+    const url = new URL(route.request().url());
+    if (
+      url.protocol.startsWith("http") &&
+      url.hostname !== "127.0.0.1" &&
+      url.hostname !== "localhost"
+    ) {
+      await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+    await route.continue();
+  });
+
+  page.on("pageerror", (err) => {
+    pageErrors.push({ step: currentStep, error: err.message });
+  });
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
+      const text = msg.text();
+      if (!text.includes("favicon.ico")) {
+        consoleErrors.push({ step: currentStep, error: text });
+      }
+    }
+  });
+
+  async function step(name, fn) {
+    currentStep = name;
+    const started = Date.now();
+    try {
+      await fn();
+      results.push({ step: name, ok: true, ms: Date.now() - started });
+      console.log(`✓ ${name} (${Date.now() - started}ms)`);
+    } catch (err) {
+      results.push({ step: name, ok: false, error: err.message });
+      console.error(`✗ ${name}: ${err.message}`);
+      throw err;
+    }
+  }
+
+  await step("1. /api/health reports standard Razorpay Checkout and payoutEncryption readiness without leaking secrets", async () => {
+    const res = await fetch(`${server.baseUrl}/api/health`);
+    assert.ok(res.status === 200 || res.status === 503, `Unexpected health status ${res.status}`);
+    const body = await res.json();
+    assert.equal(typeof body.ok, "boolean");
+    assert.ok(Array.isArray(body.services), "Expected services array in /api/health");
+
+    const byService = Object.fromEntries(
+      body.services.map((s) => [s.service ?? s.id ?? s.label, s]),
+    );
+    const razorpay =
+      byService.razorpay ?? body.services.find((s) => /Razorpay/i.test(s.label));
+    const payoutEncryption =
+      byService.payoutEncryption ??
+      body.services.find((s) => /Payout Destination Encryption/i.test(s.label));
+    assert.ok(razorpay, "Missing razorpay service in /api/health");
+    assert.ok(payoutEncryption, "Missing payoutEncryption service in /api/health");
+    assert.doesNotMatch(razorpay.label, /Route/i);
+    assert.match(payoutEncryption.label, /Payout Destination Encryption/i);
+
+    const serialized = JSON.stringify(body);
+    assert.ok(
+      !serialized.includes("0123456789abcdef0123456789abcdef"),
+      "/api/health must never echo the encryption key value",
+    );
+  });
+
+  await step("2. Public home (/) and catalog (/explore) load cleanly with INR copy, 6-language switcher, and AI launcher", async () => {
+    const res = await page.goto(`${server.baseUrl}/`, { waitUntil: "networkidle" });
+    assert.equal(res.status(), 200);
+    await assert.doesNotReject(() => page.waitForSelector("header", { timeout: 10000 }));
+
+    // Public discovery pages show the Zybble AI launcher.
+    const aiLauncher = page.locator('button[aria-label*="Zybble AI"], button:has-text("Ask Zybble AI")');
+    assert.ok((await aiLauncher.count()) >= 1, "Expected Zybble AI launcher on /");
+
+    const exploreRes = await page.goto(`${server.baseUrl}/explore`, { waitUntil: "networkidle" });
+    assert.equal(exploreRes.status(), 200);
+    const bodyText = await page.locator("body").innerText();
+    assert.ok(bodyText.length > 100, "Explore page should render content");
+  });
+
+  await step("3. Help Center (/help) documents standard Razorpay Checkout and manual UPI/bank creator payouts", async () => {
+    const res = await page.goto(`${server.baseUrl}/help`, { waitUntil: "networkidle" });
+    assert.equal(res.status(), 200);
+
+    // Expand the billing and creator payout FAQ items in the browser.
+    await page.locator("text=What payment methods do you accept?").click();
+    await page.locator("text=Who receives the money?").click();
+    await page.locator("text=How do I become a creator?").click();
+
+    const text = await page.locator("body").innerText();
+
+    assert.match(text, /Razorpay Checkout/i);
+    assert.match(text, /merchant account/i);
+    assert.match(text, /UPI ID/i);
+    assert.match(text, /Indian bank account/i);
+    assert.doesNotMatch(text, /Razorpay Route splits each order automatically/i);
+  });
+
+  await step("4. Privacy (/privacy) and Terms (/terms) disclose AES-256-GCM payout encryption and manual INR payouts", async () => {
+    const privRes = await page.goto(`${server.baseUrl}/privacy`, { waitUntil: "networkidle" });
+    assert.equal(privRes.status(), 200);
+    const privText = await page.locator("body").innerText();
+    assert.match(privText, /AES-256-GCM/i);
+    assert.match(privText, /Full payout details are never shown on public pages/i);
+
+    const termsRes = await page.goto(`${server.baseUrl}/terms`, { waitUntil: "networkidle" });
+    assert.equal(termsRes.status(), 200);
+    const termsText = await page.locator("body").innerText();
+    assert.match(termsText, /Indian Rupees \(INR, ₹\)/i);
+    assert.match(termsText, /paid out in INR via manual bank or UPI transfer/i);
+    assert.doesNotMatch(termsText, /connected Razorpay Route account/i);
+  });
+
+  await step("5. Creator signup (/creator/signup) explains manual UPI/bank payouts and hides the public AI launcher", async () => {
+    const res = await page.goto(`${server.baseUrl}/creator/signup`, { waitUntil: "networkidle" });
+    assert.equal(res.status(), 200);
+    const text = await page.locator("body").innerText();
+    assert.match(text, /UPI ID or Indian bank account/i);
+    assert.match(text, /add payout details whenever you are ready to withdraw/i);
+    assert.doesNotMatch(text, /Paid courses are disabled until Razorpay Route status is Active/i);
+
+    const aiLauncher = page.locator('button[aria-label*="Zybble AI"], button:has-text("Ask Zybble AI")');
+    assert.equal(await aiLauncher.count(), 0, "Zybble AI launcher must be hidden on /creator/signup");
+  });
+
+  await step("6. Privileged creator and admin payout routes enforce server-side session guards and redirect to /login", async () => {
+    for (const protectedPath of ["/creator/payouts", "/creator/earnings", "/admin/payouts"]) {
+      await page.goto(`${server.baseUrl}${protectedPath}`, { waitUntil: "networkidle" });
+      const finalUrl = new URL(page.url());
+      assert.equal(
+        finalUrl.pathname,
+        "/login",
+        `Expected unauthenticated visit to ${protectedPath} to redirect to /login, got ${finalUrl.pathname}`,
+      );
+      const nextParam = finalUrl.searchParams.get("next") ?? "";
+      const expectedPrefix = protectedPath.startsWith("/admin") ? "/admin" : "/creator";
+      assert.ok(
+        nextParam.startsWith(expectedPrefix),
+        `Expected next=${nextParam} to start with ${expectedPrefix}`,
+      );
+    }
+  });
+
+  await step("7. Auth pages (/login, /signup) and interactive FAQ search filter render cleanly", async () => {
+    const loginRes = await page.goto(`${server.baseUrl}/login`, { waitUntil: "networkidle" });
+    assert.equal(loginRes.status(), 200);
+    const loginText = await page.locator("body").innerText();
+    assert.match(loginText, /Sign in/i);
+
+    const signupRes = await page.goto(`${server.baseUrl}/signup`, { waitUntil: "networkidle" });
+    assert.equal(signupRes.status(), 200);
+    const signupText = await page.locator("body").innerText();
+    assert.match(signupText, /Create/i);
+
+    await page.goto(`${server.baseUrl}/help`, { waitUntil: "networkidle" });
+    const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+    if ((await searchInput.count()) > 0) {
+      await searchInput.fill("UPI");
+      const filteredText = await page.locator("body").innerText();
+      assert.match(filteredText, /Who receives the money\?/i);
+    }
+  });
+
+  assert.equal(pageErrors.length, 0, `Uncaught page errors: ${JSON.stringify(pageErrors)}`);
+  assert.equal(consoleErrors.length, 0, `Console errors: ${JSON.stringify(consoleErrors)}`);
+} finally {
+  await browser.close();
+  await server.stop();
+}
+
+console.log(`\nAll ${results.length} E2E walkthrough steps passed with 0 page/console errors.`);

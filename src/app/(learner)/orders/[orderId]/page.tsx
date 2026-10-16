@@ -91,7 +91,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted-foreground">Paid to the creator</dt>
+                    <dt className="text-muted-foreground">Creator net share</dt>
                     <dd className="tabular-nums">{formatInr(item.creatorSharePaise)}</dd>
                   </div>
                 </dl>

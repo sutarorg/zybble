@@ -23,7 +23,12 @@ export type EmailTemplate =
   | "security_password_reset_requested"
   | "security_email_changed"
   | "payment_reversed"
-  | "transfer_status";
+  | "transfer_status"
+  | "payout_requested"
+  | "payout_approved"
+  | "payout_paid"
+  | "payout_rejected"
+  | "payout_failed";
 
 /** Runtime list used to validate outbox rows written by an older build. */
 export const EMAIL_TEMPLATES = [
@@ -36,6 +41,11 @@ export const EMAIL_TEMPLATES = [
   "security_email_changed",
   "payment_reversed",
   "transfer_status",
+  "payout_requested",
+  "payout_approved",
+  "payout_paid",
+  "payout_rejected",
+  "payout_failed",
 ] as const satisfies readonly EmailTemplate[];
 
 let cached: Resend | null = null;
@@ -85,16 +95,20 @@ const shell = (title: string, body: string) => `<!doctype html>
 const button = (href: string, label: string) =>
   `<p style="margin:24px 0 0"><a href="${href}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:11px 18px;border-radius:9px;font-size:14px;font-weight:550">${label}</a></p>`;
 
-function render(template: EmailTemplate, data: Record<string, string | number>): { subject: string; html: string } {
+export function renderEmailTemplate(
+  template: EmailTemplate,
+  data: Record<string, string | number>
+): { subject: string; html: string } {
   const origin = siteOrigin();
   switch (template) {
     case "purchase_confirmation": {
-      const total = formatInr(Number(data.totalPaise ?? 0));
+      const total = formatInr(Number(data.totalPaise ?? data.amountPaise ?? 0));
+      const learnerName = data.learnerName ?? data.name ?? "there";
       return {
         subject: `Your Zybble receipt — ${data.courseTitle}`,
         html: shell(
           "Payment confirmed",
-          `<p>Hi ${data.learnerName},</p>
+          `<p>Hi ${learnerName},</p>
            <p>We received your payment for <strong>${data.courseTitle}</strong>.</p>
            <table style="margin:16px 0;font-size:14px"><tr><td style="padding:4px 16px 4px 0;color:#71717a">Order</td><td style="font-family:ui-monospace,monospace">${data.orderRef}</td></tr>
            <tr><td style="padding:4px 16px 4px 0;color:#71717a">Amount paid</td><td><strong>${total}</strong></td></tr></table>
@@ -168,19 +182,101 @@ function render(template: EmailTemplate, data: Record<string, string | number>):
            Access to the course has ended because the payment no longer stands. Your bank may take several business days to show the credit.</p>`
         ) + button(`${origin}/orders`, "View your orders"),
       };
+    case "payout_requested": {
+      const ref = String(data.payoutRef ?? data.publicId ?? "");
+      const amount = data.amountPaise !== undefined ? formatInr(Number(data.amountPaise ?? 0)) : String(data.amount ?? formatInr(0));
+      const masked = String(data.maskedDestination ?? data.destinationMasked ?? "Saved destination");
+      return {
+        subject: `Payout request received — ${ref}`,
+        html: shell(
+          "Payout request received",
+          `<p>Hi ${data.creatorName ?? "there"},</p>
+           <p>We received your manual payout request for <strong>${amount}</strong>.</p>
+           <table style="margin:16px 0;font-size:14px">
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Request ID</td><td style="font-family:ui-monospace,monospace">${ref}</td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Amount</td><td><strong>${amount}</strong></td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Destination</td><td>${masked}</td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Status</td><td>Requested · awaiting review</td></tr>
+           </table>
+           <p>This amount is reserved from your available balance while an administrator reviews and processes the transfer.</p>`
+        ) + button(`${origin}/creator/payouts`, "View payout requests"),
+      };
+    }
+    case "payout_approved": {
+      const ref = String(data.payoutRef ?? data.publicId ?? "");
+      const amount = data.amountPaise !== undefined ? formatInr(Number(data.amountPaise ?? 0)) : String(data.amount ?? formatInr(0));
+      const masked = String(data.maskedDestination ?? data.destinationMasked ?? "your saved destination");
+      return {
+        subject: `Payout request approved — ${ref}`,
+        html: shell(
+          "Payout request approved",
+          `<p>Hi ${data.creatorName ?? "there"},</p>
+           <p>Your payout request <strong>${ref}</strong> for <strong>${amount}</strong> to <strong>${masked}</strong> has been approved and queued for manual bank/UPI transfer.</p>
+           <p>We will email you the UTR / transaction reference as soon as the transfer is completed.</p>`
+        ) + button(`${origin}/creator/payouts`, "View payout status"),
+      };
+    }
+    case "payout_paid": {
+      const ref = String(data.payoutRef ?? data.publicId ?? "");
+      const amount = data.amountPaise !== undefined ? formatInr(Number(data.amountPaise ?? 0)) : String(data.amount ?? formatInr(0));
+      const masked = String(data.maskedDestination ?? data.destinationMasked ?? "masked destination");
+      return {
+        subject: `Payout sent — ${ref}`,
+        html: shell(
+          "Creator payout sent",
+          `<p>Hi ${data.creatorName ?? "there"},</p>
+           <p>We have transferred <strong>${amount}</strong> to your saved payout destination (<strong>${masked}</strong>).</p>
+           <table style="margin:16px 0;font-size:14px">
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Request ID</td><td style="font-family:ui-monospace,monospace">${ref}</td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Amount sent</td><td><strong>${amount}</strong></td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Payment reference (UTR)</td><td style="font-family:ui-monospace,monospace"><strong>${data.paymentReference ?? "—"}</strong></td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Method</td><td>${data.paymentMethodUsed ?? "Bank / UPI"}</td></tr>
+           </table>`
+        ) + button(`${origin}/creator/payouts`, "Open payouts"),
+      };
+    }
+    case "payout_rejected": {
+      const ref = String(data.payoutRef ?? data.publicId ?? "");
+      const amount = data.amountPaise !== undefined ? formatInr(Number(data.amountPaise ?? 0)) : String(data.amount ?? formatInr(0));
+      return {
+        subject: `Payout request not approved — ${ref}`,
+        html: shell(
+          "Payout request not approved",
+          `<p>Hi ${data.creatorName ?? "there"},</p>
+           <p>Your payout request <strong>${ref}</strong> for <strong>${amount}</strong> was not approved:</p>
+           <blockquote style="margin:16px 0;padding:12px 16px;background:#fafafa;border-left:3px solid #d4d4d8;color:#52525b">${data.reason ?? "Please review your payout details."}</blockquote>
+           <p>The reserved amount has been released back to your available balance.</p>`
+        ) + button(`${origin}/creator/payouts`, "Review payouts"),
+      };
+    }
+    case "payout_failed": {
+      const ref = String(data.payoutRef ?? data.publicId ?? "");
+      const amount = data.amountPaise !== undefined ? formatInr(Number(data.amountPaise ?? 0)) : String(data.amount ?? formatInr(0));
+      return {
+        subject: `Payout transfer failed — action needed (${ref})`,
+        html: shell(
+          "Payout transfer could not be completed",
+          `<p>Hi ${data.creatorName ?? "there"},</p>
+           <p>We attempted to send <strong>${amount}</strong> for payout request <strong>${data.payoutRef}</strong> to <strong>${data.maskedDestination ?? "your saved destination"}</strong>, but the transfer could not be completed:</p>
+           <blockquote style="margin:16px 0;padding:12px 16px;background:#fafafa;border-left:3px solid #d4d4d8;color:#52525b">${data.reason ?? "Please verify your UPI ID or bank account details."}</blockquote>
+           <p>The reserved amount has been returned to your available balance. Please update your UPI ID or bank account details in Creator Studio and submit a new payout request.</p>`
+        ) + button(`${origin}/creator/payouts`, "Update payout destination"),
+      };
+    }
     case "transfer_status":
       return {
-        subject: `Earnings update — ${data.status}`,
+        subject: `Payout update — ${data.status}`,
         html: shell(
-          "Creator transfer update",
-          `<p>Hi ${data.creatorName},</p><p>A Razorpay Route transfer of <strong>${formatInr(Number(data.amountPaise ?? 0))}</strong> for <strong>${data.courseTitle}</strong> is now <strong>${data.status}</strong>.</p>
-           <p style="color:#71717a;font-size:13px">A processed transfer still has to settle to your bank account before the money is available.</p>`
-        ) + button(`${origin}/creator/earnings`, "View earnings"),
+          "Creator payout update",
+          `<p>Hi ${data.creatorName},</p><p>Your payout of <strong>${formatInr(Number(data.amountPaise ?? 0))}</strong>${data.courseTitle ? ` for <strong>${data.courseTitle}</strong>` : ""} is now <strong>${data.status}</strong>.</p>`
+        ) + button(`${origin}/creator/payouts`, "View payouts"),
       };
     default:
       return { subject: "Zybble", html: shell("Notification", "<p>You have a new update in Zybble.</p>") };
   }
 }
+
+const render = renderEmailTemplate;
 
 /* -------------------------------------------------------------------------- */
 /* Dispatch                                                                    */

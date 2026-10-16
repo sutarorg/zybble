@@ -36,7 +36,6 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           // `frame-src` is required for the Bunny Stream player iframe; it is
           // the only third-party frame Zybble embeds.
@@ -52,7 +51,7 @@ const nextConfig: NextConfig = {
               "frame-src 'self' https://api.razorpay.com https://player.mediadelivery.net",
               "connect-src 'self' https://*.supabase.co https://api.razorpay.com https://*.razorpay.com https://*.bunny.net https://*.bunnycdn.com wss://*.supabase.co",
               "form-action 'self' https://api.razorpay.com",
-              "frame-ancestors 'self'",
+              "frame-ancestors 'self' https://*.e2b.app https://*.arena.ai https://*.lmarena.ai",
               "base-uri 'self'",
               "object-src 'none'",
             ].join("; "),

@@ -70,7 +70,7 @@ export default async function CreatorDashboardPage({
             Creator dashboard
           </h1>
           <p className="mt-1.5 text-[14px] text-muted-foreground">
-            Real figures from your courses, orders and verified Razorpay transfers.
+            Real figures from your courses, captured learner orders, and manual payouts.
           </p>
         </div>
         <Button asChild>
@@ -80,12 +80,15 @@ export default async function CreatorDashboardPage({
         </Button>
       </header>
 
-      {route.blockedReason ? (
+      {!route.hasAccount && finance.netEarnedPaise > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] text-amber-900">
-          <p className="font-semibold">Razorpay Route is not active yet</p>
-          <p className="mt-1 text-amber-800">{route.blockedReason}</p>
+          <p className="font-semibold">Save a payout destination to request your earnings</p>
+          <p className="mt-1 text-amber-800">
+            You have {money(finance.availablePaise)} in available creator earnings. Add a UPI ID or
+            Indian bank account whenever you are ready to request a manual payout.
+          </p>
           <Link href="/creator/payouts" className="mt-2 inline-flex items-center gap-1 font-medium underline">
-            Open payouts <ArrowRight className="size-3.5" aria-hidden />
+            Configure payout destination <ArrowRight className="size-3.5" aria-hidden />
           </Link>
         </div>
       ) : null}
@@ -197,11 +200,10 @@ export default async function CreatorDashboardPage({
               { label: "Gross course sales", value: finance.grossPaise },
               { label: `Zybble commission (${finance.commissionPercentLabel}%)`, value: -finance.commissionPaise },
               { label: "Net earned", value: finance.netEarnedPaise },
-              { label: "Transferred to your Route account", value: finance.transferredPaise },
-              { label: "Settled by Razorpay", value: finance.settledPaise },
-              { label: "Pending with Razorpay", value: finance.pendingPaise },
-              { label: "Reversed", value: finance.reversedPaise },
-              { label: "Refunded to learners", value: finance.refundPaise },
+              { label: "Available to request", value: finance.availablePaise },
+              { label: "Reserved in pending requests", value: finance.reservedPendingPaise },
+              { label: "Paid out to you", value: finance.paidOutPaise },
+              { label: "Refund adjustments", value: finance.refundedCreatorSharePaise },
             ].map((row) => (
               <div key={row.label} className="flex items-baseline justify-between gap-4 text-[13px]">
                 <dt className="text-muted-foreground">{row.label}</dt>
@@ -210,7 +212,7 @@ export default async function CreatorDashboardPage({
             ))}
           </dl>
           <p className="mt-4 text-[12px] text-zinc-400">
-            Transfers and settlements reflect the state reported by Razorpay, never a guess made here.
+            Figures reconcile captured orders, processed refunds, and confirmed manual payouts in INR paise.
           </p>
         </section>
       </div>
@@ -223,8 +225,8 @@ export default async function CreatorDashboardPage({
         </h2>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "Creator profile complete", done: !route.hasAccount, href: "/creator/profile" },
-            { label: "Razorpay Route active", done: route.settlementVerified, href: "/creator/payouts" },
+            { label: "Creator profile complete", done: true, href: "/creator/profile" },
+            { label: "Payout destination saved", done: route.hasAccount, href: "/creator/payouts" },
             { label: "At least one course", done: courses.length > 0, href: "/creator/courses" },
             {
               label: "A published course",
@@ -251,8 +253,7 @@ export default async function CreatorDashboardPage({
           ))}
         </ul>
         <p className="mt-4 flex items-center gap-1.5 text-[12px] text-zinc-400">
-          <Eye className="size-3.5" aria-hidden /> Every figure on this page is read from the database or from
-          Razorpay at request time.
+          <Eye className="size-3.5" aria-hidden /> Every figure on this page is read from the database at request time.
         </p>
       </section>
     </div>

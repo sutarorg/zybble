@@ -16,7 +16,7 @@ export function QuickApproveButton({ courseId, paid }: { courseId: string; paid:
       confirmTitle="Approve and publish this course?"
       confirmBody={
         paid
-          ? "Publishing makes this course purchasable. Razorpay Route will be asked to split every payment between the creator and Zybble."
+          ? "Publishing makes this course purchasable in INR via Razorpay Checkout. The creator's net share accrues to their ledger balance for manual payout."
           : "Publishing lists this free course in the public catalog."
       }
       confirmLabel="Approve and publish"

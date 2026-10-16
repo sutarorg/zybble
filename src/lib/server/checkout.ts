@@ -1,10 +1,14 @@
 /**
- * Checkout, payment confirmation, Route transfers and the financial ledger.
+ * Checkout, payment confirmation, manual creator payout accrual, and the
+ * append-only financial ledger.
  *
  * Invariants this module exists to hold:
  *  * The course price, currency, commission and creator share are computed on
  *    the server from database rows. Nothing the browser sends is authoritative.
  *  * Money is integer paise, always INR.
+ *  * Learner payments settle into Zybble's merchant account via standard
+ *    Razorpay Checkout orders (no Route `transfers` array on order creation and
+ *    no automatic Route transfer creation on capture).
  *  * Payment confirmation happens twice: the Checkout signature proves the
  *    browser response is genuine, and a Razorpay API fetch (or the
  *    `payment.captured` webhook) proves the provider actually captured it.
@@ -13,6 +17,8 @@
  *    access twice or double-credit a creator.
  *  * The commission rate is snapshotted onto each order item, so changing the
  *    marketplace rate later never rewrites a past sale.
+ *  * Refunds and reversals record explicit creator-share adjustments without
+ *    assuming funds were automatically clawed back from a creator's bank account.
  */
 
 import "server-only";
@@ -26,14 +32,13 @@ import {
 } from "@/lib/money";
 import {
   createOrder,
-  fetchOrder,
   fetchPayment,
   verifyCheckoutSignature,
   fetchTransfer,
   reverseTransfer,
-  isRouteAccountEligible,
   type RazorpayWebhookPayload,
 } from "@/lib/server/razorpay";
+import { computeCreatorRefundAdjustmentPaise } from "@/lib/server/payouts";
 import { enqueueEmail } from "@/lib/server/email";
 
 export class CheckoutError extends Error {
@@ -110,19 +115,15 @@ export async function assertPurchasable(
   }
 
   const pricePaise = Number(course.price_paise);
+  if (!Number.isSafeInteger(pricePaise) || pricePaise < 0) {
+    throw new CheckoutError("invalid_price", "Course price is invalid", 409);
+  }
   assertInr(String(course.currency ?? CURRENCY));
 
-  if (pricePaise > 0) {
-    // An India-only marketplace: a paid course cannot be sold until the
-    // creator's Razorpay Route linked account is verified as active.
-    if (!isRouteAccountEligible(creatorProfile.route_account_status as never)) {
-      throw new CheckoutError(
-        "creator_not_payable",
-        "This course cannot be purchased yet: the creator's settlement account is not active.",
-        409
-      );
-    }
-  }
+  // Paid courses no longer require Razorpay Route onboarding or pre-saved
+  // payout details to be sold. Learner payments settle to Zybble and the
+  // creator's share accrues for manual payout; payout destination details are
+  // required only when the creator requests a payout.
 
   const commissionBps = Number(settings?.commission_bps ?? 1000) as CommissionBps;
 
@@ -212,7 +213,7 @@ export async function enrollInFreeCourse(session: SessionProfile, courseId: stri
 
 /**
  * Creates a durable pending order with an immutable item snapshot, then creates
- * the matching Razorpay order **with the Route transfer already configured**.
+ * a standard INR Razorpay order without Route transfers.
  */
 export async function createCheckoutOrder(session: SessionProfile, courseId: string): Promise<CheckoutSession> {
   const service = requireServiceClient();
@@ -256,7 +257,7 @@ export async function createCheckoutOrder(session: SessionProfile, courseId: str
     commission_bps: commissionBps,
     commission_paise: commissionPaise,
     creator_share_paise: creatorPaise,
-    route_account_id: creator.route_account_id,
+    route_account_id: null,
   });
   if (itemError) {
     // Never leave an orphan order behind.
@@ -264,20 +265,10 @@ export async function createCheckoutOrder(session: SessionProfile, courseId: str
     throw new CheckoutError("order_failed", "Could not start checkout", 500);
   }
 
-  const routeAccountId = creator.route_account_id as string;
-
   const razorpayOrder = await createOrder({
     amountPaise: pricePaise,
     receipt: publicId,
     notes: { zybble_order: publicId, course: String(course.slug) },
-    transfers: [
-      {
-        account: routeAccountId,
-        amountPaise: creatorPaise,
-        notes: { course: String(course.title), learner: publicId },
-        linkedAccountNotes: ["course"],
-      },
-    ],
   });
 
   await service
@@ -499,40 +490,6 @@ export async function applyCapturedPayment(
       direction: "credit",
       description: `Earnings for ${item.course_title}`,
     });
-
-    // A Route transfer was configured on order creation; Razorpay creates it
-    // automatically once the order is paid. Record the provider id we were
-    // handed so the dashboard can show real state instead of an assumption.
-    const transferId = await findOrderTransferId(input.razorpayOrderId, item.route_account_id as string);
-    if (transferId) {
-      await service
-        .from("route_transfers")
-        .upsert(
-          {
-            transfer_id: transferId,
-            order_id: order.id,
-            order_item_id: item.id,
-            creator_id: item.creator_id,
-            route_account_id: item.route_account_id,
-            currency: CURRENCY,
-            amount_paise: item.creator_share_paise,
-            status: "created",
-          },
-          { onConflict: "transfer_id" }
-        );
-      await appendLedger(service, {
-        idempotencyKey: `transfer-created:${transferId}`,
-        kind: "transfer",
-        account: `creator:${item.creator_id}`,
-        userId: item.creator_id,
-        orderId: order.id,
-        orderItemId: item.id,
-        transferId,
-        amountPaise: item.creator_share_paise,
-        direction: "debit",
-        description: "Transfer initiated to Razorpay Route linked account",
-      });
-    }
   }
 
   await service
@@ -594,16 +551,6 @@ async function queuePurchaseReceipt(
   if (error) console.error("[checkout] receipt not queued", { orderId: order.orderId, reason: error.slice(0, 200) });
 }
 
-async function findOrderTransferId(razorpayOrderId: string, accountId: string): Promise<string | null> {
-  try {
-    const order = await fetchOrder(razorpayOrderId);
-    const transfer = order.transfers?.find((entry) => entry.account === accountId);
-    return transfer?.id ?? order.transfers?.[0]?.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export async function grantEntitlement(
   service: ReturnType<typeof requireServiceClient>,
   userId: string,
@@ -630,7 +577,7 @@ export async function appendLedger(
   service: ReturnType<typeof requireServiceClient>,
   entry: {
     idempotencyKey: string;
-    kind: "sale" | "commission" | "transfer" | "settlement" | "refund" | "reversal" | "adjustment";
+    kind: "sale" | "commission" | "transfer" | "settlement" | "payout" | "refund" | "reversal" | "adjustment";
     account: string;
     userId?: string | null;
     orderId?: string | null;
@@ -1048,9 +995,16 @@ export async function refundOrder(input: {
     notes: { zybble_order: order.public_id, reason: input.reason.slice(0, 200) },
   });
 
-  await service.from("refunds").update({ refund_id: providerRefund.id, status: "pending" }).eq("refund_id", localId);
+  await service
+    .from("refunds")
+    .update({
+      refund_id: providerRefund.id,
+      status: providerRefund.status === "processed" ? "processed" : "pending",
+    })
+    .eq("refund_id", localId);
 
-  // Reverse the creator transfer proportionally so the ledger reflects reality.
+  // If this order was a historical Route order, attempt to reverse any unsettled
+  // Route transfer; for standard manual-payout orders `transfers` is empty.
   const { data: transfers } = await service
     .from("route_transfers")
     .select("transfer_id, creator_id, order_id, order_item_id, amount_paise, reversed_paise, status")
@@ -1063,23 +1017,51 @@ export async function refundOrder(input: {
     try {
       await reverseTransfer(transfer.transfer_id, portion);
     } catch {
-      // Reversal can fail when the transfer already settled; the webhook will
-      // correct the record and the admin sees the real provider state.
+      // Historical settled Route transfer cannot be reversed via API.
     }
   }
 
   const { data: items } = await service.from("order_items").select("*").eq("order_id", order.id);
   for (const item of items ?? []) {
+    const split = computeCreatorRefundAdjustmentPaise({
+      unitPricePaise: Number(item.unit_price_paise ?? 0),
+      creatorSharePaise: Number(item.creator_share_paise ?? 0),
+      refundAmountPaise: amountPaise,
+    });
     await appendLedger(service, {
-      idempotencyKey: `refund:${localId}:${item.id}`,
+      idempotencyKey: `refund:${providerRefund.id}:${item.id}`,
       kind: "refund",
       account: "platform",
       orderId: order.id,
       orderItemId: item.id,
-      amountPaise: item.unit_price_paise,
+      amountPaise: split.refundAmountPaise,
       direction: "debit",
-      description: `Refund ${localId}`,
+      description: `Refund ${providerRefund.id} on order ${order.public_id}`,
+      metadata: {
+        refundId: providerRefund.id,
+        commissionReversalPaise: split.commissionReversalPaise,
+        creatorRefundDebitPaise: split.creatorRefundDebitPaise,
+      },
     });
+    if (split.creatorRefundDebitPaise > 0) {
+      await appendLedger(service, {
+        idempotencyKey: `refund-creator-adjustment:${providerRefund.id}:${item.id}`,
+        kind: "adjustment",
+        account: `creator:${item.creator_id}`,
+        userId: String(item.creator_id),
+        orderId: order.id,
+        orderItemId: item.id,
+        amountPaise: split.creatorRefundDebitPaise,
+        direction: "debit",
+        description: `Creator share adjustment for refunded order ${order.public_id} (reduces payable balance or records post-payout receivable)`,
+        metadata: {
+          refundId: providerRefund.id,
+          orderPublicId: order.public_id,
+          creatorRefundDebitPaise: split.creatorRefundDebitPaise,
+          commissionReversalPaise: split.commissionReversalPaise,
+        },
+      });
+    }
   }
 
   const fullyRefunded = refunded + amountPaise >= Number(order.total_paise);
@@ -1183,6 +1165,11 @@ async function reconcileProviderReversal(
   const fullyReversed = totalPaise > 0 && refundedPaise >= totalPaise;
 
   for (const item of items ?? []) {
+    const split = computeCreatorRefundAdjustmentPaise({
+      unitPricePaise: Number(item.unit_price_paise ?? 0),
+      creatorSharePaise: Number(item.creator_share_paise ?? 0),
+      refundAmountPaise: amountPaise,
+    });
     await appendLedger(service, {
       idempotencyKey: `reversal:${refund.id}:${item.id}`,
       kind: "reversal",
@@ -1190,10 +1177,34 @@ async function reconcileProviderReversal(
       userId: String(order.user_id),
       orderId: orderId,
       orderItemId: item.id,
-      amountPaise: amountPaise,
+      amountPaise: split.refundAmountPaise,
       direction: "debit",
       description: "Provider-initiated reversal",
+      metadata: {
+        refundId: refund.id,
+        commissionReversalPaise: split.commissionReversalPaise,
+        creatorRefundDebitPaise: split.creatorRefundDebitPaise,
+      },
     });
+    if (split.creatorRefundDebitPaise > 0) {
+      await appendLedger(service, {
+        idempotencyKey: `reversal-creator-adjustment:${refund.id}:${item.id}`,
+        kind: "adjustment",
+        account: `creator:${item.creator_id}`,
+        userId: String(item.creator_id),
+        orderId: orderId,
+        orderItemId: item.id,
+        amountPaise: split.creatorRefundDebitPaise,
+        direction: "debit",
+        description: `Creator share adjustment for provider reversal on order ${order.public_id} (reduces payable balance or records post-payout receivable)`,
+        metadata: {
+          refundId: refund.id,
+          orderPublicId: order.public_id,
+          creatorRefundDebitPaise: split.creatorRefundDebitPaise,
+          commissionReversalPaise: split.commissionReversalPaise,
+        },
+      });
+    }
 
     if (fullyReversed) {
       await service

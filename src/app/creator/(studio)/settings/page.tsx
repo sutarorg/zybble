@@ -25,7 +25,7 @@ export default async function CreatorSettingsPage() {
         </h2>
         <ul className="mt-3 space-y-2 text-[13px] text-muted-foreground">
           <li>• Your commission rate is a marketplace setting applied at checkout, not a personal preference.</li>
-          <li>• Settlement is handled by Razorpay Route; payout details live in the Razorpay dashboard.</li>
+          <li>• Encrypted UPI / bank payout destinations and payout requests are managed on the Payouts page.</li>
           <li>• Account status, role and email are managed from the account and admin portals.</li>
           <li>• Zybble publishes no refund policy, so there is nothing here to configure.</li>
         </ul>

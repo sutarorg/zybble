@@ -1,12 +1,24 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireAdmin, AuthorizationError } from "@/lib/server/session";
-import { MIN_COMMISSION_BPS, MAX_COMMISSION_BPS, formatCommissionPercent } from "@/lib/money";
+import { MIN_COMMISSION_BPS, MAX_COMMISSION_BPS, formatCommissionPercent, formatInr } from "@/lib/money";
 import { refundOrder } from "@/lib/server/checkout";
 import { enqueueEmail } from "@/lib/server/email";
+import {
+  decryptPayoutDestination,
+  PayoutCryptoError,
+  type PayoutDestinationMethod,
+  type PlainPayoutDestination,
+} from "@/lib/server/payout-crypto";
+import {
+  assertValidPayoutTransition,
+  PayoutWorkflowError,
+  validateManualPayoutConfirmation,
+  type PayoutRequestStatus,
+} from "@/lib/server/payouts";
 
 export interface AdminActionResult {
   ok: boolean;
@@ -67,22 +79,6 @@ export async function approveCourse(input: unknown): Promise<AdminActionResult> 
       .maybeSingle();
     if (!course) return { ok: false, error: "Course not found" };
     if (course.status === "published") return { ok: false, error: "This course is already published" };
-
-    // A paid course must have an active Route account before it can be sold.
-    if (Number(course.price_paise ?? 0) > 0) {
-      const { data: creator } = await service
-        .from("creator_profiles")
-        .select("route_account_status")
-        .eq("user_id", course.creator_id)
-        .maybeSingle();
-      if (creator?.route_account_status !== "active") {
-        return {
-          ok: false,
-          error:
-            "This course is paid, but Razorpay does not report the creator's Route account as active. It cannot be published until settlement is verified.",
-        };
-      }
-    }
 
     await service
       .from("courses")
@@ -534,5 +530,542 @@ export async function refundOrderAction(input: unknown): Promise<AdminActionResu
       return { ok: false, error: typed.message };
     }
     return fail(error, "Could not process this refund");
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Manual Creator Payouts                                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface AdminRevealPayoutDestinationResult extends AdminActionResult {
+  destination?: PlainPayoutDestination;
+}
+
+/**
+ * Audited, server-authorized reveal of a payout request's encrypted destination
+ * snapshot so an admin can execute an off-platform UPI or bank transfer.
+ *
+ * Uses `noStore()` so the decrypted payload is never cached by Next.js or HTTP
+ * intermediaries, and writes an immutable audit event before returning.
+ */
+export async function revealPayoutDestinationAction(
+  requestId: string
+): Promise<AdminRevealPayoutDestinationResult> {
+  noStore();
+  try {
+    const admin = await requireAdmin();
+    if (!UUID.safeParse(requestId).success) {
+      return { ok: false, error: "Invalid payout request" };
+    }
+
+    const service = createServiceClient();
+    if (!service) return { ok: false, error: "Service is unavailable" };
+
+    const { data: row } = await service
+      .from("payout_requests")
+      .select(
+        "id, public_id, creator_id, destination_method, destination_encrypted_payload, destination_masked"
+      )
+      .eq("id", requestId)
+      .maybeSingle();
+    if (!row) return { ok: false, error: "Payout request not found" };
+
+    let plain: PlainPayoutDestination;
+    try {
+      plain = decryptPayoutDestination(String(row.destination_encrypted_payload), {
+        creatorId: String(row.creator_id),
+        expectedMethod: String(row.destination_method) as PayoutDestinationMethod,
+      });
+    } catch (cryptoErr) {
+      if (
+        cryptoErr instanceof PayoutCryptoError &&
+        (cryptoErr.code === "encryption_unconfigured" ||
+          cryptoErr.code === "encryption_key_invalid")
+      ) {
+        return {
+          ok: false,
+          error:
+            "PAYOUT_DETAILS_ENCRYPTION_KEY is missing or invalid in this environment; destination cannot be decrypted.",
+        };
+      }
+      return { ok: false, error: "Could not decrypt payout destination snapshot" };
+    }
+
+    await service.from("payout_audit_events").insert({
+      payout_request_id: String(row.id),
+      creator_id: String(row.creator_id),
+      actor_id: admin.id,
+      action: "destination_revealed",
+      metadata: {
+        public_id: String(row.public_id),
+        destination_method: String(row.destination_method),
+        destination_masked: String(row.destination_masked),
+      },
+    });
+    await audit(admin.id, "payout.reveal_destination", "payout_request", String(row.id), {
+      publicId: String(row.public_id),
+      destinationMethod: String(row.destination_method),
+      destinationMasked: String(row.destination_masked),
+    });
+
+    return { ok: true, destination: plain };
+  } catch (error) {
+    return fail(error, "Could not reveal payout destination");
+  }
+}
+
+const approvePayoutSchema = z.object({
+  requestId: UUID,
+  adminNote: z.string().trim().max(500).optional(),
+});
+
+export async function approvePayoutRequestAction(input: unknown): Promise<AdminActionResult> {
+  try {
+    const admin = await requireAdmin();
+    const parsed = approvePayoutSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "Invalid approval request" };
+
+    const service = createServiceClient();
+    if (!service) return { ok: false, error: "Service is unavailable" };
+
+    const { data: row } = await service
+      .from("payout_requests")
+      .select(
+        "id, public_id, creator_id, amount_paise, status, destination_method, destination_masked"
+      )
+      .eq("id", parsed.data.requestId)
+      .maybeSingle();
+    if (!row) return { ok: false, error: "Payout request not found" };
+
+    try {
+      assertValidPayoutTransition(String(row.status) as PayoutRequestStatus, "approved");
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Invalid status transition" };
+    }
+
+    const now = new Date().toISOString();
+    const note = parsed.data.adminNote?.trim() || null;
+    const { error } = await service
+      .from("payout_requests")
+      .update({
+        status: "approved",
+        approved_at: now,
+        approved_by: admin.id,
+        admin_note: note,
+        failure_reason: null,
+        failed_at: null,
+        failed_by: null,
+        updated_at: now,
+      })
+      .eq("id", parsed.data.requestId);
+    if (error) return { ok: false, error: "Could not approve payout request" };
+
+    const amountFormatted = formatInr(Number(row.amount_paise ?? 0));
+    await Promise.all([
+      service.from("payout_audit_events").insert({
+        payout_request_id: String(row.id),
+        creator_id: String(row.creator_id),
+        actor_id: admin.id,
+        action: "payout_approved",
+        metadata: {
+          public_id: String(row.public_id),
+          amount_paise: Number(row.amount_paise ?? 0),
+          admin_note: note,
+        },
+      }),
+      service.from("notifications").insert({
+        user_id: String(row.creator_id),
+        audience: "creator",
+        kind: "payout",
+        title: `Payout ${String(row.public_id)} approved`,
+        body: `Your payout request for ${amountFormatted} is approved and queued for manual transfer.`,
+        href: "/creator/payouts",
+      }),
+    ]);
+    await audit(admin.id, "payout.approve", "payout_request", String(row.id), {
+      publicId: String(row.public_id),
+      amountPaise: Number(row.amount_paise ?? 0),
+    });
+
+    const { data: creatorProfile } = await service
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", String(row.creator_id))
+      .maybeSingle();
+    if (creatorProfile?.email) {
+      await enqueueEmail({
+        to: String(creatorProfile.email),
+        template: "payout_approved",
+        payload: {
+          creatorName: String(creatorProfile.full_name ?? "Creator"),
+          publicId: String(row.public_id),
+          amount: amountFormatted,
+          destinationMasked: `${String(row.destination_method).toUpperCase()} (${String(row.destination_masked)})`,
+        },
+        idempotencyKey: `payout_approved:${String(row.id)}`,
+      });
+    }
+
+    revalidatePath("/admin/payouts");
+    revalidatePath("/admin");
+    revalidatePath("/creator/payouts");
+    revalidatePath("/creator/earnings");
+    return {
+      ok: true,
+      message: `Approved payout request ${String(row.public_id)} (${amountFormatted}). Complete the off-platform transfer and record the UTR/reference to mark it paid.`,
+    };
+  } catch (error) {
+    return fail(error, "Could not approve payout request");
+  }
+}
+
+const reasonDecisionSchema = z.object({
+  requestId: UUID,
+  reason: z.string().trim().min(5, "Provide a clear reason (at least 5 characters)").max(500),
+});
+
+export async function rejectPayoutRequestAction(input: unknown): Promise<AdminActionResult> {
+  try {
+    const admin = await requireAdmin();
+    const parsed = reasonDecisionSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Provide a rejection reason" };
+    }
+
+    const service = createServiceClient();
+    if (!service) return { ok: false, error: "Service is unavailable" };
+
+    const { data: row } = await service
+      .from("payout_requests")
+      .select("id, public_id, creator_id, amount_paise, status")
+      .eq("id", parsed.data.requestId)
+      .maybeSingle();
+    if (!row) return { ok: false, error: "Payout request not found" };
+
+    try {
+      assertValidPayoutTransition(String(row.status) as PayoutRequestStatus, "rejected");
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Invalid status transition" };
+    }
+
+    const now = new Date().toISOString();
+    const { error } = await service
+      .from("payout_requests")
+      .update({
+        status: "rejected",
+        rejection_reason: parsed.data.reason,
+        rejected_at: now,
+        rejected_by: admin.id,
+        updated_at: now,
+      })
+      .eq("id", parsed.data.requestId);
+    if (error) return { ok: false, error: "Could not reject payout request" };
+
+    const amountFormatted = formatInr(Number(row.amount_paise ?? 0));
+    await Promise.all([
+      service.from("payout_audit_events").insert({
+        payout_request_id: String(row.id),
+        creator_id: String(row.creator_id),
+        actor_id: admin.id,
+        action: "payout_rejected",
+        metadata: {
+          public_id: String(row.public_id),
+          amount_paise: Number(row.amount_paise ?? 0),
+          reason: parsed.data.reason,
+        },
+      }),
+      service.from("notifications").insert({
+        user_id: String(row.creator_id),
+        audience: "creator",
+        kind: "payout",
+        title: `Payout ${String(row.public_id)} was not approved`,
+        body: `${parsed.data.reason} — ${amountFormatted} has been returned to your available balance.`,
+        href: "/creator/payouts",
+      }),
+    ]);
+    await audit(admin.id, "payout.reject", "payout_request", String(row.id), {
+      publicId: String(row.public_id),
+      reason: parsed.data.reason,
+    });
+
+    const { data: creatorProfile } = await service
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", String(row.creator_id))
+      .maybeSingle();
+    if (creatorProfile?.email) {
+      await enqueueEmail({
+        to: String(creatorProfile.email),
+        template: "payout_rejected",
+        payload: {
+          creatorName: String(creatorProfile.full_name ?? "Creator"),
+          publicId: String(row.public_id),
+          amount: amountFormatted,
+          reason: parsed.data.reason,
+        },
+        idempotencyKey: `payout_rejected:${String(row.id)}:${Date.now()}`,
+      });
+    }
+
+    revalidatePath("/admin/payouts");
+    revalidatePath("/admin");
+    revalidatePath("/creator/payouts");
+    revalidatePath("/creator/earnings");
+    return {
+      ok: true,
+      message: `Rejected payout request ${String(row.public_id)}. Reserved funds (${amountFormatted}) were released back to the creator's available balance.`,
+    };
+  } catch (error) {
+    return fail(error, "Could not reject payout request");
+  }
+}
+
+export async function markPayoutRequestFailedAction(input: unknown): Promise<AdminActionResult> {
+  try {
+    const admin = await requireAdmin();
+    const parsed = reasonDecisionSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Provide a failure reason" };
+    }
+
+    const service = createServiceClient();
+    if (!service) return { ok: false, error: "Service is unavailable" };
+
+    const { data: row } = await service
+      .from("payout_requests")
+      .select("id, public_id, creator_id, amount_paise, status")
+      .eq("id", parsed.data.requestId)
+      .maybeSingle();
+    if (!row) return { ok: false, error: "Payout request not found" };
+
+    try {
+      assertValidPayoutTransition(String(row.status) as PayoutRequestStatus, "failed");
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Invalid status transition" };
+    }
+
+    const now = new Date().toISOString();
+    const { error } = await service
+      .from("payout_requests")
+      .update({
+        status: "failed",
+        failure_reason: parsed.data.reason,
+        failed_at: now,
+        failed_by: admin.id,
+        updated_at: now,
+      })
+      .eq("id", parsed.data.requestId);
+    if (error) return { ok: false, error: "Could not mark payout request as failed" };
+
+    const amountFormatted = formatInr(Number(row.amount_paise ?? 0));
+    await Promise.all([
+      service.from("payout_audit_events").insert({
+        payout_request_id: String(row.id),
+        creator_id: String(row.creator_id),
+        actor_id: admin.id,
+        action: "payout_failed",
+        metadata: {
+          public_id: String(row.public_id),
+          amount_paise: Number(row.amount_paise ?? 0),
+          reason: parsed.data.reason,
+        },
+      }),
+      service.from("notifications").insert({
+        user_id: String(row.creator_id),
+        audience: "creator",
+        kind: "payout",
+        title: `Action needed: Payout ${String(row.public_id)} could not be completed`,
+        body: `${parsed.data.reason} — ${amountFormatted} has been returned to your available balance so you can update your payout details.`,
+        href: "/creator/payouts",
+      }),
+    ]);
+    await audit(admin.id, "payout.fail", "payout_request", String(row.id), {
+      publicId: String(row.public_id),
+      reason: parsed.data.reason,
+    });
+
+    const { data: creatorProfile } = await service
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", String(row.creator_id))
+      .maybeSingle();
+    if (creatorProfile?.email) {
+      await enqueueEmail({
+        to: String(creatorProfile.email),
+        template: "payout_failed",
+        payload: {
+          creatorName: String(creatorProfile.full_name ?? "Creator"),
+          publicId: String(row.public_id),
+          amount: amountFormatted,
+          reason: parsed.data.reason,
+        },
+        idempotencyKey: `payout_failed:${String(row.id)}:${Date.now()}`,
+      });
+    }
+
+    revalidatePath("/admin/payouts");
+    revalidatePath("/admin");
+    revalidatePath("/creator/payouts");
+    revalidatePath("/creator/earnings");
+    return {
+      ok: true,
+      message: `Marked payout ${String(row.public_id)} as failed and released ${amountFormatted} back to the creator's available balance.`,
+    };
+  } catch (error) {
+    return fail(error, "Could not mark payout request as failed");
+  }
+}
+
+const confirmPaidSchema = z.object({
+  requestId: UUID,
+  paymentReference: z.string().trim().min(4, "Enter the bank UTR or UPI transaction reference").max(80),
+  paymentMethodUsed: z.string().trim().min(2).max(40),
+  confirmedAmountPaise: z.number().int().positive(),
+  confirmedAmountMatches: z.boolean(),
+  confirmedTransferSent: z.boolean(),
+  adminNote: z.string().trim().max(500).optional(),
+});
+
+/**
+ * Marks a creator payout request as `paid` ONLY after an administrator has
+ * executed the manual transfer outside Zybble, entered the bank/UPI UTR
+ * reference, and explicitly confirmed both the exact amount and completion.
+ */
+export async function confirmManualPayoutPaidAction(input: unknown): Promise<AdminActionResult> {
+  try {
+    const admin = await requireAdmin();
+    const parsed = confirmPaidSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the payout confirmation details" };
+    }
+
+    const service = createServiceClient();
+    if (!service) return { ok: false, error: "Service is unavailable" };
+
+    const { data: row } = await service
+      .from("payout_requests")
+      .select(
+        "id, public_id, creator_id, amount_paise, status, destination_method, destination_masked, approved_at, approved_by"
+      )
+      .eq("id", parsed.data.requestId)
+      .maybeSingle();
+    if (!row) return { ok: false, error: "Payout request not found" };
+
+    let validatedConfirm: { paymentReference: string; paymentMethodUsed: string };
+    try {
+      validatedConfirm = validateManualPayoutConfirmation({
+        currentStatus: String(row.status) as PayoutRequestStatus,
+        expectedAmountPaise: Number(row.amount_paise ?? 0),
+        confirmAmountPaise: parsed.data.confirmedAmountPaise,
+        paymentReference: parsed.data.paymentReference,
+        paymentMethodUsed: parsed.data.paymentMethodUsed,
+        confirmAmountMatch: parsed.data.confirmedAmountMatches,
+        confirmTransferSent: parsed.data.confirmedTransferSent,
+      });
+    } catch (err) {
+      if (err instanceof PayoutWorkflowError) {
+        return { ok: false, error: err.message };
+      }
+      return { ok: false, error: "Invalid payout confirmation" };
+    }
+
+    const now = new Date().toISOString();
+    const note = parsed.data.adminNote?.trim() || null;
+    const amountPaise = Number(row.amount_paise ?? 0);
+    const normalizedReference = validatedConfirm.paymentReference;
+
+    const { error } = await service
+      .from("payout_requests")
+      .update({
+        status: "paid",
+        payment_reference: normalizedReference,
+        payment_method_used: validatedConfirm.paymentMethodUsed,
+        confirmed_amount_matches: true,
+        confirmed_transfer_sent: true,
+        admin_note: note,
+        paid_at: now,
+        paid_by: admin.id,
+        approved_at: (row.approved_at as string) ?? now,
+        approved_by: (row.approved_by as string) ?? admin.id,
+        updated_at: now,
+      })
+      .eq("id", parsed.data.requestId);
+    if (error) return { ok: false, error: "Could not record manual payout confirmation" };
+
+    const amountFormatted = formatInr(amountPaise);
+    await Promise.all([
+      service.from("ledger_entries").insert({
+        kind: "payout",
+        direction: "debit",
+        amount_paise: amountPaise,
+        currency: "INR",
+        account: `creator:${String(row.creator_id)}`,
+        external_ref: normalizedReference,
+        note: `Manual payout ${String(row.public_id)} (${validatedConfirm.paymentMethodUsed} · Ref: ${normalizedReference})`,
+      }),
+      service.from("payout_audit_events").insert({
+        payout_request_id: String(row.id),
+        creator_id: String(row.creator_id),
+        actor_id: admin.id,
+        action: "payout_paid",
+        metadata: {
+          public_id: String(row.public_id),
+          amount_paise: amountPaise,
+          payment_reference: normalizedReference,
+          payment_method_used: validatedConfirm.paymentMethodUsed,
+          admin_note: note,
+        },
+      }),
+      service.from("notifications").insert({
+        user_id: String(row.creator_id),
+        audience: "creator",
+        kind: "payout",
+        title: `Payout ${String(row.public_id)} marked paid`,
+        body: `${amountFormatted} was sent via ${validatedConfirm.paymentMethodUsed.toUpperCase()} (Ref: ${normalizedReference}).`,
+        href: "/creator/payouts",
+      }),
+    ]);
+    await audit(admin.id, "payout.mark_paid", "payout_request", String(row.id), {
+      publicId: String(row.public_id),
+      amountPaise,
+      paymentReference: normalizedReference,
+      paymentMethodUsed: validatedConfirm.paymentMethodUsed,
+    });
+
+    const { data: creatorProfile } = await service
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", String(row.creator_id))
+      .maybeSingle();
+    if (creatorProfile?.email) {
+      await enqueueEmail({
+        to: String(creatorProfile.email),
+        template: "payout_paid",
+        payload: {
+          creatorName: String(creatorProfile.full_name ?? "Creator"),
+          publicId: String(row.public_id),
+          amount: amountFormatted,
+          destinationMasked: `${String(row.destination_method).toUpperCase()} (${String(row.destination_masked)})`,
+          paymentReference: normalizedReference,
+          paidAt: new Date(now).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          }),
+        },
+        idempotencyKey: `payout_paid:${String(row.id)}`,
+      });
+    }
+
+    revalidatePath("/admin/payouts");
+    revalidatePath("/admin");
+    revalidatePath("/creator/payouts");
+    revalidatePath("/creator/earnings");
+    return {
+      ok: true,
+      message: `Recorded manual payout ${String(row.public_id)} (${amountFormatted}) with reference ${normalizedReference}.`,
+    };
+  } catch (error) {
+    return fail(error, "Could not confirm manual payout");
   }
 }

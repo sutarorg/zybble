@@ -1,113 +1,110 @@
-import { Landmark, TrendingDown, Wallet } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { getCreatorFinance } from "@/lib/server/creator";
-import { money } from "@/lib/creator";
-import { StatCard } from "@/components/creator/stat-card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { formatInr } from "@/lib/money";
+import { Button } from "@/components/ui/button";
 
-export const metadata = { title: "Earnings" };
 export const dynamic = "force-dynamic";
-
-const TRANSFER_TONE: Record<string, string> = {
-  processed: "text-emerald-700",
-  queued: "text-amber-700",
-  pending: "text-amber-700",
-  created: "text-amber-700",
-  failed: "text-red-700",
-  reversed: "text-red-700",
-  partially_reversed: "text-orange-700",
-};
 
 export default async function CreatorEarningsPage() {
   const finance = await getCreatorFinance();
-  const hasSales = finance.grossPaise > 0;
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Earnings</h1>
-        <p className="mt-1.5 text-[14px] text-muted-foreground">
-          Every figure is derived from order items and verified Razorpay Route transfers. Amounts are INR (₹),
-          stored as integer paise.
-        </p>
-      </header>
-
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Wallet} label="Net earnings" value={money(finance.netEarnedPaise)} />
-        <StatCard
-          icon={TrendingDown}
-          label="Zybble commission"
-          value={money(finance.commissionPaise)}
-          hint={`${finance.commissionPercentLabel}% of gross`}
-        />
-        <StatCard icon={Landmark} label="Transferred to your Route account" value={money(finance.transferredPaise)} />
-        <StatCard icon={Landmark} label="Settled in your bank account" value={money(finance.settledPaise)} />
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Earnings & ledger</h1>
+          <p className="mt-1 text-xs text-muted-foreground max-w-2xl">
+            Every figure below is computed in integer paise from captured learner orders,
+            processed refunds, and confirmed manual payouts. Platform commission is{" "}
+            {finance.commissionPercentLabel}% on new orders; your creator share is{" "}
+            {100 - finance.commissionBps / 100}%.
+          </p>
+        </div>
+        <Button asChild size="sm" variant="outline" className="gap-1.5">
+          <Link href="/creator/payouts">
+            Manage destination & request payout <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </Button>
       </div>
 
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-        <h2 className="font-display text-[15px] font-semibold tracking-tight">Route transfers</h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          Each row is a transfer Razorpay actually created. Settlement to your bank follows Razorpay&apos;s
-          own timeline and is never assumed here.
-        </p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Metric label="Gross sales" value={formatInr(finance.grossPaise)} />
+        <Metric
+          label={`Commission (${finance.commissionPercentLabel}%)`}
+          value={formatInr(finance.commissionPaise)}
+        />
+        <Metric
+          label="Net creator share"
+          value={formatInr(finance.netEarnedPaise)}
+          sub={
+            finance.refundedCreatorSharePaise > 0
+              ? `After ${formatInr(finance.refundedCreatorSharePaise)} refund adjustments`
+              : undefined
+          }
+        />
+        <Metric
+          label="Available to request"
+          value={formatInr(finance.availablePaise)}
+          highlight
+        />
+        <Metric
+          label="Reserved in requests"
+          value={formatInr(finance.reservedPendingPaise)}
+        />
+        <Metric label="Paid out to you" value={formatInr(finance.paidOutPaise)} />
+      </div>
 
-        {finance.transfers.length === 0 ? (
-          <EmptyState
-            className="mt-4"
-            icon={Landmark}
-            title={hasSales ? "No transfers yet" : "No sales yet"}
-            description={
-              hasSales
-                ? "Transfers are created once a learner's payment is verified. Razorpay Route settles these on its own schedule."
-                : "Once a learner buys one of your courses, your share and the matching Route transfer appear here."
-            }
-          />
+      {finance.negativeAdjustmentPaise > 0 ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-800 dark:text-amber-300">
+          <strong>Post-payout refund adjustment:</strong> {formatInr(finance.negativeAdjustmentPaise)}{" "}
+          from a learner refund recorded after a manual payout is tracked as a receivable offset
+          against future course earnings. Zybble never silently fabricates a bank clawback.
+        </div>
+      ) : null}
+
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="border-b border-border px-5 py-3.5 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold">Course revenue breakdown</h2>
+            <p className="text-xs text-muted-foreground">
+              Captured learner orders grouped by course.
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {finance.courseBreakdown.length} courses with sales
+          </span>
+        </div>
+
+        {finance.courseBreakdown.length === 0 ? (
+          <div className="p-8 text-center text-xs text-muted-foreground">
+            No captured course sales yet.
+          </div>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-border text-[12px] text-muted-foreground">
-                  <th className="py-2 pr-4 font-medium">Course</th>
-                  <th className="py-2 pr-4 font-medium">Transfer id</th>
-                  <th className="py-2 pr-4 text-right font-medium">Amount</th>
-                  <th className="py-2 pr-4 font-medium">Transfer status</th>
-                  <th className="py-2 pr-4 font-medium">Settlement</th>
-                  <th className="py-2 font-medium">Created</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="border-b border-border bg-muted/40 text-left text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Course</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Captured sales</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Gross (INR)</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Commission</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Your share</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {finance.transfers.map((transfer) => (
-                  <tr key={transfer.transferId}>
-                    <td className="py-3 pr-4 font-medium">{transfer.courseTitle}</td>
-                    <td className="py-3 pr-4 font-mono text-[11.5px] text-muted-foreground">
-                      {transfer.transferId}
+                {finance.courseBreakdown.map((row) => (
+                  <tr key={row.courseId}>
+                    <td className="px-4 py-3 font-medium">{row.courseTitle}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{row.salesCount}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {formatInr(row.grossPaise)}
                     </td>
-                    <td className="py-3 pr-4 text-right tabular-nums">
-                      {money(transfer.amountPaise)}
-                      {transfer.reversedPaise > 0 ? (
-                        <span className="block text-[11.5px] text-red-600">
-                          −{money(transfer.reversedPaise)} reversed
-                        </span>
-                      ) : null}
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {formatInr(row.commissionPaise)}
                     </td>
-                    <td className={`py-3 pr-4 ${TRANSFER_TONE[transfer.status] ?? "text-muted-foreground"}`}>
-                      {transfer.status}
-                    </td>
-                    <td className="py-3 pr-4 text-muted-foreground">
-                      {transfer.settlementStatus ? (
-                        <>
-                          {transfer.settlementStatus}
-                          {transfer.settledAt ? (
-                            <span className="block text-[11.5px]">
-                              {new Date(transfer.settledAt).toLocaleDateString("en-IN")}
-                            </span>
-                          ) : null}
-                        </>
-                      ) : (
-                        "not reported yet"
-                      )}
-                    </td>
-                    <td className="py-3 text-muted-foreground">
-                      {new Date(transfer.createdAt).toLocaleDateString("en-IN")}
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                      {formatInr(row.creatorSharePaise)}
                     </td>
                   </tr>
                 ))}
@@ -115,43 +112,93 @@ export default async function CreatorEarningsPage() {
             </table>
           </div>
         )}
-      </section>
+      </div>
 
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-        <h2 className="font-display text-[15px] font-semibold tracking-tight">How your share is calculated</h2>
-        <dl className="mt-4 space-y-3 text-[13px]">
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-muted-foreground">Gross course sales</dt>
-            <dd className="font-medium tabular-nums">{money(finance.grossPaise)}</dd>
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="border-b border-border px-5 py-3.5 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold">Manual payout ledger</h2>
+            <p className="text-xs text-muted-foreground">
+              Payout requests, masked destination snapshots, and UTR / transaction references.
+            </p>
           </div>
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-muted-foreground">
-              Zybble commission at {finance.commissionPercentLabel}% (server-configurable, snapshotted per order)
-            </dt>
-            <dd className="font-medium tabular-nums text-red-600">−{money(finance.commissionPaise)}</dd>
+          <span className="text-xs text-muted-foreground">
+            {finance.payoutRequests.length} requests
+          </span>
+        </div>
+
+        {finance.payoutRequests.length === 0 ? (
+          <div className="p-8 text-center text-xs text-muted-foreground">
+            No manual payout requests yet. Visit{" "}
+            <Link href="/creator/payouts" className="underline font-medium text-foreground">
+              Payouts & destination
+            </Link>{" "}
+            to save a UPI ID or bank account and request a payout when you have available earnings.
           </div>
-          <div className="flex items-baseline justify-between gap-4 border-t border-border pt-3">
-            <dt className="font-medium">Net earned</dt>
-            <dd className="font-display text-[15px] font-bold tabular-nums">{money(finance.netEarnedPaise)}</dd>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="border-b border-border bg-muted/40 text-left text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Payout ID</th>
+                  <th className="px-4 py-2.5 font-medium">Requested</th>
+                  <th className="px-4 py-2.5 font-medium">Destination</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Amount</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 font-medium">UTR / Reference</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {finance.payoutRequests.map((req) => (
+                  <tr key={req.id}>
+                    <td className="px-4 py-3 font-mono text-[11px]">{req.publicId}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {new Date(req.requestedAt).toLocaleDateString("en-IN")}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="uppercase text-[10.5px] text-muted-foreground">
+                        {req.destinationMethod}
+                      </span>{" "}
+                      <span className="font-mono">{req.destinationMasked}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium tabular-nums">
+                      {formatInr(req.amountPaise)}
+                    </td>
+                    <td className="px-4 py-3 capitalize">{req.status}</td>
+                    <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
+                      {req.paymentReference ?? req.rejectionReason ?? req.failureReason ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-muted-foreground">Pending with Razorpay (not yet transferred)</dt>
-            <dd className="tabular-nums">{money(finance.pendingPaise)}</dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-muted-foreground">Reversed</dt>
-            <dd className="tabular-nums text-red-600">{money(finance.reversedPaise)}</dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-muted-foreground">Refunded to learners</dt>
-            <dd className="tabular-nums text-red-600">{money(finance.refundPaise)}</dd>
-          </div>
-        </dl>
-        <p className="mt-4 text-[12px] text-zinc-400">
-          Zybble does not publish a refund policy. A refund can only exist because Razorpay recorded one, and the
-          numbers above reflect those provider events exactly.
-        </p>
-      </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  sub,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border p-4 ${
+        highlight ? "border-primary/40 bg-primary/5" : "border-border bg-card"
+      }`}
+    >
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1.5 text-lg font-bold tabular-nums">{value}</p>
+      {sub ? <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p> : null}
     </div>
   );
 }

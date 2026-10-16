@@ -95,7 +95,7 @@ export function analyticsSeries(points: SeriesPoint[]): Array<{ label: string; v
 
 export const CREATOR_STEPS = [
   { id: "profile", title: "Creator profile", description: "Your public name, headline and username." },
-  { id: "route", title: "Razorpay Route", description: "The linked account that receives your course earnings." },
+  { id: "route", title: "Payout destination (optional now)", description: "Save a UPI ID or bank account to request manual payouts of your course earnings." },
   { id: "course", title: "Your first course", description: "Curriculum, pricing and a thumbnail." },
   { id: "review", title: "Submit for review", description: "An administrator reviews every course before it is listed." },
 ] as const;
@@ -125,8 +125,8 @@ export function commissionOf(paise: number, commissionBps: CommissionBps): {
 }
 
 /**
- * Minimum creator balance before a Route transfer is initiated, in paise.
- * Server-configured; the default is shown only when the setting is unavailable.
+ * Optional payout threshold reference in paise (no mandatory threshold is enforced
+ * unless configured by the marketplace owner).
  */
 export const DEFAULT_PAYOUT_THRESHOLD_PAISE = 1_000_00;
 
@@ -190,10 +190,8 @@ export function validateDraftStep(step: CreatorStepId, draft: CourseDraft): Draf
     case "course":
       if (!draft.title.trim()) errors.title = "Add a course title";
       if (!draft.categorySlug) errors.categorySlug = "Choose a category";
-      if (draft.pricePaise < 0) errors.pricePaise = "Price cannot be negative";
-      if (draft.pricePaise > 0) {
-        errors.pricePaise =
-          "Paid courses stay locked until Razorpay marks your Route account active.";
+      if (draft.pricePaise < 0 || !Number.isSafeInteger(draft.pricePaise)) {
+        errors.pricePaise = "Price must be a non-negative integer in paise";
       }
       break;
     case "review":

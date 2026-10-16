@@ -19,7 +19,13 @@ export default async function AdminOrdersPage({
   const active = status && ["paid", "created", "failed", "refunded", "partially_refunded"].includes(status) ? status : "all";
   const orders = active === "all" ? all : all.filter((order) => order.status === active);
 
-  const totals = orders.reduce(
+  const totalsSource =
+    active === "all"
+      ? orders.filter((order) =>
+          ["paid", "partially_refunded", "refunded"].includes(order.status)
+        )
+      : orders;
+  const totals = totalsSource.reduce(
     (acc, order) => {
       acc.gross += order.grossPaise;
       acc.commission += order.commissionPaise;

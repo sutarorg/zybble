@@ -6,7 +6,7 @@ import { CreatorSignupClient } from "./creator-signup-client";
 export const metadata: Metadata = {
   title: "Become a Creator - Zybble",
   description:
-    "Teach practical AI skills on Zybble. Same account, creator studio, Razorpay Route payouts in INR.",
+    "Teach practical AI skills on Zybble. Same account, creator studio, transparent INR earnings and manual UPI/bank payouts.",
 };
 
 export const dynamic = "force-dynamic";

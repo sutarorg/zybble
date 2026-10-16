@@ -1,18 +1,14 @@
 /**
- * Razorpay Payment Gateway + Route integration.
+ * Razorpay Payment Gateway integration (Standard Checkout, INR only).
  *
- * Scope: INR only. Razorpay documents that Route order transfers are available
- * for INR orders only, so the currency is asserted, never chosen.
+ * Scope: INR only. Learner payments settle into Zybble's merchant account via
+ * standard Razorpay Orders (`POST /v1/orders` without Route `transfers`).
+ * Creator share and platform commission are snapshotted onto `order_items` at
+ * purchase time, recorded in the append-only ledger on verified capture, and
+ * paid out to creators via the manual creator payout workflow.
  *
- * Split strategy — **transfer configured on order creation**. Razorpay documents
- * `POST /v1/orders` with a `transfers` array as the supported way to set up
- * Route splits: once the payment is captured and the order is paid, Razorpay
- * creates and settles the transfer to the linked account automatically. That
- * removes an application round-trip between capture and transfer and removes a
- * class of "payment succeeded but transfer never created" bugs.
- *
- * The platform remainder is **not** transferred; it stays with the merchant
- * balance and is recorded in the immutable ledger.
+ * Legacy Razorpay Route helpers remain marked `@deprecated` only for historical
+ * record compatibility; new orders never attach Route transfers.
  */
 
 import "server-only";
@@ -161,56 +157,45 @@ export function verifyCheckoutSignature(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Order creation with a Route transfer                                         */
+/* Standard INR Order creation (no Route transfers)                            */
 /* -------------------------------------------------------------------------- */
 
 export interface CreateOrderInput {
   amountPaise: number;
   receipt: string;
   notes?: Record<string, string>;
-  transfers?: RouteTransferRequest[];
 }
 
 /**
- * Builds the Razorpay order payload. Extracted so the contract — INR, integer
- * paise, transfer sum not exceeding the order total — can be asserted in tests
- * without touching the network.
+ * Builds a standard Razorpay order payload (`POST /v1/orders`).
+ *
+ * Enforces:
+ *   1. Integer paise > 0
+ *   2. Currency strictly `"INR"`
+ *   3. `partial_payment: false`
+ *   4. No Route `transfers` array attached
  */
-export function buildOrderPayload(input: CreateOrderInput) {
+export function buildOrderPayload(input: CreateOrderInput & { transfers?: unknown }) {
+  assertInr("INR");
   assertIntegerPaise(input.amountPaise);
   if (input.amountPaise <= 0) throw new Error("Razorpay order amount must be greater than zero");
-
-  const transfers = (input.transfers ?? []).map((transfer) => {
-    assertInr("INR");
-    assertIntegerPaise(transfer.amountPaise);
-    if (transfer.amountPaise <= 0) throw new Error("Transfer amount must be greater than zero");
-    return {
-      account: transfer.account,
-      amount: transfer.amountPaise,
-      currency: "INR" as const,
-      ...(transfer.notes ? { notes: transfer.notes } : {}),
-      ...(transfer.linkedAccountNotes ? { linked_account_notes: transfer.linkedAccountNotes } : {}),
-      ...(transfer.onHold ? { on_hold: true } : {}),
-    };
-  });
-
-  const transferTotal = transfers.reduce((sum, t) => sum + t.amount, 0);
-  if (transferTotal > input.amountPaise) {
-    throw new Error("Route transfer total cannot exceed the order amount");
+  if (!input.receipt || input.receipt.trim().length === 0) {
+    throw new Error("Razorpay order receipt is required");
+  }
+  if (input.transfers !== undefined) {
+    throw new Error("Razorpay Route order transfers are disabled; orders settle to Zybble for manual creator payout");
   }
 
   return {
     amount: input.amountPaise,
     currency: "INR" as const,
-    receipt: input.receipt,
-    // Partial payments are incompatible with Route order transfers.
+    receipt: input.receipt.trim(),
     partial_payment: false,
     ...(input.notes ? { notes: input.notes } : {}),
-    ...(transfers.length > 0 ? { transfers } : {}),
   };
 }
 
-/** Creates an INR order, optionally with a Route transfer configured up front. */
+/** Creates a standard INR Razorpay order without Route transfers. */
 export async function createOrder(input: CreateOrderInput): Promise<RazorpayOrderResult> {
   const payload = buildOrderPayload(input);
   const response = await getRazorpay().orders.create(payload as never);
@@ -230,7 +215,6 @@ export async function createOrder(input: CreateOrderInput): Promise<RazorpayOrde
     status: order.status,
     attempts: order.attempts ?? 0,
     createdAt: order.created_at ?? Math.floor(Date.now() / 1000),
-    transfers: (order.transfers as RazorpayOrderResult["transfers"]) ?? undefined,
   };
 }
 

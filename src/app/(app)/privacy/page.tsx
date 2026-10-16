@@ -27,7 +27,7 @@ export default function PrivacyPage() {
               "Learning data: enrolments, lesson progress, lesson notes, resume position and issued certificates.",
               "Order data: INR amounts in paise, order and payment references, and the creator share and platform commission recorded at the time of purchase.",
               "Payment data: processed entirely by Razorpay. Zybble stores a masked method descriptor (for example “UPI” or “Card”) and Razorpay's own payment reference — never a card number, UPI PIN or bank credential.",
-              "Creator data: the profile, bio and teaching topics a creator publishes, plus the Razorpay Route account status Razorpay reports.",
+              "Creator data: the profile, bio and teaching topics a creator publishes, plus an AES-256-GCM encrypted payout destination (UPI ID or Indian bank account and IFSC) when the creator saves one to request manual payouts. Full payout details are never shown on public pages, client queries, logs, CSV exports, or emails.",
               "Usage data: page views, search queries and feature interactions, collected only when analytics keys are configured and only with your consent.",
             ]}
           />

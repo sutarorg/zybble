@@ -27,9 +27,9 @@ import { cn } from "@/lib/utils";
  * Purchase card.
  *
  * `enrolled` and `saved` are decided on the server and passed in: the browser
- * cannot mark itself as owning a course. `checkoutBlocked` is set when paid
- * checkout is unavailable — for example when the creator's Razorpay Route
- * account is not active — and the card says so instead of failing at payment.
+ * cannot mark itself as owning a course. `checkoutBlocked` is set only when
+ * paid checkout is unavailable in the environment (for example when Razorpay
+ * keys are not configured).
  */
 export function EnrollCard({
   course,
