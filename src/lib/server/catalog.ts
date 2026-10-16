@@ -346,39 +346,29 @@ export const marketplaceStats = cache(async () => {
  * Viewer-specific state for a course page.
  *
  * Entitlement and wishlist membership are read under the caller's own RLS
- * scope. Paid checkout is only offered when Razorpay reports the creator's Route
- * linked account as active — otherwise a sale could not be settled, so the page
- * explains that instead of taking money.
+ * scope. Paid courses settle to Zybble's merchant account via Razorpay Checkout
+ * and accrue creator share for manual payout, so checkout does not depend on
+ * creator Route onboarding.
  */
-export const getCourseViewerState = cache(async (courseId: string, pricePaise: number) => {
+export const getCourseViewerState = cache(async (courseId: string, _pricePaise: number) => {
+  void _pricePaise;
   const session = await getSession();
   if (!session || !isSupabaseConfigured()) {
-    return { enrolled: false, wishlisted: false, checkoutBlocked: blockedReason(pricePaise, null) };
+    return { enrolled: false, wishlisted: false, checkoutBlocked: null as string | null };
   }
 
   const supabase = await createServerClient();
-  const [entitlement, wishlist, course] = await Promise.all([
+  const [entitlement, wishlist] = await Promise.all([
     supabase.from("entitlements").select("id").eq("user_id", session.id).eq("course_id", courseId).is("revoked_at", null).maybeSingle(),
     supabase.from("wishlist").select("course_id").eq("user_id", session.id).eq("course_id", courseId).maybeSingle(),
-    supabase.from("courses").select("creator_id, creator_profiles ( route_account_status )").eq("id", courseId).maybeSingle(),
   ]);
 
-  const creator = first((course as { creator_profiles?: unknown } | null)?.creator_profiles as never) as
-    | { route_account_status: string | null }
-    | null;
-
   return {
-    enrolled: Boolean(entitlement),
-    wishlisted: Boolean(wishlist),
-    checkoutBlocked: blockedReason(pricePaise, creator?.route_account_status ?? null),
+    enrolled: Boolean(entitlement.data),
+    wishlisted: Boolean(wishlist.data),
+    checkoutBlocked: null as string | null,
   };
 });
-
-function blockedReason(pricePaise: number, routeStatus: string | null): string | null {
-  if (pricePaise <= 0) return null;
-  if (routeStatus === "active") return null;
-  return "Paid checkout is unavailable for this course: Razorpay has not reported the creator's Route settlement account as active, so Zybble could not pay them out. You can still watch the free preview lessons.";
-}
 
 /**
  * Aggregate figures for one creator's public profile.

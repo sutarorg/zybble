@@ -16,6 +16,7 @@
 export type ServiceId =
   | "supabase"
   | "razorpay"
+  | "payoutEncryption"
   | "bunny"
   | "r2"
   | "resend"
@@ -36,7 +37,8 @@ export interface ServiceStatus {
 
 export const SERVICE_LABELS: Record<ServiceId, string> = {
   supabase: "Supabase (auth + Postgres)",
-  razorpay: "Razorpay (Checkout + Route)",
+  razorpay: "Razorpay (Checkout)",
+  payoutEncryption: "Creator Payout Destination Encryption (AES-256-GCM)",
   bunny: "Bunny Stream (video)",
   r2: "Cloudflare R2 (resources)",
   resend: "Resend (email)",
@@ -67,7 +69,11 @@ const SERVICE_VARIABLES: Record<
       "RAZORPAY_KEY_SECRET",
       "RAZORPAY_WEBHOOK_SECRET",
     ],
-    impact: "Paid checkout and Route creator splits are disabled.",
+    impact: "Paid course checkout is disabled.",
+  },
+  payoutEncryption: {
+    variables: ["PAYOUT_DETAILS_ENCRYPTION_KEY"],
+    impact: "Saving or revealing creator bank/UPI payout destinations is disabled.",
   },
   bunny: {
     variables: ["BUNNY_STREAM_LIBRARY_ID", "BUNNY_STREAM_API_KEY", "BUNNY_STREAM_TOKEN_AUTH_KEY"],
@@ -138,6 +144,9 @@ export const serverEnv = {
   razorpayKeyId: read("RAZORPAY_KEY_ID"),
   razorpayKeySecret: read("RAZORPAY_KEY_SECRET"),
   razorpayWebhookSecret: read("RAZORPAY_WEBHOOK_SECRET"),
+  get payoutDetailsEncryptionKey() {
+    return read("PAYOUT_DETAILS_ENCRYPTION_KEY");
+  },
   bunnyLibraryId: read("BUNNY_STREAM_LIBRARY_ID"),
   bunnyApiKey: read("BUNNY_STREAM_API_KEY"),
   bunnyTokenAuthKey: read("BUNNY_STREAM_TOKEN_AUTH_KEY"),
@@ -173,6 +182,9 @@ export const isServiceRoleConfigured = () => Boolean(serverEnv.supabaseServiceRo
 
 export const isRazorpayConfigured = () =>
   Boolean(serverEnv.razorpayKeyId && serverEnv.razorpayKeySecret);
+
+export const isPayoutEncryptionConfigured = () =>
+  Boolean(serverEnv.payoutDetailsEncryptionKey);
 
 export const isBunnyConfigured = () =>
   Boolean(serverEnv.bunnyLibraryId && serverEnv.bunnyApiKey);

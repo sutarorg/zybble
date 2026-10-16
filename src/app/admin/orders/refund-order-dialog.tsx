@@ -31,7 +31,7 @@ export function RefundOrderDialog({
       icon={Undo2}
       danger
       confirmTitle="Refund this order through Razorpay?"
-      confirmBody="This creates a real refund with Razorpay. The learner's entitlement is revoked and the creator's Route transfer is reversed for the refunded portion. Nothing here happens locally."
+      confirmBody="This creates a real refund with Razorpay, revokes the learner's entitlement, and records a proportional creator-share adjustment on the ledger. Nothing here happens locally."
       confirmLabel="Refund with Razorpay"
       reasonLabel="Reason recorded in the audit log"
       minReasonLength={5}

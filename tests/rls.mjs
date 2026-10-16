@@ -24,9 +24,14 @@ const MIGRATIONS = path.join(ROOT, "supabase", "migrations");
 
 const readMigration = (name) => fs.readFileSync(path.join(MIGRATIONS, name), "utf8");
 
-const schemaSql = readMigration("20260101000200_schema.sql");
+const manualPayoutsSql = readMigration("20260101000600_manual_payouts.sql");
+const schemaSql = readMigration("20260101000200_schema.sql") + "\n" + manualPayoutsSql;
 const rlsSql =
-  readMigration("20260101000300_rls.sql") + readMigration("20260101000500_learner_rls_policies.sql");
+  readMigration("20260101000300_rls.sql") +
+  "\n" +
+  readMigration("20260101000500_learner_rls_policies.sql") +
+  "\n" +
+  manualPayoutsSql;
 
 /** Tables a browser role (anon / authenticated) is allowed to touch at all. */
 const grantedTables = () => new Set(rlsSql.match(/grant\s+[^;]*?\bon public\.([a-z_]+)\s+to/gi)?.map((m) => m.match(/public\.([a-z_]+)/i)[1]) ?? []);
@@ -673,4 +678,75 @@ test("every table declared in the schema is enabled for RLS by the blanket loop"
   assert.ok(loop, "the blanket RLS loop is missing");
   assert.doesNotMatch(loop, /limit\s+\d/i, "the RLS loop skips tables");
   assert.equal(declaredTables().size > 30, true, "expected a substantial schema");
+});
+
+// ===========================================================================
+// Manual Payout Destination & Request Security Contracts
+// ===========================================================================
+
+test("manual payout tables enable RLS and never grant encrypted_payload columns to anon or authenticated", () => {
+  for (const table of ["creator_payout_destinations", "payout_requests", "payout_audit_events"]) {
+    assert.match(
+      manualPayoutsSql,
+      new RegExp(`alter table public\\.${table} enable row level security`, "i"),
+      `${table} must explicitly enable RLS`
+    );
+    assert.match(
+      manualPayoutsSql,
+      new RegExp(`revoke all on public\\.${table} from anon, authenticated`, "i"),
+      `${table} must revoke default grants from anon and authenticated`
+    );
+    assert.ok(
+      !/grant\s+[^;]*\bon public\.(creator_payout_destinations|payout_requests|payout_audit_events)\s+to\s+[^;]*\banon\b/i.test(
+        manualPayoutsSql
+      ),
+      `${table} must never be granted to anon`
+    );
+  }
+
+  // Column-level SELECT grants for `authenticated` must exclude encrypted payload columns.
+  const destGrant = manualPayoutsSql.match(
+    /grant select\s*\(([\s\S]*?)\)\s*on public\.creator_payout_destinations to authenticated/i
+  )?.[1];
+  assert.ok(destGrant, "expected explicit column-level SELECT grant on creator_payout_destinations");
+  assert.doesNotMatch(destGrant, /encrypted_payload/i, "encrypted_payload must never be selectable by authenticated");
+
+  const reqGrant = manualPayoutsSql.match(
+    /grant select\s*\(([\s\S]*?)\)\s*on public\.payout_requests to authenticated/i
+  )?.[1];
+  assert.ok(reqGrant, "expected explicit column-level SELECT grant on payout_requests");
+  assert.doesNotMatch(
+    reqGrant,
+    /destination_encrypted_payload/i,
+    "destination_encrypted_payload must never be selectable by authenticated"
+  );
+});
+
+test("creator and admin page data queries never select encrypted payout payload columns", () => {
+  for (const file of ["src/lib/server/creator.ts", "src/lib/server/admin.ts", "src/lib/server/catalog.ts"]) {
+    const source = fs.readFileSync(path.join(ROOT, file), "utf8");
+    // Strip comments before checking `.select(...)` calls.
+    const withoutComments = source.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.doesNotMatch(
+      withoutComments,
+      /encrypted_payload/,
+      `${file} must never select encrypted_payload or destination_encrypted_payload in page/list queries`
+    );
+  }
+});
+
+test("course submission, approval, and checkout no longer block on Razorpay Route account status", () => {
+  for (const file of [
+    "src/lib/server/checkout.ts",
+    "src/app/creator/actions.ts",
+    "src/app/admin/actions.ts",
+    "src/lib/server/catalog.ts",
+  ]) {
+    const source = fs.readFileSync(path.join(ROOT, file), "utf8");
+    assert.doesNotMatch(
+      source,
+      /creator_not_payable|route_account_status\s*!==\s*["']active["']/,
+      `${file} still blocks courses or checkout on Razorpay Route status`
+    );
+  }
 });

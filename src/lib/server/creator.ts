@@ -1,21 +1,29 @@
 /**
  * Creator studio data.
  *
- * Creator-facing financial figures are derived from the immutable ledger and
- * from verified Razorpay Route transfer rows. Nothing here is generated,
- * sampled or seeded: an empty ledger produces an empty dashboard.
+ * Creator-facing financial figures are derived from captured orders, processed
+ * refunds, the immutable ledger, and manual creator payout requests (`payout_requests`).
+ * Nothing here is generated, sampled or seeded: an empty ledger produces an
+ * empty dashboard.
  */
 
 import "server-only";
 import { cache } from "react";
-import { createServerClient, createServiceClient } from "@/lib/supabase/server";
+import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { requireCreator, requireSession, AuthorizationError } from "@/lib/server/session";
 import { formatCommissionPercent } from "@/lib/money";
+import {
+  computeCreatorPayoutBalance,
+  type CreatorPayoutBalance,
+  type CreatorPayoutDestinationView,
+  type CreatorPayoutRequestView,
+  type PayoutRequestStatus,
+} from "@/lib/server/payouts";
+import type { PayoutDestinationMethod } from "@/lib/server/payout-crypto";
 
 /** Planned default only — see `getMarketplaceCommissionBps`. */
 const DEFAULT_COMMISSION_BPS = 1000;
-import { fetchLinkedAccountStatuses } from "@/lib/server/razorpay";
 
 export interface CreatorCourseSummary {
   id: string;
@@ -166,14 +174,22 @@ interface TransferSummary {
   pendingPaise: number;
 }
 
-export interface CreatorFinance extends TransferSummary {
+export interface CreatorCourseRevenueRow {
+  courseId: string;
+  courseTitle: string;
+  salesCount: number;
   grossPaise: number;
   commissionPaise: number;
-  netEarnedPaise: number;
-  refundPaise: number;
+  creatorSharePaise: number;
+}
+
+export interface CreatorFinance extends TransferSummary, CreatorPayoutBalance {
   commissionBps: number;
   commissionPercentLabel: string;
-  /** Real provider transfer rows — never a locally generated payout record. */
+  destination: CreatorPayoutDestinationView | null;
+  payoutRequests: CreatorPayoutRequestView[];
+  courseBreakdown: CreatorCourseRevenueRow[];
+  /** Legacy Route transfer rows kept for historical records. */
   transfers: Array<{
     transferId: string;
     courseTitle: string;
@@ -208,32 +224,132 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
   const empty: CreatorFinance = {
     grossPaise: 0,
     commissionPaise: 0,
+    grossEarnedPaise: 0,
+    refundPaise: 0,
+    refundedCreatorSharePaise: 0,
     netEarnedPaise: 0,
+    reservedPendingPaise: 0,
+    paidOutPaise: 0,
+    outstandingPayablePaise: 0,
+    availablePaise: 0,
+    negativeAdjustmentPaise: 0,
     transferredPaise: 0,
     settledPaise: 0,
     reversedPaise: 0,
     pendingPaise: 0,
-    refundPaise: 0,
     commissionBps: 1000,
     commissionPercentLabel: "10",
+    destination: null,
+    payoutRequests: [],
+    courseBreakdown: [],
     transfers: [],
   };
   if (!isSupabaseConfigured()) return empty;
 
   const supabase = await createServerClient();
 
-  const [{ data: items }, { data: transfers }, { data: settlements }, { data: settings }] = await Promise.all([
-    supabase.from("order_items").select("unit_price_paise, commission_paise, creator_share_paise, course_title, created_at").eq("creator_id", session.id),
-    supabase.from("route_transfers").select("transfer_id, order_item_id, amount_paise, reversed_paise, status, created_at").eq("creator_id", session.id),
-    supabase.from("route_settlements").select("transfer_id, amount_paise, status, settled_at").eq("creator_id", session.id),
+  const [
+    { data: items },
+    { data: destinationRow },
+    { data: payoutRequestRows },
+    { data: transfers },
+    { data: settlements },
+    { data: settings },
+  ] = await Promise.all([
+    supabase
+      .from("order_items")
+      .select(
+        "id, order_id, course_id, unit_price_paise, commission_paise, creator_share_paise, course_title, created_at, orders ( id, status )"
+      )
+      .eq("creator_id", session.id),
+    supabase
+      .from("creator_payout_destinations")
+      .select("method, masked_destination, masked_account_holder, bank_label, updated_at")
+      .eq("creator_id", session.id)
+      .maybeSingle(),
+    supabase
+      .from("payout_requests")
+      .select(
+        "id, public_id, creator_id, amount_paise, currency, status, destination_method, destination_masked, destination_holder_masked, destination_bank_label, creator_note, admin_note, rejection_reason, failure_reason, payment_reference, payment_method_used, requested_at, approved_at, paid_at, rejected_at, failed_at, cancelled_at"
+      )
+      .eq("creator_id", session.id)
+      .order("requested_at", { ascending: false }),
+    supabase
+      .from("route_transfers")
+      .select("transfer_id, order_item_id, amount_paise, reversed_paise, status, created_at")
+      .eq("creator_id", session.id),
+    supabase
+      .from("route_settlements")
+      .select("transfer_id, amount_paise, status, settled_at")
+      .eq("creator_id", session.id),
     supabase.from("marketplace_settings").select("commission_bps").eq("id", true).maybeSingle(),
   ]);
 
   const commissionBps = Number(settings?.commission_bps ?? 1000);
-  const rows = (items ?? []) as Array<Record<string, number>>;
-  const grossPaise = rows.reduce((sum, row) => sum + Number(row.unit_price_paise ?? 0), 0);
-  const commissionPaise = rows.reduce((sum, row) => sum + Number(row.commission_paise ?? 0), 0);
-  const netEarnedPaise = rows.reduce((sum, row) => sum + Number(row.creator_share_paise ?? 0), 0);
+  const rawItems = (items ?? []) as Array<Record<string, unknown>>;
+
+  // Only orders that were actually captured count toward creator earnings.
+  const capturedItems = rawItems.filter((row) => {
+    const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
+    const orderObj = Array.isArray(orderRel) ? orderRel[0] : orderRel;
+    if (!orderObj || !orderObj.status) return true;
+    return (
+      orderObj.status === "paid" ||
+      orderObj.status === "partially_refunded" ||
+      orderObj.status === "refunded"
+    );
+  });
+
+  const capturedOrderIds = Array.from(
+    new Set(
+      capturedItems
+        .map((row) => (row.order_id ? String(row.order_id) : null))
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  const { data: refundRows } =
+    capturedOrderIds.length > 0
+      ? await supabase
+          .from("refunds")
+          .select("order_id, amount_paise, status")
+          .in("order_id", capturedOrderIds)
+          .eq("status", "processed")
+      : { data: [] as Array<Record<string, unknown>> };
+
+  const itemByOrderId = new Map<string, Record<string, unknown>>();
+  const breakdownMap = new Map<string, CreatorCourseRevenueRow>();
+
+  for (const item of capturedItems) {
+    if (item.order_id) itemByOrderId.set(String(item.order_id), item);
+    const courseId = String(item.course_id ?? item.course_title ?? "course");
+    const courseTitle = String(item.course_title ?? "Course");
+    const current = breakdownMap.get(courseId) ?? {
+      courseId,
+      courseTitle,
+      salesCount: 0,
+      grossPaise: 0,
+      commissionPaise: 0,
+      creatorSharePaise: 0,
+    };
+    current.salesCount += 1;
+    current.grossPaise += Number(item.unit_price_paise ?? 0);
+    current.commissionPaise += Number(item.commission_paise ?? 0);
+    current.creatorSharePaise += Number(item.creator_share_paise ?? 0);
+    breakdownMap.set(courseId, current);
+  }
+
+  const processedRefundInputs = ((refundRows ?? []) as Array<Record<string, unknown>>)
+    .map((r) => {
+      const item = itemByOrderId.get(String(r.order_id ?? ""));
+      if (!item) return null;
+      return {
+        unitPricePaise: Number(item.unit_price_paise ?? 0),
+        creatorSharePaise: Number(item.creator_share_paise ?? 0),
+        refundAmountPaise: Number(r.amount_paise ?? 0),
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
   const transferRows = (transfers ?? []) as Array<Record<string, unknown>>;
   const settlementByTransfer = new Map(
@@ -242,38 +358,92 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
       { status: String(row.status), at: (row.settled_at as string) ?? null, amount: Number(row.amount_paise ?? 0) },
     ])
   );
-  const summary = transferRows.reduce<TransferSummary>(
-    (acc, row) => {
-      const status = String(row.status);
-      const amount = Number(row.amount_paise ?? 0);
-      const reversed = Number(row.reversed_paise ?? 0);
-      const settlement = settlementByTransfer.get(String(row.transfer_id));
-      if (status === "processed") acc.transferredPaise += amount;
-      if (status === "failed") acc.pendingPaise += amount;
-      if (status === "reversed" || status === "partially_reversed") acc.reversedPaise += reversed || amount;
-      if (settlement?.status === "processed") acc.settledPaise += settlement.amount;
-      return acc;
-    },
-    { transferredPaise: 0, settledPaise: 0, reversedPaise: 0, pendingPaise: 0 }
+
+  let legacySettledPaise = 0;
+  let legacyPendingPaise = 0;
+  let legacyReversedPaise = 0;
+  for (const row of transferRows) {
+    const status = String(row.status);
+    const amount = Number(row.amount_paise ?? 0);
+    const reversed = Number(row.reversed_paise ?? 0);
+    const settlement = settlementByTransfer.get(String(row.transfer_id));
+    if (settlement?.status === "processed") {
+      legacySettledPaise += settlement.amount;
+    } else if (status === "created" || status === "pending" || status === "processed") {
+      legacyPendingPaise += Math.max(0, amount - reversed);
+    }
+    if ((status === "reversed" || status === "partially_reversed") && processedRefundInputs.length === 0) {
+      legacyReversedPaise += reversed || amount;
+    }
+  }
+
+  const payoutRequests: CreatorPayoutRequestView[] = ((payoutRequestRows ?? []) as Array<Record<string, unknown>>).map(
+    (row) => ({
+      id: String(row.id),
+      publicId: String(row.public_id),
+      creatorId: String(row.creator_id),
+      amountPaise: Number(row.amount_paise ?? 0),
+      currency: "INR",
+      status: String(row.status) as PayoutRequestStatus,
+      destinationMethod: String(row.destination_method) as PayoutDestinationMethod,
+      destinationMasked: String(row.destination_masked ?? ""),
+      destinationHolderMasked: String(row.destination_holder_masked ?? ""),
+      destinationBankLabel: (row.destination_bank_label as string) ?? null,
+      creatorNote: (row.creator_note as string) ?? null,
+      adminNote: (row.admin_note as string) ?? null,
+      rejectionReason: (row.rejection_reason as string) ?? null,
+      failureReason: (row.failure_reason as string) ?? null,
+      paymentReference: (row.payment_reference as string) ?? null,
+      paymentMethodUsed: (row.payment_method_used as string) ?? null,
+      requestedAt: String(row.requested_at),
+      approvedAt: (row.approved_at as string) ?? null,
+      paidAt: (row.paid_at as string) ?? null,
+      rejectedAt: (row.rejected_at as string) ?? null,
+      failedAt: (row.failed_at as string) ?? null,
+      cancelledAt: (row.cancelled_at as string) ?? null,
+    })
   );
 
-  const { data: refunds } = await supabase
-    .from("ledger_entries")
-    .select("amount_paise")
-    .eq("account", `creator:${session.id}`)
-    .eq("kind", "refund");
-  const refundPaise = ((refunds ?? []) as Array<{ amount_paise: number }>).reduce(
-    (sum, row) => sum + Number(row.amount_paise ?? 0),
-    0
-  );
+  const balance = computeCreatorPayoutBalance({
+    capturedOrderItems: capturedItems.map((row) => ({
+      unitPricePaise: Number(row.unit_price_paise ?? 0),
+      commissionPaise: Number(row.commission_paise ?? 0),
+      creatorSharePaise: Number(row.creator_share_paise ?? 0),
+    })),
+    processedRefunds: processedRefundInputs,
+    payoutRequests: payoutRequests.map((req) => ({
+      amountPaise: req.amountPaise,
+      status: req.status,
+    })),
+    legacySettledPaise,
+    legacyPendingPaise,
+    legacyReversedPaise,
+  });
+
+  const destination: CreatorPayoutDestinationView | null = destinationRow
+    ? {
+        method: String((destinationRow as Record<string, unknown>).method) as PayoutDestinationMethod,
+        maskedDestination: String((destinationRow as Record<string, unknown>).masked_destination ?? ""),
+        maskedAccountHolder: String((destinationRow as Record<string, unknown>).masked_account_holder ?? ""),
+        bankLabel: ((destinationRow as Record<string, unknown>).bank_label as string) ?? null,
+        statusLabel: "Details saved · Awaiting payout",
+        updatedAt: String((destinationRow as Record<string, unknown>).updated_at ?? new Date().toISOString()),
+      }
+    : null;
+
   return {
-    grossPaise,
-    commissionPaise,
-    netEarnedPaise,
-    ...summary,
-    refundPaise,
+    ...balance,
+    transferredPaise: balance.paidOutPaise,
+    settledPaise: balance.paidOutPaise,
+    pendingPaise: balance.reservedPendingPaise,
+    reversedPaise: balance.refundedCreatorSharePaise,
     commissionBps,
     commissionPercentLabel: formatCommissionPercent(commissionBps),
+    destination,
+    payoutRequests,
+    courseBreakdown: Array.from(breakdownMap.values()).sort(
+      (a, b) => b.creatorSharePaise - a.creatorSharePaise
+    ),
     transfers: transferRows.map((row) => {
       const settlement = settlementByTransfer.get(String(row.transfer_id));
       return {
@@ -319,7 +489,7 @@ export const getCreatorAnalytics = cache(async (range: "7d" | "30d" | "90d" | "1
   const [{ data: sales }, { data: enrollments }] = await Promise.all([
     supabase
       .from("order_items")
-      .select("created_at, creator_share_paise")
+      .select("created_at, creator_share_paise, orders ( status )")
       .eq("creator_id", session.id)
       .gte("created_at", since),
     courseIdsOf(courseRowsTyped).length > 0
@@ -327,7 +497,22 @@ export const getCreatorAnalytics = cache(async (range: "7d" | "30d" | "90d" | "1
       : Promise.resolve({ data: [] as Array<{ id: string; created_at: string }>, error: null }),
   ]);
 
-  const points = buildSeries(((sales ?? []) as Array<{ created_at: string; creator_share_paise: number }>), ((enrollments ?? []) as Array<{ created_at: string }>), days);
+  const capturedSales = ((sales ?? []) as Array<Record<string, unknown>>).filter((row) => {
+    const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
+    const orderObj = Array.isArray(orderRel) ? orderRel[0] : orderRel;
+    if (!orderObj || !orderObj.status) return true;
+    return (
+      orderObj.status === "paid" ||
+      orderObj.status === "partially_refunded" ||
+      orderObj.status === "refunded"
+    );
+  });
+
+  const points = buildSeries(
+    capturedSales as Array<{ created_at: string; creator_share_paise: number }>,
+    ((enrollments ?? []) as Array<{ created_at: string }>),
+    days
+  );
 
   return {
     points,
@@ -416,7 +601,7 @@ export const getCreatorNotifications = cache(async () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Route onboarding                                                            */
+/* Payout destination onboarding state                                         */
 /* -------------------------------------------------------------------------- */
 
 export interface RouteOnboardingState {
@@ -424,32 +609,22 @@ export interface RouteOnboardingState {
   accountId: string | null;
   status: string | null;
   settlementVerified: boolean;
-  /** Set when Razorpay reports something other than `active`. */
+  /** Always `null` for course creation/publication: payout details are only required to request a payout. */
   blockedReason: string | null;
   checkedAt: string | null;
+  destination: CreatorPayoutDestinationView | null;
 }
 
 /**
- * Reads the creator's Razorpay Route status.
+ * Reads the creator's saved manual payout destination state (masked only).
  *
- * When a live provider check is possible it is used; otherwise the last value
- * stored from a previous verified check is reported, clearly labelled. The
- * application never assumes approval.
+ * Course creation, pricing, review submission, and publication are never
+ * blocked by payout destination setup. Payout details are required only when
+ * the creator requests a payout.
  */
 export async function getRouteOnboardingState(): Promise<RouteOnboardingState> {
   const session = await requireCreator();
   if (!isSupabaseConfigured()) {
-    return { hasAccount: false, accountId: null, status: null, settlementVerified: false, blockedReason: "Provider not configured", checkedAt: null };
-  }
-  const supabase = await createServerClient();
-  const { data } = await supabase
-    .from("creator_profiles")
-    .select("route_account_id, route_account_status, route_settlement_verified, route_last_checked_at, route_error")
-    .eq("user_id", session.id)
-    .maybeSingle();
-
-  const accountId = (data?.route_account_id as string) ?? null;
-  if (!accountId) {
     return {
       hasAccount: false,
       accountId: null,
@@ -457,70 +632,50 @@ export async function getRouteOnboardingState(): Promise<RouteOnboardingState> {
       settlementVerified: false,
       blockedReason: null,
       checkedAt: null,
+      destination: null,
+    };
+  }
+  const supabase = await createServerClient();
+  const { data } = await supabase
+    .from("creator_payout_destinations")
+    .select("method, masked_destination, masked_account_holder, bank_label, updated_at")
+    .eq("creator_id", session.id)
+    .maybeSingle();
+
+  if (!data) {
+    return {
+      hasAccount: false,
+      accountId: null,
+      status: "not_saved",
+      settlementVerified: false,
+      blockedReason: null,
+      checkedAt: null,
+      destination: null,
     };
   }
 
-  try {
-    const statuses = await fetchLinkedAccountStatuses([accountId]);
-    const live = statuses[accountId];
-    if (live && live.status !== "unreachable") {
-      // Persisted through the service role, not the caller's session. Route
-      // fields are provider-owned and `revoke update on creator_profiles from
-      // authenticated` means a session client cannot write them — the previous
-      // session-client write here was silently rejected, so verified provider
-      // state was never actually stored.
-      const service = createServiceClient();
-      if (service) {
-        await service
-          .from("creator_profiles")
-          .update({
-            route_account_status: live.status,
-            route_settlement_verified: live.status === "active",
-            route_last_checked_at: new Date().toISOString(),
-            route_error: null,
-          })
-          .eq("user_id", session.id);
-      }
-      return {
-        hasAccount: true,
-        accountId,
-        status: live.status,
-        settlementVerified: live.status === "active",
-        blockedReason: live.status === "active" ? null : routeBlockedReason(live.status),
-        checkedAt: new Date().toISOString(),
-      };
-    }
-  } catch {
-    // Fall through to the stored state below.
-  }
+  const row = data as Record<string, unknown>;
+  const destination: CreatorPayoutDestinationView = {
+    method: String(row.method) as PayoutDestinationMethod,
+    maskedDestination: String(row.masked_destination ?? ""),
+    maskedAccountHolder: String(row.masked_account_holder ?? ""),
+    bankLabel: (row.bank_label as string) ?? null,
+    statusLabel: "Details saved · Awaiting payout",
+    updatedAt: String(row.updated_at ?? new Date().toISOString()),
+  };
 
-  const storedStatus = (data?.route_account_status as string) ?? null;
   return {
     hasAccount: true,
-    accountId,
-    status: storedStatus,
-    settlementVerified: Boolean(data?.route_settlement_verified),
-    blockedReason: (data?.route_error as string) ?? (storedStatus ? routeBlockedReason(storedStatus) : null),
-    checkedAt: (data?.route_last_checked_at as string) ?? null,
+    accountId: destination.maskedDestination,
+    status: "details_saved",
+    settlementVerified: true,
+    blockedReason: null,
+    checkedAt: destination.updatedAt,
+    destination,
   };
 }
 
-function routeBlockedReason(status: string): string | null {
-  switch (status) {
-    case "created":
-      return "Your Route account has been created. Razorpay runs a bank-account verification (penny test) before transfers can be initiated — this usually completes within 24 hours.";
-    case "requested":
-      return "Your Route onboarding request is under review by Razorpay. Complete any outstanding KYC steps in the Razorpay Dashboard linked-account email.";
-    case "suspended":
-      return "Razorpay has suspended this linked account. Contact Razorpay support to have it reinstated.";
-    case "closed":
-      return "This linked account is closed. Contact Razorpay support if this is unexpected.";
-    case "error":
-      return "Razorpay reported an error on this linked account. Check your details and contact Razorpay support.";
-    default:
-      return "This linked account is not yet active.";
-  }
-}
+export const getPayoutOnboardingState = getRouteOnboardingState;
 
 export function assertCreatorOwnsCourse(courseId: string, creatorId: string, courseOwnerId: unknown): void {
   if (courseOwnerId !== creatorId) {

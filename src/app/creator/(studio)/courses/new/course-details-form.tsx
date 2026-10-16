@@ -62,7 +62,7 @@ export function CourseDetailsForm({
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const priceDisabled = lockPrice || !routeActive;
+  const priceDisabled = Boolean(lockPrice);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -164,8 +164,8 @@ export function CourseDetailsForm({
           />
           <p className="mt-1 text-[11.5px] text-zinc-400">
             {priceDisabled
-              ? "Locked at Free until Razorpay Route is active."
-              : `Stored as ${previewPaise(form.priceRupees)} paise. Free courses can be published immediately.`}
+              ? "Locked while the course is published."
+              : `Stored as ${previewPaise(form.priceRupees)} paise. Set 0 for a free course; payout details are only needed when you request a payout.`}
           </p>
         </div>
 

@@ -29,7 +29,6 @@ export default async function AdminCoursePage({ params }: { params: Promise<{ id
   const lessons = course.sections.flatMap((section) => section.lessons);
   const lessonsWithoutVideo = lessons.filter((lesson) => !lesson.hasVideo);
   const pendingVideos = lessons.filter((lesson) => lesson.hasVideo && !lesson.videoReady);
-  const paidButUnsettleable = course.pricePaise > 0 && course.routeStatus !== "active";
 
   return (
     <div className="space-y-6">
@@ -71,20 +70,6 @@ export default async function AdminCoursePage({ params }: { params: Promise<{ id
         ))}
       </dl>
 
-      {paidButUnsettleable ? (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5 text-[13px]">
-          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-700" aria-hidden />
-          <div>
-            <p className="font-medium text-amber-900">This is a paid course that cannot be settled yet</p>
-            <p className="mt-1 text-amber-800">
-              Razorpay reports the creator&apos;s Route account as{" "}
-              <strong>{course.routeStatus ?? "not set up"}</strong>. Zybble cannot approve a paid course until
-              Razorpay marks the linked account active, because a sale could not be paid out to the creator.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
       {lessons.length === 0 || lessonsWithoutVideo.length > 0 || pendingVideos.length > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3.5 text-[13px] text-amber-900">
           <p className="font-medium">Curriculum is not ready</p>
@@ -111,7 +96,7 @@ export default async function AdminCoursePage({ params }: { params: Promise<{ id
         courseId={course.id}
         status={course.status}
         paid={course.pricePaise > 0}
-        settleable={course.routeStatus === "active"}
+        settleable={true}
         hasLessons={lessons.length > 0}
       />
 
@@ -185,7 +170,7 @@ export default async function AdminCoursePage({ params }: { params: Promise<{ id
             <h2 className="font-display text-[15px] font-semibold tracking-tight">Creator</h2>
             <p className="mt-2 text-[13.5px] font-medium">{course.creatorName}</p>
             <p className="mt-1 text-[12.5px] text-muted-foreground">
-              Razorpay Route: {course.routeStatus ?? "not set up"}
+              Payout destination: {course.routeStatus?.startsWith("details_saved") ? "saved" : "not saved yet"}
             </p>
             {course.creatorBio ? (
               <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{course.creatorBio}</p>

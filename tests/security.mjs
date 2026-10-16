@@ -21,12 +21,14 @@ const SECRET = "test_webhook_secret_not_a_real_credential";
 const KEY_SECRET = "test_key_secret_not_a_real_credential";
 const BUNNY_KEY = "test-bunny-readonly-key-not-real";
 const BUNNY_TOKEN = "test-bunny-token-auth-key-not-real";
+const PAYOUT_ENC_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 process.env.RAZORPAY_KEY_SECRET = KEY_SECRET;
 process.env.RAZORPAY_WEBHOOK_SECRET = SECRET;
 process.env.BUNNY_STREAM_API_KEY = BUNNY_KEY;
 process.env.BUNNY_STREAM_TOKEN_AUTH_KEY = BUNNY_TOKEN;
 process.env.BUNNY_STREAM_LIBRARY_ID = "lib-12345";
+process.env.PAYOUT_DETAILS_ENCRYPTION_KEY = PAYOUT_ENC_KEY;
 
 before(async () => {
   register(new URL("./helpers/loader.mjs", import.meta.url), pathToFileURL("./"));
@@ -35,6 +37,9 @@ before(async () => {
 const razorpay = await import("../src/lib/server/razorpay.ts");
 const bunny = await import("../src/lib/server/bunny.ts");
 const r2 = await import("../src/lib/server/r2.ts");
+const payoutCrypto = await import("../src/lib/server/payout-crypto.ts");
+const payouts = await import("../src/lib/server/payouts.ts");
+const email = await import("../src/lib/server/email.ts");
 
 const hex = (value) => createHmac("sha256", SECRET).update(value, "utf8").digest("hex");
 
@@ -387,4 +392,243 @@ test("a malformed signature is rejected, never thrown — a throw would be a ret
       `bunny ${JSON.stringify(signature)}`
     );
   }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Standard Razorpay order payload (no Route transfers)                       */
+/* -------------------------------------------------------------------------- */
+
+test("buildOrderPayload builds a standard INR order without Route transfers", () => {
+  const payload = razorpay.buildOrderPayload({
+    amountPaise: 149900,
+    receipt: "ZYB-2026-ABCDEF",
+    notes: { orderId: "order-1", courseId: "course-1" },
+  });
+  assert.deepEqual(payload, {
+    amount: 149900,
+    currency: "INR",
+    receipt: "ZYB-2026-ABCDEF",
+    partial_payment: false,
+    notes: { orderId: "order-1", courseId: "course-1" },
+  });
+  assert.equal("transfers" in payload, false);
+
+  // Supplying Route transfers on order creation must fail closed.
+  assert.throws(
+    () =>
+      razorpay.buildOrderPayload({
+        amountPaise: 149900,
+        receipt: "ZYB-2026-ABCDEF",
+        transfers: [{ account: "acc_123", amount: 134910, currency: "INR" }],
+      }),
+    /Razorpay Route order transfers are disabled/
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Creator Payout Destination Validation, Masking & AES-256-GCM Encryption    */
+/* -------------------------------------------------------------------------- */
+
+test("Indian IFSC, bank account number, and UPI VPA validators enforce strict format rules", () => {
+  assert.equal(payoutCrypto.isValidIfsc("HDFC0001234"), true);
+  assert.equal(payoutCrypto.isValidIfsc("sbin0005678"), true);
+  for (const badIfsc of ["HDFC1001234", "HDFC01234", "12340ABCDEF", "HDFC00012345", ""]) {
+    assert.equal(payoutCrypto.isValidIfsc(badIfsc), false, badIfsc);
+  }
+
+  assert.equal(payoutCrypto.isValidBankAccountNumber("123456789"), true);
+  assert.equal(payoutCrypto.isValidBankAccountNumber("123456789012345678"), true);
+  for (const badAcc of ["12345678", "1234567890123456789", "0000000000", "12345abc90", ""]) {
+    assert.equal(payoutCrypto.isValidBankAccountNumber(badAcc), false, badAcc);
+  }
+
+  assert.equal(payoutCrypto.isValidUpiVpa("rahul.sharma@okaxis"), true);
+  assert.equal(payoutCrypto.isValidUpiVpa("creator_01@ybl"), true);
+  for (const badUpi of ["rahul", "@okaxis", "rahul@", "a@b", "rahul sharma@okaxis", ""]) {
+    assert.equal(payoutCrypto.isValidUpiVpa(badUpi), false, badUpi);
+  }
+});
+
+test("masked destination summaries never contain full UPI handle, account number, or IFSC", () => {
+  const upiSummary = payoutCrypto.preparePayoutDestination({
+    method: "upi",
+    accountHolderName: "Asha Rao",
+    upiId: "asharao.creator@okaxis",
+  });
+  assert.equal(upiSummary.method, "upi");
+  assert.equal(upiSummary.maskedDestination.includes("asharao.creator"), false);
+  assert.ok(upiSummary.maskedDestination.endsWith("@okaxis"));
+  assert.equal(upiSummary.maskedAccountHolder.includes("Asha"), false);
+
+  const bankSummary = payoutCrypto.preparePayoutDestination({
+    method: "bank",
+    accountHolderName: "Rohan Deshmukh",
+    accountNumber: "987654321098",
+    ifsc: "HDFC0004321",
+    bankName: "HDFC Bank",
+  });
+  assert.equal(bankSummary.method, "bank");
+  assert.equal(bankSummary.maskedDestination.includes("987654321098"), false);
+  assert.equal(bankSummary.maskedDestination.includes("HDFC0004321"), false);
+  assert.ok(bankSummary.maskedDestination.includes("1098"));
+  assert.equal(bankSummary.maskedAccountHolder.includes("Rohan"), false);
+});
+
+test("AES-256-GCM payout encryption round-trips, uses random IVs, and binds AAD to creatorId+method", () => {
+  const creatorA = "11111111-2222-3333-4444-555555555555";
+  const creatorB = "22222222-3333-4444-5555-666666666666";
+  const secret = {
+    method: "bank",
+    accountHolderName: "Priya Nair",
+    accountNumber: "112233445566",
+    ifsc: "ICIC0001122",
+    bankName: "ICICI Bank",
+  };
+
+  const enc1 = payoutCrypto.encryptPayoutDestination(secret, { creatorId: creatorA, key: PAYOUT_ENC_KEY });
+  const enc2 = payoutCrypto.encryptPayoutDestination(secret, { creatorId: creatorA, key: PAYOUT_ENC_KEY });
+
+  // Ciphertexts must differ due to fresh 96-bit IVs and must not leak plaintext.
+  assert.notEqual(enc1, enc2);
+  assert.equal(enc1.includes("112233445566"), false);
+  assert.equal(enc1.includes("Priya Nair"), false);
+
+  const dec = payoutCrypto.decryptPayoutDestination(enc1, {
+    creatorId: creatorA,
+    expectedMethod: "bank",
+    key: PAYOUT_ENC_KEY,
+  });
+  assert.deepEqual(dec, secret);
+
+  // Cross-creator AAD swap attack must fail closed.
+  assert.throws(
+    () =>
+      payoutCrypto.decryptPayoutDestination(enc1, {
+        creatorId: creatorB,
+        expectedMethod: "bank",
+        key: PAYOUT_ENC_KEY,
+      }),
+    /Could not authenticate or decrypt/
+  );
+
+  // Cross-method AAD mismatch must fail closed.
+  assert.throws(
+    () =>
+      payoutCrypto.decryptPayoutDestination(enc1, {
+        creatorId: creatorA,
+        expectedMethod: "upi",
+        key: PAYOUT_ENC_KEY,
+      }),
+    /Could not authenticate or decrypt/
+  );
+
+  // Ciphertext / tag tampering must fail closed.
+  const parts = enc1.split(":");
+  const tamperedTag = `${parts[0]}:${parts[1]}:${"A".repeat(parts[2].length)}:${parts[3]}`;
+  assert.throws(
+    () =>
+      payoutCrypto.decryptPayoutDestination(tamperedTag, {
+        creatorId: creatorA,
+        expectedMethod: "bank",
+        key: PAYOUT_ENC_KEY,
+      }),
+    /Could not authenticate or decrypt|Invalid/
+  );
+});
+
+test("payout encryption fails closed when PAYOUT_DETAILS_ENCRYPTION_KEY is missing, short, or all-zero", () => {
+  for (const invalidKey of ["", "   ", "short-key", "0".repeat(64), "z".repeat(64)]) {
+    assert.throws(
+      () => payoutCrypto.parsePayoutEncryptionKey(invalidKey),
+      /PAYOUT_DETAILS_ENCRYPTION_KEY|not configured/
+    );
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Manual Payout Transitions, Confirmation Guards & Email Privacy             */
+/* -------------------------------------------------------------------------- */
+
+test("manual payout state machine allows only valid transitions and blocks terminal mutations", () => {
+  assert.equal(payouts.canTransitionPayoutStatus("requested", "approved"), true);
+  assert.equal(payouts.canTransitionPayoutStatus("requested", "paid"), true);
+  assert.equal(payouts.canTransitionPayoutStatus("requested", "rejected"), true);
+  assert.equal(payouts.canTransitionPayoutStatus("requested", "failed"), true);
+  assert.equal(payouts.canTransitionPayoutStatus("requested", "cancelled"), true);
+  assert.equal(payouts.canTransitionPayoutStatus("approved", "paid"), true);
+
+  for (const terminal of ["paid", "rejected", "failed", "cancelled"]) {
+    for (const target of ["requested", "approved", "paid", "rejected", "failed", "cancelled"]) {
+      assert.equal(payouts.canTransitionPayoutStatus(terminal, target), false, `${terminal}->${target}`);
+    }
+  }
+});
+
+test("marking a manual payout as paid requires UTR reference, amount match, and transfer confirmation", () => {
+  const valid = payouts.validateManualPayoutConfirmation({
+    currentStatus: "approved",
+    expectedAmountPaise: 134910,
+    confirmAmountPaise: 134910,
+    paymentReference: "UTR428914509812",
+    paymentMethodUsed: "upi",
+    confirmAmountMatch: true,
+    confirmTransferSent: true,
+  });
+  assert.equal(valid.paymentReference, "UTR428914509812");
+
+  // Missing transfer confirmation -> throws
+  assert.throws(
+    () =>
+      payouts.validateManualPayoutConfirmation({
+        currentStatus: "approved",
+        expectedAmountPaise: 134910,
+        confirmAmountPaise: 134910,
+        paymentReference: "UTR428914509812",
+        confirmAmountMatch: true,
+        confirmTransferSent: false,
+      }),
+    /actually been sent/
+  );
+
+  // Amount mismatch -> throws
+  assert.throws(
+    () =>
+      payouts.validateManualPayoutConfirmation({
+        currentStatus: "approved",
+        expectedAmountPaise: 134910,
+        confirmAmountPaise: 100000,
+        paymentReference: "UTR428914509812",
+        confirmAmountMatch: true,
+        confirmTransferSent: true,
+      }),
+    /must match the exact payout request amount/
+  );
+
+  // Missing / too-short UTR -> throws
+  assert.throws(
+    () =>
+      payouts.validateManualPayoutConfirmation({
+        currentStatus: "approved",
+        expectedAmountPaise: 134910,
+        confirmAmountPaise: 134910,
+        paymentReference: "12",
+        confirmAmountMatch: true,
+        confirmTransferSent: true,
+      }),
+    /transaction reference/
+  );
+});
+
+test("manual payout lifecycle emails render masked destination details and UTRs without leaking full account data", () => {
+  const paidRendered = email.renderEmailTemplate("payout_paid", {
+    creatorName: "Asha",
+    publicId: "PAY-20261016-ABC123",
+    amount: "₹1,349.10",
+    destinationMasked: "UPI (as••••a@okaxis)",
+    paymentReference: "UTR9988776655",
+    paidAt: "16 Oct 2026",
+  });
+  assert.match(paidRendered.subject, /PAY-20261016-ABC123/);
+  assert.match(paidRendered.html, /UTR9988776655/);
+  assert.match(paidRendered.html, /as••••a@okaxis/);
 });

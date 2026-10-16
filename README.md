@@ -1,15 +1,15 @@
 # Zybble
 
 An India-only marketplace for practical AI courses, built on Next.js App Router
-with a real backend: Supabase Postgres + Auth, Razorpay Payments and Route for
-INR settlement, Bunny Stream for video, private Cloudflare R2 for files, Resend
-for transactional email, and DeepSeek (via OpenRouter) for the public
-course-discovery assistant.
+with a real backend: Supabase Postgres + Auth, Razorpay Standard Checkout for
+INR learner payments, encrypted UPI/bank manual creator payouts, Bunny Stream for
+video, private Cloudflare R2 for files, Resend for transactional email, and
+DeepSeek (via OpenRouter) for the public course-discovery assistant.
 
-**Read [`LAUNCH_BLOCKERS.md`](./LAUNCH_BLOCKERS.md) before trusting any of this.**
-No provider integration in this repository has been executed against a live
-account. The code is implemented, typechecked and unit-tested; the credentials,
-KYC, DNS and commercial decisions that make it *work* are still outstanding.
+**Read [`LAUNCH_BLOCKERS.md`](./LAUNCH_BLOCKERS.md) before enabling live payments.**
+Live Razorpay credentials must remain gated until Razorpay Merchant Compliance
+approves Zybble's marketplace / instructor payout model and Indian tax
+(Section 194-O TDS and GST/TCS) sign-off is complete.
 
 ---
 
@@ -54,7 +54,7 @@ Server (Node runtime)
   └─ route handlers    ── src/app/api/**
         │
         ├─ Supabase (Postgres + RLS + Auth)   ── src/lib/supabase/*
-        ├─ Razorpay Payments + Route          ── src/lib/server/{razorpay,checkout}.ts
+        ├─ Razorpay Checkout + Manual Payouts ── src/lib/server/{razorpay,checkout,payouts,payout-crypto}.ts
         ├─ Bunny Stream                      ── src/lib/server/bunny.ts
         ├─ Cloudflare R2 (private)           ── src/lib/server/r2.ts
         ├─ Resend                            ── src/lib/server/email.ts
@@ -121,16 +121,23 @@ See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full sequence.
   **snapshotted onto every order item** so a later change cannot rewrite history.
 - **The split always reconciles:** `creator_paise = gross_paise − commission_paise`,
   so the halves sum back to the gross exactly.
-- **Paid publication is blocked** unless Razorpay reports the creator's Route
-  linked account as `active`. Enforced in the checkout, the creator submit flow
-  and the moderation approval flow.
-- **No tax logic is invented.** Razorpay's reported `fee` and `tax` are stored
-  verbatim. GST/TDS treatment is an open question recorded in
-  `LAUNCH_BLOCKERS.md` §3.
-- **There is no refund policy and no refund flow.** Provider reversals are
-  handled as accounting corrections.
+- **Standard Razorpay Checkout + Manual Creator Payouts:** Learners pay Zybble
+  in INR via standard Razorpay Checkout (no Razorpay Route `transfers` array).
+  Creators can publish and earn without Route onboarding or pre-saved bank/UPI
+  details; saving an AES-256-GCM encrypted UPI ID or Indian bank account is
+  required only when requesting a payout.
+- **Audited off-platform payout confirmation:** Admins review payout requests in
+  `/admin/payouts`, perform an audited `no-store` reveal of the encrypted
+  destination snapshot, execute the bank/UPI transfer off-platform, and can mark
+  a request `paid` only after entering the bank/UPI UTR reference and confirming
+  both the exact INR amount and transfer completion.
+- **Refund & reversal adjustments:** Refunds debit the creator's share
+  proportionally (`computeCreatorRefundAdjustmentPaise`). If a refund occurs
+  after a manual payout has already been paid, the negative balance is tracked
+  explicitly as `negativeAdjustmentPaise` against future earnings rather than
+  pretending funds were automatically recovered from the creator's bank account.
 
-Full detail: [`PAYMENT_FLOW.md`](./PAYMENT_FLOW.md).
+Full detail: [`PAYMENT_FLOW.md`](./PAYMENT_FLOW.md) and [`LAUNCH_BLOCKERS.md`](./LAUNCH_BLOCKERS.md).
 
 ---
 
@@ -185,11 +192,11 @@ npm run test:unit     # all four node:test suites below
 npm test              # typecheck + lint + test:unit
 npm run build         # production build
 
-npm run test:money     # INR paise, conversion, formatting, commission
+npm run test:money     # INR paise, conversion, formatting, commission & payout accounting
 npm run test:chatbot   # grounded catalogue assistant, fail-closed
-npm run test:security  # payment/Bunny/upload/object-key primitives
-npm run test:rls       # migration + authorization static contracts
-npm run test:e2e       # Playwright walkthrough — STALE, see below
+npm run test:security  # payment/Bunny/upload/object-key + AES-256-GCM payout crypto & confirmation guards
+npm run test:rls       # migration + authorization + payout column-grant/RLS static contracts
+npm run test:e2e       # Playwright walkthrough against current architecture
 ```
 
 **Status on this branch:** typecheck 0 errors · lint 0 errors / 0 warnings ·

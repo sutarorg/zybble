@@ -35,8 +35,8 @@ export default async function AdminCoursesPage({
       <header>
         <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Courses</h1>
         <p className="mt-1.5 text-[14px] text-muted-foreground">
-          {all.length} course{all.length === 1 ? "" : "s"} in Zybble. Paid courses cannot be approved while
-          Razorpay reports the creator&apos;s Route account as anything other than active.
+          {all.length} course{all.length === 1 ? "" : "s"} in Zybble. Creators can publish and earn on
+          paid courses immediately; saved UPI/bank details are required only when requesting a payout.
         </p>
       </header>
 
@@ -59,9 +59,9 @@ export default async function AdminCoursesPage({
                       {course.title}
                     </Link>
                     <StatusBadge status={course.status} />
-                    {course.pricePaise > 0 && course.routeStatus !== "active" ? (
-                      <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
-                        Route: {course.routeStatus ?? "not set up"}
+                    {course.pricePaise > 0 ? (
+                      <span className="rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        Payout dest: {course.routeStatus?.startsWith("details_saved") ? "saved" : "not saved yet"}
                       </span>
                     ) : null}
                   </div>

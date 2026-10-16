@@ -53,12 +53,14 @@ export default async function PublishCoursePage({ params }: { params: Promise<{ 
       detail: "Courses without a thumbnail look unfinished in the catalog.",
     },
     {
-      label: course.pricePaise > 0 ? "Razorpay Route active (paid course)" : "Pricing",
-      done: course.pricePaise === 0 || route.settlementVerified,
+      label: course.pricePaise > 0 ? "Paid course pricing (INR)" : "Pricing (Free)",
+      done: true,
       detail:
         course.pricePaise > 0
-          ? "Razorpay must report your linked account as active before a paid course can go live."
-          : "This course is free, so no settlement account is required.",
+          ? route.hasAccount
+            ? `Priced at ${money(course.pricePaise)}. Payout destination saved (${route.accountId}).`
+            : `Priced at ${money(course.pricePaise)}. You can publish and earn now; save a UPI ID or bank account in Payouts whenever you are ready to request a payout.`
+          : "This course is free.",
     },
   ];
 

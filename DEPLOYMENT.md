@@ -72,7 +72,7 @@ supabase link --project-ref <project-ref>
 supabase db push
 ```
 
-Five migrations, in order:
+Six migrations, in order:
 
 | File | Contents |
 | --- | --- |
@@ -81,13 +81,12 @@ Five migrations, in order:
 | `20260101000300_rls.sql` | row-level security, grants, triggers, `published_courses` view |
 | `20260101000400_seed_configuration.sql` | **categories only** |
 | `20260101000500_learner_rls_policies.sql` | owner-scoped policies for the eight learner-owned tables |
+| `20260101000600_manual_payouts.sql` | encrypted manual payout destinations (`creator_payout_destinations`), payout requests (`payout_requests`), audit events (`payout_audit_events`), transition guards, and atomic reservation RPC (`create_creator_payout_request`) |
 
-The fifth migration is **not optional**. `20260101000300_rls.sql` grants those
-tables to `authenticated` while enabling RLS globally, but originally shipped no
-policies for them. Postgres treats *granted + RLS enabled + no matching policy*
-as **deny**, so without migration 5 the application runs without errors and every
-learner silently sees an empty wishlist, no progress, no notes, no resume
-position and no entitlements.
+The fifth and sixth migrations are **not optional**. `20260101000300_rls.sql` grants those
+tables to `authenticated` while enabling RLS globally, and `20260101000600_manual_payouts.sql`
+adds column-level grants that exclude `encrypted_payload` and `destination_encrypted_payload`
+from `anon` and `authenticated`.
 
 `npm run test:rls` asserts grant/policy parity so this cannot silently recur: if
 you add a table to the grants without giving it a policy, the suite fails.
@@ -99,10 +98,9 @@ users, no reviews. Shipping demo business records would mean shipping fake ones.
 RLS behaviour. With migrations applied, open three sessions and confirm: an
 anonymous session cannot read any learner row; a learner session cannot read
 another learner's entitlements, notes or progress; neither can write
-`profiles.role`; and an anonymous session gets **no columns at all** from
-`creator_profiles` — the Razorpay `route_account_id` in particular must not be
-reachable. This three-session check is an unclosed launch blocker —
-`LAUNCH_BLOCKERS.md` §6.
+`profiles.role`; and neither `anon` nor `authenticated` can select
+`creator_payout_destinations.encrypted_payload` or
+`payout_requests.destination_encrypted_payload`.
 
 ### 3.4 Promote the first admin
 
@@ -128,7 +126,7 @@ already exists and the ids match.
 
 ---
 
-## 4. Razorpay
+## 4. Razorpay & Payout Destination Encryption
 
 ### 4.1 Keys
 
@@ -136,12 +134,15 @@ Dashboard → Settings → API keys.
 
 | Key | Env |
 | --- | --- |
-| Key ID | `RAZORPAY_KEY_ID` |
+| Publishable Key ID | `NEXT_PUBLIC_RAZORPAY_KEY_ID` (and `RAZORPAY_KEY_ID`) |
 | Key secret | `RAZORPAY_KEY_SECRET` — **secret** |
 | Webhook secret | `RAZORPAY_WEBHOOK_SECRET` — **secret** |
+| Payout encryption key | `PAYOUT_DETAILS_ENCRYPTION_KEY` — **32-byte secret** (`openssl rand -hex 32`) |
 
-Build and test with **test mode** keys first. Do not put test keys anywhere near
-the production deployment, and do not put live keys in CI.
+Build and test with **test mode** (`rzp_test_...`) keys first. Do not enable live
+Razorpay keys (`rzp_live_...`) until Razorpay Merchant Compliance approves
+Zybble's marketplace / instructor payout model and Indian tax (Section 194-O TDS
+and GST/TCS) sign-off is complete — see `LAUNCH_BLOCKERS.md`.
 
 ### 4.2 Webhook
 
@@ -150,30 +151,19 @@ Dashboard → Webhooks, add `https://<domain>/api/razorpay/webhook`.
 | Setting | Value |
 | --- | --- |
 | Secret | same value as `RAZORPAY_WEBHOOK_SECRET` |
-| Active events | `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`, `transfer.processed`, `transfer.settled`, `transfer.failed`, `transfer.reversed`, `payout.processed`, `payout.reversed` |
+| Active events | `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed` |
 | Content type | `application/json` |
 
 The handler reads the body as **text before parsing** — re-serialising changes
 the bytes and breaks the HMAC.
 
-### 4.3 Enable Route
+### 4.3 Manual Creator Payouts (No Razorpay Route Dependency)
 
-This is the hard part and it is **not an API key**.
-
-1. Contact Razorpay to enable **Route** (and **Route (Standard/Express)**) on
-   the merchant account. Sign the agreement.
-2. Confirm linked accounts are enabled and that your account is authorised to
-   create them.
-3. Note Razorpay's documented constraints that the code already honours:
-   - Route is **INR-only**.
-   - There is a **24-hour cooling period** between creating a linked account and
-     it becoming usable.
-   - Order transfers are **API-only** — there is no dashboard equivalent, so all
-     transfer state must come from the API.
-   - Route does **not** support partial payments.
-
-Until this is live, **paid checkout stays disabled everywhere** — which is the
-correct behaviour, not a bug.
+Zybble does **not** use Razorpay Route linked accounts or automatic order splits:
+1. Learner payments settle in INR to Zybble's merchant account via standard Razorpay Checkout.
+2. Creators can publish paid or free courses immediately; saving a UPI ID or Indian bank account in `/creator/payouts` is required only when requesting a payout.
+3. Sensitive destination fields (beneficiary name, UPI VPA, bank account number, IFSC) are encrypted server-side with AES-256-GCM using `PAYOUT_DETAILS_ENCRYPTION_KEY` before being written to Postgres.
+4. Administrators review payout requests in `/admin/payouts`, perform an audited reveal of the decrypted destination snapshot, execute the UPI/NEFT/IMPS transfer off-platform, and confirm the payout only after entering the bank/UPI UTR reference and confirming both the exact INR amount and transfer completion.
 
 ---
 

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * Checkout entry point.
  *
  * Everything the page shows is read from the database on the server. The
- * browser receives a price it can never edit and a Route-eligibility verdict it
+ * browser receives a price it can never edit and a checkout-readiness verdict it
  * can never override; `/api/checkout` re-checks both before writing an order.
  */
 export default async function CheckoutPage({ params }: { params: Promise<{ courseId: string }> }) {

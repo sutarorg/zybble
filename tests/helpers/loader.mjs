@@ -19,7 +19,7 @@ function resolveAsFile(target, context, nextResolve) {
 }
 
 export function resolve(specifier, context, nextResolve) {
-  if (specifier === "server-only") {
+  if (specifier === "server-only" || specifier === "next/headers") {
     return {
       url: pathToFileURL(path.join(ROOT, "tests/helpers/empty.mjs")).href,
       shortCircuit: true,

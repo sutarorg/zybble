@@ -113,9 +113,9 @@ export default async function CreatorOnboardingPage() {
 
       {!published ? (
         <p className="text-[12.5px] text-muted-foreground">
-          <strong className="font-medium">Heads up:</strong> Zybble publishes no course until an
-          administrator reviews it, and a paid course additionally requires Razorpay to report your Route
-          account as active.
+          <strong className="font-medium">Heads up:</strong> Zybble publishes courses after an
+          administrator reviews them. You can publish and start earning before saving a payout
+          destination; a saved UPI ID or bank account is required only when you request a payout.
         </p>
       ) : null}
     </div>

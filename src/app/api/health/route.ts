@@ -20,6 +20,7 @@ export async function GET() {
   const report = configurationReport();
   const services = report.services.map((service) => ({
     id: service.id,
+    service: service.id,
     label: service.label,
     configured: service.configured,
     missing: service.missing,

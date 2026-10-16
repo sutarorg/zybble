@@ -18,6 +18,7 @@ before(async () => {
 });
 
 const money = await import("../src/lib/money.ts");
+const payouts = await import("../src/lib/server/payouts.ts");
 
 test("INR is the only currency", () => {
   assert.equal(money.CURRENCY, "INR");
@@ -132,4 +133,76 @@ test("exact formatting always shows both decimal places for reconciliation", () 
   assert.match(money.formatInrExact(129900), /₹1,299\.00/);
   assert.match(money.formatInrExact(1), /₹0\.01/);
   assert.doesNotMatch(money.formatInrExact(129900), /USD|EUR|GBP/);
+});
+
+test("refund split proportionally debits creator share and commission in integer paise", () => {
+  // ₹1,499.00 course at 10% commission -> ₹149.90 commission, ₹1,349.10 creator share
+  const full = payouts.computeCreatorRefundAdjustmentPaise({
+    unitPricePaise: 149900,
+    creatorSharePaise: 134910,
+    refundAmountPaise: 149900,
+  });
+  assert.equal(full.refundAmountPaise, 149900);
+  assert.equal(full.creatorRefundDebitPaise, 134910);
+  assert.equal(full.commissionReversalPaise, 14990);
+  assert.equal(full.creatorRefundDebitPaise + full.commissionReversalPaise, full.refundAmountPaise);
+
+  // Partial 50% refund -> exact paise sum
+  const half = payouts.computeCreatorRefundAdjustmentPaise({
+    unitPricePaise: 149900,
+    creatorSharePaise: 134910,
+    refundAmountPaise: 74950,
+  });
+  assert.equal(half.refundAmountPaise, 74950);
+  assert.equal(half.creatorRefundDebitPaise + half.commissionReversalPaise, 74950);
+  assert.equal(half.creatorRefundDebitPaise, 67455);
+});
+
+test("creator manual payout balance reconciles sales, refunds, reserved requests, and paid payouts", () => {
+  // Two captured sales of ₹1,000.00 each (10% commission => ₹900.00 creator share each)
+  const balance = payouts.computeCreatorPayoutBalance({
+    capturedOrderItems: [
+      { unitPricePaise: 100000, commissionPaise: 10000, creatorSharePaise: 90000 },
+      { unitPricePaise: 100000, commissionPaise: 10000, creatorSharePaise: 90000 },
+    ],
+    processedRefunds: [],
+    payoutRequests: [
+      { amountPaise: 50000, status: "paid" },
+      { amountPaise: 40000, status: "requested" },
+      { amountPaise: 25000, status: "rejected" }, // released back to available
+      { amountPaise: 15000, status: "failed" }, // released back to available
+      { amountPaise: 10000, status: "cancelled" }, // released back to available
+    ],
+  });
+
+  assert.equal(balance.grossPaise, 200000);
+  assert.equal(balance.commissionPaise, 20000);
+  assert.equal(balance.grossEarnedPaise, 180000);
+  assert.equal(balance.netEarnedPaise, 180000);
+  assert.equal(balance.paidOutPaise, 50000);
+  assert.equal(balance.reservedPendingPaise, 40000);
+  assert.equal(balance.outstandingPayablePaise, 130000); // 180000 - 50000
+  assert.equal(balance.availablePaise, 90000); // 180000 - 50000 - 40000
+  assert.equal(balance.negativeAdjustmentPaise, 0);
+});
+
+test("post-payout refund surfaces negativeAdjustmentPaise without faking a bank clawback", () => {
+  // Creator sold ₹1,000.00 (earned ₹900.00), was paid ₹900.00 manually, then learner was refunded ₹1,000.00
+  const postRefund = payouts.computeCreatorPayoutBalance({
+    capturedOrderItems: [
+      { unitPricePaise: 100000, commissionPaise: 10000, creatorSharePaise: 90000 },
+    ],
+    processedRefunds: [
+      { unitPricePaise: 100000, creatorSharePaise: 90000, refundAmountPaise: 100000 },
+    ],
+    payoutRequests: [{ amountPaise: 90000, status: "paid" }],
+  });
+
+  assert.equal(postRefund.grossEarnedPaise, 90000);
+  assert.equal(postRefund.refundedCreatorSharePaise, 90000);
+  assert.equal(postRefund.netEarnedPaise, 0);
+  assert.equal(postRefund.paidOutPaise, 90000);
+  assert.equal(postRefund.availablePaise, 0);
+  assert.equal(postRefund.outstandingPayablePaise, 0);
+  assert.equal(postRefund.negativeAdjustmentPaise, 90000);
 });

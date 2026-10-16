@@ -1,64 +1,65 @@
 "use client";
 
-import * as React from "react";
 import { Download } from "lucide-react";
-import { downloadCsv } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
+import { downloadCsv } from "@/lib/admin";
+import { paiseToRupees } from "@/lib/money";
+import type { AdminPayoutRequestRow } from "@/lib/server/admin";
 
-interface Row {
-  transferId: string;
-  creatorName: string;
-  routeAccountId: string;
-  amountPaise: number;
-  reversedPaise: number;
-  status: string;
-  settlementStatus: string | null;
-  settledAt: string | null;
-  createdAt: string;
-}
-
-export function ExportTransfersCsv({ transfers }: { transfers: Row[] }) {
-  const [busy, setBusy] = React.useState(false);
+export function ExportPayoutsCsv({
+  requests,
+}: {
+  requests: AdminPayoutRequestRow[];
+}) {
+  function download() {
+    downloadCsv(
+      `zybble-creator-payouts-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        "payout_public_id",
+        "creator_name",
+        "creator_email",
+        "amount_inr",
+        "amount_paise",
+        "status",
+        "destination_method",
+        "destination_masked",
+        "holder_masked",
+        "payment_reference_utr",
+        "payment_method_used",
+        "requested_at",
+        "paid_at",
+      ],
+      requests.map((req) => [
+        req.publicId,
+        req.creatorName,
+        req.creatorEmail,
+        paiseToRupees(req.amountPaise),
+        req.amountPaise,
+        req.status,
+        req.destinationMethod,
+        req.destinationMasked,
+        req.destinationHolderMasked,
+        req.paymentReference ?? "",
+        req.paymentMethodUsed ?? "",
+        req.requestedAt,
+        req.paidAt ?? "",
+      ])
+    );
+  }
 
   return (
     <Button
+      type="button"
       variant="outline"
       size="sm"
-      disabled={busy || transfers.length === 0}
-      onClick={() => {
-        setBusy(true);
-        try {
-          downloadCsv(
-            `zybble-route-transfers-${new Date().toISOString().slice(0, 10)}`,
-            [
-              "transfer_id",
-              "creator",
-              "razorpay_account_id",
-              "amount_inr",
-              "reversed_inr",
-              "transfer_status",
-              "settlement_status",
-              "settled_at",
-              "created_at",
-            ],
-            transfers.map((transfer) => [
-              transfer.transferId,
-              transfer.creatorName,
-              transfer.routeAccountId,
-              (transfer.amountPaise / 100).toFixed(2),
-              (transfer.reversedPaise / 100).toFixed(2),
-              transfer.status,
-              transfer.settlementStatus ?? "",
-              transfer.settledAt ?? "",
-              transfer.createdAt,
-            ])
-          );
-        } finally {
-          setBusy(false);
-        }
-      }}
+      disabled={requests.length === 0}
+      onClick={download}
     >
-      <Download className="size-4" aria-hidden /> Export CSV
+      <Download className="mr-1.5 h-3.5 w-3.5" />
+      Export CSV (masked)
     </Button>
   );
 }
+
+/** Backwards-compatible export alias. */
+export const ExportTransfersCsv = ExportPayoutsCsv;

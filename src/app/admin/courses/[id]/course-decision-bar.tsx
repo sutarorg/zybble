@@ -59,11 +59,11 @@ export function CourseDecisionBar({
             label="Approve & publish"
             icon={CheckCircle2}
             variant="default"
-            disabled={!hasLessons || (paid && !settleable)}
+            disabled={!hasLessons}
             confirmTitle="Approve and publish this course?"
             confirmBody={
               paid
-                ? "Learners can now buy this course. Razorpay Route will split each payment between the creator and Zybble using the commission snapshotted at checkout."
+                ? "Learners can now buy this course in INR via Razorpay Checkout. The creator's share after Zybble's commission accrues to their ledger balance for manual payout."
                 : "This free course becomes visible in the public catalog."
             }
             confirmLabel="Approve and publish"
@@ -112,11 +112,6 @@ export function CourseDecisionBar({
         </p>
       )}
 
-      {paid && !settleable ? (
-        <p className="text-[12.5px] text-amber-700">
-          Publication is blocked until Razorpay reports the creator&apos;s Route account as active.
-        </p>
-      ) : null}
       {!hasLessons ? <p className="text-[12.5px] text-amber-700">Add at least one lesson first.</p> : null}
     </section>
   );

@@ -9,9 +9,15 @@
 import "server-only";
 import { cache } from "react";
 import { createServerClient, createServiceClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isPayoutEncryptionConfigured, isSupabaseConfigured } from "@/lib/env";
 import { requireAdmin } from "@/lib/server/session";
 import { CATEGORIES } from "@/lib/config/catalog";
+import {
+  computeCreatorPayoutBalance,
+  type CreatorPayoutBalance,
+  type PayoutRequestStatus,
+} from "@/lib/server/payouts";
+import type { PayoutDestinationMethod } from "@/lib/server/payout-crypto";
 
 /* -------------------------------------------------------------------------- */
 /* Overview                                                                    */
@@ -32,6 +38,11 @@ export interface AdminOverview {
   routeTransfers: number;
   failedTransfers: number;
   settledPaise: number;
+  payoutRequestsCount: number;
+  pendingPayoutRequests: number;
+  pendingPayoutPaise: number;
+  paidOutPaise: number;
+  outstandingCreatorPayablePaise: number;
 }
 
 export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
@@ -40,6 +51,8 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
     courses: 0, publishedCourses: 0, pendingCourses: 0, learners: 0, creators: 0, orders: 0,
     grossPaise: 0, commissionPaise: 0, creatorPayablePaise: 0, refundedPaise: 0,
     openReports: 0, routeTransfers: 0, failedTransfers: 0, settledPaise: 0,
+    payoutRequestsCount: 0, pendingPayoutRequests: 0, pendingPayoutPaise: 0,
+    paidOutPaise: 0, outstandingCreatorPayablePaise: 0,
   };
   if (!isSupabaseConfigured()) return empty;
   const service = createServiceClient();
@@ -48,6 +61,7 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
   const [
     courses, published, pending, learners, creators, orders,
     commissionLedger, creatorLedger, refunds, reports, transfers, failedTransfers, settlements,
+    payoutRequestsRes, creatorAdjustmentsRes,
   ] = await Promise.all([
     service.from("courses").select("id", { count: "exact", head: true }),
     service.from("courses").select("id", { count: "exact", head: true }).eq("status", "published"),
@@ -57,11 +71,18 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
     service.from("orders").select("id", { count: "exact", head: true }),
     service.from("ledger_entries").select("amount_paise").eq("kind", "commission"),
     service.from("ledger_entries").select("amount_paise").eq("kind", "sale").eq("account", "platform").eq("direction", "debit"),
-    service.from("refunds").select("amount_paise"),
+    service.from("refunds").select("amount_paise").eq("status", "processed"),
     service.from("reports").select("id", { count: "exact", head: true }).eq("status", "open"),
     service.from("route_transfers").select("id", { count: "exact", head: true }),
     service.from("route_transfers").select("id", { count: "exact", head: true }).eq("status", "failed"),
     service.from("route_settlements").select("amount_paise").eq("status", "processed"),
+    service.from("payout_requests").select("amount_paise, status"),
+    service
+      .from("ledger_entries")
+      .select("amount_paise")
+      .eq("kind", "adjustment")
+      .eq("direction", "debit")
+      .not("account", "eq", "platform"),
   ]);
 
   const sum = (rows: { amount_paise: number }[] | null) =>
@@ -74,6 +95,21 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
     .eq("direction", "credit")
     .not("account", "eq", "platform");
 
+  const payoutRows = (payoutRequestsRes.data ?? []) as Array<{ amount_paise: number; status: string }>;
+  const paidOutManualPaise = payoutRows
+    .filter((row) => row.status === "paid")
+    .reduce((total, row) => total + Number(row.amount_paise ?? 0), 0);
+  const pendingRows = payoutRows.filter((row) => row.status === "requested" || row.status === "approved");
+  const pendingPayoutPaise = pendingRows.reduce((total, row) => total + Number(row.amount_paise ?? 0), 0);
+  const failedPayoutRequests = payoutRows.filter((row) => row.status === "failed").length;
+
+  const legacySettledPaise = sum(settlements.data as { amount_paise: number }[]);
+  const paidOutPaise = paidOutManualPaise + legacySettledPaise;
+  const grossCreatorEarnedPaise = sum(sales as { amount_paise: number }[]);
+  const creatorAdjustmentDebitPaise = sum(creatorAdjustmentsRes.data as { amount_paise: number }[]);
+  const netCreatorPayablePaise = Math.max(0, grossCreatorEarnedPaise - creatorAdjustmentDebitPaise);
+  const outstandingCreatorPayablePaise = Math.max(0, netCreatorPayablePaise - paidOutPaise);
+
   return {
     courses: courses.count ?? 0,
     publishedCourses: published.count ?? 0,
@@ -83,12 +119,17 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
     orders: orders.count ?? 0,
     grossPaise: sum(creatorLedger.data as { amount_paise: number }[]) + sum(commissionLedger.data as { amount_paise: number }[]),
     commissionPaise: sum(commissionLedger.data as { amount_paise: number }[]),
-    creatorPayablePaise: sum(sales as { amount_paise: number }[]),
+    creatorPayablePaise: netCreatorPayablePaise,
     refundedPaise: sum(refunds.data as { amount_paise: number }[]),
     openReports: reports.count ?? 0,
-    routeTransfers: transfers.count ?? 0,
-    failedTransfers: failedTransfers.count ?? 0,
-    settledPaise: sum(settlements.data as { amount_paise: number }[]),
+    routeTransfers: payoutRows.length + (transfers.count ?? 0),
+    failedTransfers: failedPayoutRequests + (failedTransfers.count ?? 0),
+    settledPaise: paidOutPaise,
+    payoutRequestsCount: payoutRows.length,
+    pendingPayoutRequests: pendingRows.length,
+    pendingPayoutPaise,
+    paidOutPaise,
+    outstandingCreatorPayablePaise,
   };
 });
 
@@ -128,6 +169,7 @@ export const getAdminCourses = cache(async (status?: string | null): Promise<Adm
     .select(
       `id, slug, title, status, price_paise, lessons_count, duration_minutes, thumbnail_key,
        submitted_at, published_at, rejection_reason, students_count, rating, ratings_count,
+       creator_id,
        categories ( name ),
        profiles!courses_creator_id_fkey ( full_name ),
        creator_profiles ( display_name, username, route_account_status )`
@@ -136,13 +178,25 @@ export const getAdminCourses = cache(async (status?: string | null): Promise<Adm
     .limit(200);
 
   if (status && status !== "all") query = query.eq("status", status);
-  const { data } = await query;
+  const [{ data }, { data: destRows }] = await Promise.all([
+    query,
+    service.from("creator_payout_destinations").select("creator_id, method"),
+  ]);
+
+  const savedDestByCreator = new Map(
+    ((destRows ?? []) as Array<{ creator_id: string; method: string }>).map((d) => [
+      String(d.creator_id),
+      String(d.method),
+    ])
+  );
 
   return ((data ?? []) as Array<Record<string, unknown>>).map((row) => {
     const category = (row.categories ?? null) as { name: string } | null;
     const creator = (row.creator_profiles ?? null) as
       | { display_name: string | null; username: string | null; route_account_status: string | null }
       | null;
+    const creatorId = String(row.creator_id ?? "");
+    const savedMethod = savedDestByCreator.get(creatorId) ?? null;
     return {
       id: String(row.id),
       slug: String(row.slug),
@@ -151,7 +205,7 @@ export const getAdminCourses = cache(async (status?: string | null): Promise<Adm
       categoryName: category?.name ?? null,
       creatorName: creator?.display_name ?? "Unknown creator",
       creatorUsername: creator?.username ?? null,
-      routeStatus: creator?.route_account_status ?? null,
+      routeStatus: savedMethod ? `details_saved:${savedMethod}` : "not_saved",
       pricePaise: Number(row.price_paise ?? 0),
       lessonsCount: Number(row.lessons_count ?? 0),
       durationMinutes: Number(row.duration_minutes ?? 0),
@@ -205,6 +259,11 @@ export const getAdminCourseDetail = cache(async (courseId: string): Promise<Admi
   const record = row as Record<string, unknown>;
   const category = (record.categories ?? null) as { name: string } | null;
   const creator = (record.creator_profiles ?? null) as Record<string, unknown> | null;
+  const { data: destRow } = await service
+    .from("creator_payout_destinations")
+    .select("method, masked_destination")
+    .eq("creator_id", String(record.creator_id))
+    .maybeSingle();
 
   return {
     id: String(record.id),
@@ -216,7 +275,7 @@ export const getAdminCourseDetail = cache(async (courseId: string): Promise<Admi
     creatorUsername: (creator?.username as string) ?? null,
     creatorId: String(record.creator_id),
     creatorBio: (creator?.bio as string) ?? null,
-    routeStatus: (creator?.route_account_status as string) ?? null,
+    routeStatus: destRow ? `details_saved:${String((destRow as Record<string, unknown>).method)}` : "not_saved",
     pricePaise: Number(record.price_paise ?? 0),
     lessonsCount: Number(record.lessons_count ?? 0),
     durationMinutes: Number(record.duration_minutes ?? 0),
@@ -297,23 +356,33 @@ export const getAdminUsers = cache(async (): Promise<AdminUserRow[]> => {
   const service = createServiceClient();
   if (!service) return [];
 
-  const { data } = await service
-    .from("profiles")
-    .select(
-      `id, full_name, email, role, status, country_code, email_verified, created_at,
-       creator_profiles ( route_account_status ),
-       courses ( id ),
-       entitlements ( id ),
-       orders ( total_paise, status )`
-    )
-    .order("created_at", { ascending: false })
-    .limit(300);
+  const [{ data }, { data: destRows }] = await Promise.all([
+    service
+      .from("profiles")
+      .select(
+        `id, full_name, email, role, status, country_code, email_verified, created_at,
+         creator_profiles ( route_account_status ),
+         courses ( id ),
+         entitlements ( id ),
+         orders ( total_paise, status )`
+      )
+      .order("created_at", { ascending: false })
+      .limit(300),
+    service.from("creator_payout_destinations").select("creator_id, method, masked_destination"),
+  ]);
+
+  const destByCreator = new Map(
+    ((destRows ?? []) as Array<{ creator_id: string; method: string; masked_destination: string }>).map((d) => [
+      String(d.creator_id),
+      `${d.method.toUpperCase()} (${d.masked_destination})`,
+    ])
+  );
 
   return ((data ?? []) as Array<Record<string, unknown>>).map((row) => {
-    const creator = (row.creator_profiles ?? null) as { route_account_status: string | null } | null;
     const orders = (row.orders ?? []) as Array<{ total_paise: number; status: string }>;
+    const userId = String(row.id);
     return {
-      id: String(row.id),
+      id: userId,
       name: String(row.full_name ?? "—"),
       email: String(row.email),
       role: String(row.role),
@@ -326,7 +395,7 @@ export const getAdminUsers = cache(async (): Promise<AdminUserRow[]> => {
       lifetimeSpendPaise: orders
         .filter((order) => order.status === "paid")
         .reduce((sum, order) => sum + Number(order.total_paise ?? 0), 0),
-      routeStatus: creator?.route_account_status ?? null,
+      routeStatus: destByCreator.get(userId) ?? null,
     };
   });
 });
@@ -444,6 +513,367 @@ export const getAdminTransfers = cache(async (): Promise<AdminTransferRow[]> => 
       orderPublicId: order?.public_id ?? null,
     };
   });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Manual Creator Payouts                                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface AdminPayoutRequestRow {
+  id: string;
+  publicId: string;
+  creatorId: string;
+  creatorName: string;
+  creatorEmail: string;
+  creatorUsername: string | null;
+  amountPaise: number;
+  currency: "INR";
+  status: PayoutRequestStatus;
+  destinationMethod: PayoutDestinationMethod;
+  destinationMasked: string;
+  destinationHolderMasked: string;
+  destinationBankLabel: string | null;
+  creatorNote: string | null;
+  adminNote: string | null;
+  rejectionReason: string | null;
+  failureReason: string | null;
+  paymentReference: string | null;
+  paymentMethodUsed: string | null;
+  confirmedAmountMatches: boolean;
+  confirmedTransferSent: boolean;
+  requestedAt: string;
+  approvedAt: string | null;
+  paidAt: string | null;
+  rejectedAt: string | null;
+  failedAt: string | null;
+  cancelledAt: string | null;
+  creatorBalance: CreatorPayoutBalance;
+}
+
+export interface AdminCreatorBalanceRow extends CreatorPayoutBalance {
+  creatorId: string;
+  creatorName: string;
+  creatorEmail: string;
+  creatorUsername: string | null;
+  destinationMethod: PayoutDestinationMethod | null;
+  destinationMasked: string | null;
+  destinationHolderMasked: string | null;
+  destinationBankLabel: string | null;
+  destinationUpdatedAt: string | null;
+}
+
+export interface AdminPayoutAuditRow {
+  id: string;
+  payoutRequestId: string | null;
+  creatorId: string;
+  creatorName: string;
+  actorEmail: string | null;
+  action: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AdminPayoutsOverview {
+  encryptionReady: boolean;
+  requests: AdminPayoutRequestRow[];
+  creatorBalances: AdminCreatorBalanceRow[];
+  auditEvents: AdminPayoutAuditRow[];
+  legacyTransfers: AdminTransferRow[];
+}
+
+export const getAdminPayouts = cache(async (): Promise<AdminPayoutsOverview> => {
+  await requireAdmin();
+  const empty: AdminPayoutsOverview = {
+    encryptionReady: isPayoutEncryptionConfigured(),
+    requests: [],
+    creatorBalances: [],
+    auditEvents: [],
+    legacyTransfers: [],
+  };
+  if (!isSupabaseConfigured()) return empty;
+  const service = createServiceClient();
+  if (!service) return empty;
+
+  const [
+    { data: requestRows },
+    { data: destRows },
+    { data: creatorRows },
+    { data: itemRows },
+    { data: refundRows },
+    { data: settlementRows },
+    { data: auditRows },
+    legacyTransfers,
+  ] = await Promise.all([
+    // NEVER select `destination_encrypted_payload` in list/page queries.
+    service
+      .from("payout_requests")
+      .select(
+        `id, public_id, creator_id, amount_paise, currency, status,
+         destination_method, destination_masked, destination_holder_masked, destination_bank_label,
+         creator_note, admin_note, rejection_reason, failure_reason,
+         payment_reference, payment_method_used, confirmed_amount_matches, confirmed_transfer_sent,
+         requested_at, approved_at, paid_at, rejected_at, failed_at, cancelled_at`
+      )
+      .order("requested_at", { ascending: false })
+      .limit(300),
+    // NEVER select `encrypted_payload` in list/page queries.
+    service
+      .from("creator_payout_destinations")
+      .select("creator_id, method, masked_destination, masked_account_holder, bank_label, updated_at"),
+    service
+      .from("creator_profiles")
+      .select("user_id, display_name, username, profiles!creator_profiles_user_id_fkey ( full_name, email )"),
+    service
+      .from("order_items")
+      .select("order_id, creator_id, unit_price_paise, commission_paise, creator_share_paise, orders ( status )"),
+    service
+      .from("refunds")
+      .select("order_id, amount_paise, status")
+      .eq("status", "processed"),
+    service
+      .from("route_settlements")
+      .select("creator_id, amount_paise, status")
+      .eq("status", "processed"),
+    service
+      .from("payout_audit_events")
+      .select("id, payout_request_id, creator_id, actor_id, action, metadata, created_at, profiles!payout_audit_events_actor_id_fkey ( email )")
+      .order("created_at", { ascending: false })
+      .limit(100),
+    getAdminTransfers(),
+  ]);
+
+  const creatorMeta = new Map<
+    string,
+    { name: string; email: string; username: string | null }
+  >();
+  for (const row of (creatorRows ?? []) as Array<Record<string, unknown>>) {
+    const id = String(row.user_id);
+    const prof = (row.profiles ?? null) as { full_name?: string | null; email?: string | null } | null;
+    creatorMeta.set(id, {
+      name: String(row.display_name ?? prof?.full_name ?? "Creator"),
+      email: String(prof?.email ?? ""),
+      username: (row.username as string) ?? null,
+    });
+  }
+
+  const destByCreator = new Map<
+    string,
+    {
+      method: PayoutDestinationMethod;
+      maskedDestination: string;
+      maskedAccountHolder: string;
+      bankLabel: string | null;
+      updatedAt: string;
+    }
+  >();
+  for (const row of (destRows ?? []) as Array<Record<string, unknown>>) {
+    destByCreator.set(String(row.creator_id), {
+      method: String(row.method) as PayoutDestinationMethod,
+      maskedDestination: String(row.masked_destination ?? ""),
+      maskedAccountHolder: String(row.masked_account_holder ?? ""),
+      bankLabel: (row.bank_label as string) ?? null,
+      updatedAt: String(row.updated_at),
+    });
+  }
+
+  const capturedItemsByCreator = new Map<
+    string,
+    Array<{ orderId: string; unitPricePaise: number; commissionPaise: number; creatorSharePaise: number }>
+  >();
+  const itemByOrderId = new Map<
+    string,
+    { creatorId: string; unitPricePaise: number; creatorSharePaise: number }
+  >();
+
+  for (const row of (itemRows ?? []) as Array<Record<string, unknown>>) {
+    const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
+    const orderObj = Array.isArray(orderRel) ? orderRel[0] : orderRel;
+    if (
+      orderObj?.status &&
+      orderObj.status !== "paid" &&
+      orderObj.status !== "partially_refunded" &&
+      orderObj.status !== "refunded"
+    ) {
+      continue;
+    }
+    const creatorId = String(row.creator_id);
+    const orderId = String(row.order_id ?? "");
+    const entry = {
+      orderId,
+      unitPricePaise: Number(row.unit_price_paise ?? 0),
+      commissionPaise: Number(row.commission_paise ?? 0),
+      creatorSharePaise: Number(row.creator_share_paise ?? 0),
+    };
+    const list = capturedItemsByCreator.get(creatorId) ?? [];
+    list.push(entry);
+    capturedItemsByCreator.set(creatorId, list);
+    if (orderId) {
+      itemByOrderId.set(orderId, {
+        creatorId,
+        unitPricePaise: entry.unitPricePaise,
+        creatorSharePaise: entry.creatorSharePaise,
+      });
+    }
+  }
+
+  const refundsByCreator = new Map<
+    string,
+    Array<{ unitPricePaise: number; creatorSharePaise: number; refundAmountPaise: number }>
+  >();
+  for (const row of (refundRows ?? []) as Array<Record<string, unknown>>) {
+    const item = itemByOrderId.get(String(row.order_id ?? ""));
+    if (!item) continue;
+    const list = refundsByCreator.get(item.creatorId) ?? [];
+    list.push({
+      unitPricePaise: item.unitPricePaise,
+      creatorSharePaise: item.creatorSharePaise,
+      refundAmountPaise: Number(row.amount_paise ?? 0),
+    });
+    refundsByCreator.set(item.creatorId, list);
+  }
+
+  const legacySettledByCreator = new Map<string, number>();
+  for (const row of (settlementRows ?? []) as Array<Record<string, unknown>>) {
+    const creatorId = String(row.creator_id ?? "");
+    legacySettledByCreator.set(
+      creatorId,
+      (legacySettledByCreator.get(creatorId) ?? 0) + Number(row.amount_paise ?? 0)
+    );
+  }
+
+  const requestsByCreator = new Map<string, Array<{ amountPaise: number; status: PayoutRequestStatus }>>();
+  for (const row of (requestRows ?? []) as Array<Record<string, unknown>>) {
+    const creatorId = String(row.creator_id);
+    const list = requestsByCreator.get(creatorId) ?? [];
+    list.push({
+      amountPaise: Number(row.amount_paise ?? 0),
+      status: String(row.status) as PayoutRequestStatus,
+    });
+    requestsByCreator.set(creatorId, list);
+  }
+
+  const allCreatorIds = new Set<string>([
+    ...creatorMeta.keys(),
+    ...destByCreator.keys(),
+    ...capturedItemsByCreator.keys(),
+    ...requestsByCreator.keys(),
+  ]);
+
+  const balanceByCreator = new Map<string, CreatorPayoutBalance>();
+  for (const creatorId of allCreatorIds) {
+    balanceByCreator.set(
+      creatorId,
+      computeCreatorPayoutBalance({
+        capturedOrderItems: capturedItemsByCreator.get(creatorId) ?? [],
+        processedRefunds: refundsByCreator.get(creatorId) ?? [],
+        payoutRequests: requestsByCreator.get(creatorId) ?? [],
+        legacySettledPaise: legacySettledByCreator.get(creatorId) ?? 0,
+      })
+    );
+  }
+
+  const emptyBalance: CreatorPayoutBalance = {
+    grossPaise: 0,
+    commissionPaise: 0,
+    grossEarnedPaise: 0,
+    refundPaise: 0,
+    refundedCreatorSharePaise: 0,
+    netEarnedPaise: 0,
+    reservedPendingPaise: 0,
+    paidOutPaise: 0,
+    outstandingPayablePaise: 0,
+    availablePaise: 0,
+    negativeAdjustmentPaise: 0,
+  };
+
+  const requests: AdminPayoutRequestRow[] = ((requestRows ?? []) as Array<Record<string, unknown>>).map(
+    (row) => {
+      const creatorId = String(row.creator_id);
+      const meta = creatorMeta.get(creatorId) ?? {
+        name: "Creator",
+        email: "",
+        username: null,
+      };
+      return {
+        id: String(row.id),
+        publicId: String(row.public_id),
+        creatorId,
+        creatorName: meta.name,
+        creatorEmail: meta.email,
+        creatorUsername: meta.username,
+        amountPaise: Number(row.amount_paise ?? 0),
+        currency: "INR",
+        status: String(row.status) as PayoutRequestStatus,
+        destinationMethod: String(row.destination_method) as PayoutDestinationMethod,
+        destinationMasked: String(row.destination_masked ?? ""),
+        destinationHolderMasked: String(row.destination_holder_masked ?? ""),
+        destinationBankLabel: (row.destination_bank_label as string) ?? null,
+        creatorNote: (row.creator_note as string) ?? null,
+        adminNote: (row.admin_note as string) ?? null,
+        rejectionReason: (row.rejection_reason as string) ?? null,
+        failureReason: (row.failure_reason as string) ?? null,
+        paymentReference: (row.payment_reference as string) ?? null,
+        paymentMethodUsed: (row.payment_method_used as string) ?? null,
+        confirmedAmountMatches: Boolean(row.confirmed_amount_matches),
+        confirmedTransferSent: Boolean(row.confirmed_transfer_sent),
+        requestedAt: String(row.requested_at),
+        approvedAt: (row.approved_at as string) ?? null,
+        paidAt: (row.paid_at as string) ?? null,
+        rejectedAt: (row.rejected_at as string) ?? null,
+        failedAt: (row.failed_at as string) ?? null,
+        cancelledAt: (row.cancelled_at as string) ?? null,
+        creatorBalance: balanceByCreator.get(creatorId) ?? emptyBalance,
+      };
+    }
+  );
+
+  const creatorBalances: AdminCreatorBalanceRow[] = Array.from(allCreatorIds)
+    .map((creatorId) => {
+      const meta = creatorMeta.get(creatorId) ?? {
+        name: "Creator",
+        email: "",
+        username: null,
+      };
+      const dest = destByCreator.get(creatorId) ?? null;
+      const bal = balanceByCreator.get(creatorId) ?? emptyBalance;
+      return {
+        creatorId,
+        creatorName: meta.name,
+        creatorEmail: meta.email,
+        creatorUsername: meta.username,
+        destinationMethod: dest?.method ?? null,
+        destinationMasked: dest?.maskedDestination ?? null,
+        destinationHolderMasked: dest?.maskedAccountHolder ?? null,
+        destinationBankLabel: dest?.bankLabel ?? null,
+        destinationUpdatedAt: dest?.updatedAt ?? null,
+        ...bal,
+      };
+    })
+    .sort((a, b) => b.outstandingPayablePaise - a.outstandingPayablePaise || b.grossPaise - a.grossPaise);
+
+  const auditEvents: AdminPayoutAuditRow[] = ((auditRows ?? []) as Array<Record<string, unknown>>).map((row) => {
+    const creatorId = String(row.creator_id);
+    const meta = creatorMeta.get(creatorId);
+    const actor = (row.profiles ?? null) as { email?: string | null } | null;
+    return {
+      id: String(row.id),
+      payoutRequestId: (row.payout_request_id as string) ?? null,
+      creatorId,
+      creatorName: meta?.name ?? "Creator",
+      actorEmail: actor?.email ?? null,
+      action: String(row.action),
+      metadata: ((row.metadata ?? {}) as Record<string, unknown>),
+      createdAt: String(row.created_at),
+    };
+  });
+
+  return {
+    encryptionReady: isPayoutEncryptionConfigured(),
+    requests,
+    creatorBalances,
+    auditEvents,
+    legacyTransfers,
+  };
 });
 
 /* -------------------------------------------------------------------------- */

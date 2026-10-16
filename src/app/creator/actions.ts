@@ -5,13 +5,19 @@ import { z } from "zod";
 import { createServiceClient, createServerClient } from "@/lib/supabase/server";
 import { requireCreator, AuthorizationError } from "@/lib/server/session";
 import { inrPriceInputSchema, formatInr } from "@/lib/money";
-import {
-  createLinkedAccount,
-  fetchLinkedAccount,
-  isRouteAccountEligible,
-  type CreateLinkedAccountInput,
-} from "@/lib/server/razorpay";
 import { dispatchEmail } from "@/lib/server/email";
+import {
+  encryptPayoutDestination,
+  PayoutCryptoError,
+  preparePayoutDestination,
+} from "@/lib/server/payout-crypto";
+import {
+  assertValidPayoutTransition,
+  generatePublicPayoutId,
+  PayoutWorkflowError,
+  validatePayoutRequestCreation,
+} from "@/lib/server/payouts";
+import { getCreatorFinance } from "@/lib/server/creator";
 
 export interface CreatorActionResult {
   ok: boolean;
@@ -119,142 +125,354 @@ export async function saveCreatorProfile(input: unknown): Promise<CreatorActionR
   }
 }
 
-const routeAccountSchema = z.object({
-  email: z.string().trim().email("Enter a valid email address"),
-  phone: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a 10-digit Indian mobile number"),
-  legalBusinessName: z.string().trim().min(4, "Enter your legal business or full name").max(200),
-  businessType: z.string().trim().min(3).max(60),
-  contactName: z.string().trim().min(2, "Enter a contact name").max(120),
-  category: z.string().trim().min(2).max(60),
-  subcategory: z.string().trim().min(2).max(60),
-  street1: z.string().trim().min(3, "Enter your address").max(100),
-  street2: z.string().trim().max(100).optional(),
-  city: z.string().trim().min(2, "Enter your city").max(100),
-  state: z.string().trim().length(2, "Select your Indian state").toUpperCase(),
-  postalCode: z.string().trim().regex(/^\d{6}$/, "Enter a 6-digit PIN code"),
-  pan: z.string().trim().max(10).optional(),
-});
+/* -------------------------------------------------------------------------- */
+/* Manual Payout Destination & Payout Requests                                 */
+/* -------------------------------------------------------------------------- */
+
+const payoutDestinationFormSchema = z.discriminatedUnion("method", [
+  z.object({
+    method: z.literal("upi"),
+    accountHolderName: z.string().trim().min(1, "Enter the beneficiary name"),
+    upiId: z.string().trim().min(3, "Enter a valid UPI ID (VPA)"),
+  }),
+  z.object({
+    method: z.literal("bank"),
+    accountHolderName: z.string().trim().min(1, "Enter the account holder name"),
+    accountNumber: z.string().trim().min(6, "Enter the bank account number"),
+    ifsc: z.string().trim().min(11, "Enter the 11-character IFSC code"),
+    bankName: z.string().trim().max(100).optional(),
+  }),
+]);
 
 /**
- * Creates the creator's Razorpay Route linked account.
+ * Saves or updates the creator's single active manual payout destination
+ * (either UPI or Indian bank transfer).
  *
- * Zybble stores only the provider account id and the verified status. It never
- * stores bank account numbers or KYC documents: Razorpay collects and holds
- * those, and Zybble asks the provider for the resulting status.
+ * Sensitive fields (beneficiary name, full account number / UPI VPA) are
+ * encrypted server-side using AES-256-GCM before storage. Only masked display
+ * metadata is returned or exposed to client components.
  */
-export async function createRouteAccount(input: unknown): Promise<CreatorActionResult> {
+export async function savePayoutDestination(input: unknown): Promise<CreatorActionResult> {
   try {
     const session = await requireCreator();
-    const parsed = routeAccountSchema.safeParse(input);
-    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your details" };
+    const parsed = payoutDestinationFormSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your payout destination details" };
+    }
+
+    let summary;
+    try {
+      summary = preparePayoutDestination(parsed.data);
+    } catch (err) {
+      if (err instanceof PayoutCryptoError) {
+        return { ok: false, error: err.message };
+      }
+      throw err;
+    }
+
+    let encryptedPayload: string;
+    try {
+      encryptedPayload = encryptPayoutDestination(summary.secretPayload, {
+        creatorId: session.id,
+      });
+    } catch (cryptoErr) {
+      if (cryptoErr instanceof PayoutCryptoError) {
+        return {
+          ok: false,
+          error:
+            "Payout destination storage is not configured in this environment (PAYOUT_DETAILS_ENCRYPTION_KEY is missing or invalid).",
+        };
+      }
+      throw cryptoErr;
+    }
 
     const service = createServiceClient();
     if (!service) return { ok: false, error: "Service is unavailable" };
 
-    const { data: profile } = await service
-      .from("creator_profiles")
-      .select("route_account_id")
-      .eq("user_id", session.id)
-      .maybeSingle();
-    if (profile?.route_account_id) {
-      return { ok: false, error: "A Route account already exists for this creator" };
+    const now = new Date().toISOString();
+    const { error } = await service.from("creator_payout_destinations").upsert(
+      {
+        creator_id: session.id,
+        method: summary.method,
+        encrypted_payload: encryptedPayload,
+        key_version: 1,
+        masked_destination: summary.maskedDestination,
+        masked_account_holder: summary.maskedAccountHolder,
+        bank_label: summary.bankLabel,
+        updated_at: now,
+      },
+      { onConflict: "creator_id" }
+    );
+    if (error) {
+      return { ok: false, error: "Could not save your payout destination" };
     }
 
-    const payload: CreateLinkedAccountInput = {
-      email: parsed.data.email,
-      phone: parsed.data.phone,
-      legalBusinessName: parsed.data.legalBusinessName,
-      businessType: parsed.data.businessType,
-      contactName: parsed.data.contactName,
-      customerFacingBusinessName: parsed.data.legalBusinessName,
-      profile: {
-        category: parsed.data.category,
-        subcategory: parsed.data.subcategory,
-        businessModel: "Independent AI course creator on the Zybble marketplace",
-        addresses: {
-          registered: {
-            street1: parsed.data.street1,
-            street2: parsed.data.street2 || undefined,
-            city: parsed.data.city,
-            state: parsed.data.state,
-            postal_code: parsed.data.postalCode,
-            country: "IN",
-          },
-        },
+    await service.from("payout_audit_events").insert({
+      creator_id: session.id,
+      actor_id: session.id,
+      action: "destination_saved",
+      metadata: {
+        method: summary.method,
+        masked_destination: summary.maskedDestination,
+        masked_account_holder: summary.maskedAccountHolder,
+        bank_label: summary.bankLabel,
       },
-      legalInfo: parsed.data.pan ? { pan: parsed.data.pan.toUpperCase() } : undefined,
-    };
-
-    const account = await createLinkedAccount(payload);
-
-    await service
-      .from("creator_profiles")
-      .update({
-        route_account_id: account.id,
-        route_account_status: account.status,
-        route_settlement_verified: isRouteAccountEligible(account.status),
-        route_created_at: new Date().toISOString(),
-        route_last_checked_at: new Date().toISOString(),
-        route_error: null,
-        onboarding_status: isRouteAccountEligible(account.status) ? "route_active" : "route_pending",
-      })
-      .eq("user_id", session.id);
+    });
 
     revalidatePath("/creator/onboarding");
     revalidatePath("/creator/payouts");
+    revalidatePath("/creator/earnings");
+    revalidatePath("/creator");
     return {
       ok: true,
-      id: account.id,
-      message: isRouteAccountEligible(account.status)
-        ? "Your Route account is active. You can now publish paid courses."
-        : "Your Route account was created. Razorpay now verifies your bank account (penny test) before transfers can be initiated. Paid courses stay hidden until it is active.",
+      message: `Payout destination saved (${summary.maskedDestination}) · Status: details saved, awaiting payout.`,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (/not configured/i.test(message)) {
-      return { ok: false, error: "Razorpay is not configured for this environment, so settlement onboarding is unavailable." };
-    }
-    return { ok: false, error: "Razorpay could not create your settlement account. Please try again shortly." };
+    return fail(error, "Could not save your payout destination");
   }
 }
 
-/** Re-reads the live Razorpay status. Never assumes approval. */
-export async function refreshRouteStatus(): Promise<CreatorActionResult> {
+const payoutRequestSchema = z.object({
+  amountRupees: z.union([z.string(), z.number()]),
+  note: z.string().trim().max(500, "Keep your note under 500 characters").optional(),
+});
+
+/**
+ * Submits a manual payout request for the authenticated creator's available INR
+ * balance, atomically reserving the requested amount so concurrent submissions
+ * cannot exceed the creator's available balance.
+ */
+export async function requestCreatorPayout(input: unknown): Promise<CreatorActionResult> {
   try {
     const session = await requireCreator();
+    const parsed = payoutRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your payout request details" };
+    }
+
+    const amountParsed = inrPriceInputSchema.safeParse(parsed.data.amountRupees);
+    if (!amountParsed.success || amountParsed.data <= 0) {
+      return { ok: false, error: "Enter a valid payout amount in INR greater than ₹0" };
+    }
+    const requestedPaise = amountParsed.data;
+
     const service = createServiceClient();
     if (!service) return { ok: false, error: "Service is unavailable" };
 
+    const [{ data: destRow }, finance] = await Promise.all([
+      service
+        .from("creator_payout_destinations")
+        .select(
+          "method, encrypted_payload, key_version, masked_destination, masked_account_holder, bank_label"
+        )
+        .eq("creator_id", session.id)
+        .maybeSingle(),
+      getCreatorFinance(),
+    ]);
+
+    try {
+      validatePayoutRequestCreation({
+        hasDestination: Boolean(destRow),
+        availablePaise: finance.availablePaise,
+        requestedAmountPaise: requestedPaise,
+      });
+    } catch (validationErr) {
+      if (validationErr instanceof PayoutWorkflowError) {
+        return { ok: false, error: validationErr.message };
+      }
+      throw validationErr;
+    }
+
+    const dest = destRow as Record<string, unknown>;
+    const publicId = generatePublicPayoutId();
+    const note = parsed.data.note?.trim() || null;
+
+    // Prefer the atomic database RPC which acquires a row lock on creator_profiles
+    // and re-verifies available balance inside a single Postgres transaction.
+    let createdRequestId: string | null = null;
+    if (typeof (service as { rpc?: unknown }).rpc === "function") {
+      const { data: rpcRow, error: rpcError } = await service.rpc("create_creator_payout_request", {
+        p_creator_id: session.id,
+        p_public_id: publicId,
+        p_amount_paise: requestedPaise,
+        p_creator_note: note,
+      });
+      if (rpcError) {
+        const msg = String(rpcError.message ?? "");
+        if (/exceeds available balance/i.test(msg)) {
+          return { ok: false, error: "Requested amount exceeds your available balance." };
+        }
+        if (/destination is required/i.test(msg)) {
+          return { ok: false, error: "Save a payout destination before requesting a payout." };
+        }
+        if (!/function .* does not exist/i.test(msg)) {
+          return { ok: false, error: "Could not submit your payout request. Please try again." };
+        }
+      } else if (rpcRow) {
+        createdRequestId = String((rpcRow as Record<string, unknown>).id ?? "");
+      }
+    }
+
+    if (!createdRequestId) {
+      const { data: inserted, error: insertError } = await service
+        .from("payout_requests")
+        .insert({
+          public_id: publicId,
+          creator_id: session.id,
+          amount_paise: requestedPaise,
+          currency: "INR",
+          status: "requested",
+          destination_method: String(dest.method),
+          destination_encrypted_payload: String(dest.encrypted_payload),
+          destination_key_version: Number(dest.key_version ?? 1),
+          destination_masked: String(dest.masked_destination),
+          destination_holder_masked: String(dest.masked_account_holder),
+          destination_bank_label: (dest.bank_label as string) ?? null,
+          creator_note: note,
+        })
+        .select("id")
+        .single();
+      if (insertError || !inserted) {
+        return { ok: false, error: "Could not submit your payout request" };
+      }
+      createdRequestId = String((inserted as Record<string, unknown>).id);
+      await service.from("payout_audit_events").insert({
+        payout_request_id: createdRequestId,
+        creator_id: session.id,
+        actor_id: session.id,
+        action: "payout_requested",
+        metadata: {
+          public_id: publicId,
+          amount_paise: requestedPaise,
+          destination_method: String(dest.method),
+          destination_masked: String(dest.masked_destination),
+        },
+      });
+    }
+
     const { data: profile } = await service
-      .from("creator_profiles")
-      .select("route_account_id")
-      .eq("user_id", session.id)
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", session.id)
       .maybeSingle();
-    if (!profile?.route_account_id) return { ok: false, error: "No settlement account yet" };
+    if (profile?.email) {
+      await dispatchEmail({
+        to_email: String(profile.email),
+        template: "payout_requested",
+        payload: {
+          creatorName: String(profile.full_name ?? "Creator"),
+          publicId,
+          amount: formatInr(requestedPaise),
+          destinationMasked: `${String(dest.method).toUpperCase()} (${String(dest.masked_destination)})`,
+        },
+      });
+    }
 
-    const account = await fetchLinkedAccount(profile.route_account_id);
-    const active = isRouteAccountEligible(account.status);
-
-    await service
-      .from("creator_profiles")
-      .update({
-        route_account_status: account.status,
-        route_settlement_verified: active,
-        route_last_checked_at: new Date().toISOString(),
-        onboarding_status: active ? "route_active" : "route_pending",
-      })
-      .eq("user_id", session.id);
-
-    revalidatePath("/creator/onboarding");
     revalidatePath("/creator/payouts");
+    revalidatePath("/creator/earnings");
+    revalidatePath("/creator");
+    revalidatePath("/admin/payouts");
     return {
       ok: true,
-      message: `Razorpay reports this account as “${account.status}”.${
-        active ? "" : " Paid courses remain hidden until Razorpay marks it active."
-      }`,
+      id: createdRequestId,
+      message: `Payout request ${publicId} for ${formatInr(requestedPaise)} submitted. That amount is now reserved while Zybble reviews your request.`,
     };
   } catch (error) {
-    return fail(error, "Could not reach Razorpay to refresh your settlement status");
+    return fail(error, "Could not submit your payout request");
+  }
+}
+
+/**
+ * Cancels a creator's own `requested` payout request before admin processing,
+ * immediately releasing the reserved amount back into available balance.
+ */
+export async function cancelCreatorPayoutRequest(requestId: string): Promise<CreatorActionResult> {
+  try {
+    const session = await requireCreator();
+    if (!UUID.safeParse(requestId).success) {
+      return { ok: false, error: "Invalid payout request" };
+    }
+    const service = createServiceClient();
+    if (!service) return { ok: false, error: "Service is unavailable" };
+
+    const { data: row } = await service
+      .from("payout_requests")
+      .select("id, public_id, creator_id, status, amount_paise")
+      .eq("id", requestId)
+      .maybeSingle();
+    if (!row) return { ok: false, error: "Payout request not found" };
+    if (String(row.creator_id) !== session.id) {
+      return { ok: false, error: "You do not own this payout request" };
+    }
+
+    try {
+      assertValidPayoutTransition(
+        String(row.status) as Parameters<typeof assertValidPayoutTransition>[0],
+        "cancelled"
+      );
+    } catch (transitionErr) {
+      return {
+        ok: false,
+        error:
+          transitionErr instanceof Error
+            ? transitionErr.message
+            : "Only pending requests can be cancelled",
+      };
+    }
+
+    const now = new Date().toISOString();
+    const { error } = await service
+      .from("payout_requests")
+      .update({
+        status: "cancelled",
+        cancelled_at: now,
+        updated_at: now,
+      })
+      .eq("id", requestId)
+      .eq("creator_id", session.id)
+      .eq("status", "requested");
+    if (error) return { ok: false, error: "Could not cancel the payout request" };
+
+    await service.from("payout_audit_events").insert({
+      payout_request_id: requestId,
+      creator_id: session.id,
+      actor_id: session.id,
+      action: "payout_cancelled",
+      metadata: {
+        public_id: String(row.public_id),
+        amount_paise: Number(row.amount_paise ?? 0),
+      },
+    });
+
+    revalidatePath("/creator/payouts");
+    revalidatePath("/creator/earnings");
+    revalidatePath("/creator");
+    revalidatePath("/admin/payouts");
+    return {
+      ok: true,
+      message: `Cancelled payout request ${String(row.public_id)}. ${formatInr(Number(row.amount_paise ?? 0))} is available in your balance again.`,
+    };
+  } catch (error) {
+    return fail(error, "Could not cancel the payout request");
+  }
+}
+
+/** Deprecated compatibility alias for `savePayoutDestination`. */
+export const createRouteAccount = savePayoutDestination;
+
+/** Refreshes the creator's saved payout destination state. */
+export async function refreshRouteStatus(): Promise<CreatorActionResult> {
+  try {
+    await requireCreator();
+    revalidatePath("/creator/onboarding");
+    revalidatePath("/creator/payouts");
+    revalidatePath("/creator/earnings");
+    return {
+      ok: true,
+      message: "Payout destination status refreshed.",
+    };
+  } catch (error) {
+    return fail(error, "Could not refresh payout destination status");
   }
 }
 
@@ -450,22 +668,6 @@ export async function submitCourseForReview(courseId: string): Promise<CreatorAc
     }
     if (Number(course.lessons_count ?? 0) === 0) {
       return { ok: false, error: "Add at least one lesson before submitting" };
-    }
-
-    if (Number(course.lessons_count ?? 0) > 0) {
-      const { data: creator } = await service
-        .from("creator_profiles")
-        .select("route_account_status")
-        .eq("user_id", session.id)
-        .maybeSingle();
-      const { data: priceRow } = await service.from("courses").select("price_paise").eq("id", courseId).maybeSingle();
-      if (Number(priceRow?.price_paise ?? 0) > 0 && creator?.route_account_status !== "active") {
-        return {
-          ok: false,
-          error:
-            "A paid course can only go live once Razorpay reports your Route settlement account as active. Complete settlement onboarding first.",
-        };
-      }
     }
 
     await service

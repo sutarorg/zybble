@@ -99,8 +99,8 @@ export function CreatorSignupClient({
       return;
     }
 
-    toast.success("Creator profile created. Next: connect your Razorpay payout account.");
-    router.push("/creator/route");
+    toast.success("Creator profile created. Welcome to Creator Studio!");
+    router.push("/creator/onboarding");
     router.refresh();
   }
 
@@ -127,8 +127,8 @@ export function CreatorSignupClient({
             <span className="text-primary">Someone else&apos;s breakthrough.</span>
           </h1>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
-            Share the skills you have built. Create practical courses, reach learners across India, and get paid through
-            Razorpay Route.
+            Share the skills you have built. Create practical courses, reach learners across India, and request
+            INR payouts to your UPI ID or Indian bank account.
           </p>
 
           {!hydrated ? (
@@ -351,8 +351,8 @@ export function CreatorSignupClient({
             deserves an audience.
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-violet-950/60">
-            Build the outline, upload your video, submit for review and publish. Razorpay Route pays you your share
-            directly into your Indian bank account.
+            Build the outline, upload your video, submit for review and publish. Request manual payouts of your
+            earned INR balance to your UPI ID or Indian bank account.
           </p>
           <div className="mt-8 space-y-3">
             {[
@@ -388,7 +388,7 @@ export function CreatorSignupClient({
           </div>
           <div className="mt-8 flex items-center gap-2 border-t border-violet-200 pt-5 text-xs text-violet-950/60">
             <ShieldCheck className="size-4 text-primary" />
-            No upfront fee. Paid courses stay disabled until Razorpay confirms your payout account.
+            No upfront fee. Publish courses first and add payout details whenever you are ready to withdraw.
           </div>
         </div>
       </aside>

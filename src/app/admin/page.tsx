@@ -39,13 +39,18 @@ export default async function AdminOverviewPage() {
 
       <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={IndianRupee} label="Gross volume" value={money(overview.grossPaise)} />
-        <StatCard icon={Wallet} label="Creator payable" value={money(overview.creatorPayablePaise)} />
-        <StatCard icon={Landmark} label="Settled by Razorpay" value={money(overview.settledPaise)} />
+        <StatCard
+          icon={Wallet}
+          label="Creator payable"
+          value={money(overview.outstandingCreatorPayablePaise)}
+          hint={`${money(overview.creatorPayablePaise)} net earned`}
+        />
+        <StatCard icon={Landmark} label="Paid out to creators" value={money(overview.settledPaise)} />
         <StatCard
           icon={ShieldAlert}
-          label="Failed transfers"
-          value={String(overview.failedTransfers)}
-          hint={overview.failedTransfers > 0 ? "needs attention" : "none"}
+          label="Pending payout requests"
+          value={String(overview.pendingPayoutRequests)}
+          hint={overview.pendingPayoutPaise > 0 ? `${money(overview.pendingPayoutPaise)} reserved` : "none queued"}
         />
       </div>
 

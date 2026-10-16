@@ -45,6 +45,7 @@ export default function TermsPage() {
           <LegalList
             items={[
               "All prices are displayed in Indian Rupees (INR, \u20b9) and are charged in INR through Razorpay. Zybble is an India-only marketplace and does not offer any other currency.",
+              "Creator earnings are recorded on Zybble's ledger after deducting the snapshotted marketplace commission, and are paid out in INR via manual bank or UPI transfer upon creator request (subject to applicable Indian tax and marketplace onboarding requirements).",
               "Promotional prices are time-limited and apply at the time of purchase only.",
               "You authorize us to charge your selected payment method for each order.",
             ]}
