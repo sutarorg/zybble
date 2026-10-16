@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { saveCreatorProfile } from "@/app/creator/actions";
+import { UsernameField } from "@/components/creator/username-field";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,9 +47,11 @@ export function CreatorProfileForm({ accountEmail, initial }: Props) {
     setBusy(false);
     if (!result.ok) {
       setError(result.error ?? "Could not save your profile");
+      toast.error(result.error ?? "Could not save your profile");
       return;
     }
     setMessage("Profile saved.");
+    toast.success(result.message ?? "Profile saved");
     router.refresh();
   }
 
@@ -60,18 +64,12 @@ export function CreatorProfileForm({ accountEmail, initial }: Props) {
       </p>
 
       <form onSubmit={onSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="cp-username" className="mb-1.5 block text-[13px]">Username</Label>
-          <Input
-            id="cp-username"
-            required
-            pattern="[a-z0-9][a-z0-9-]*"
-            placeholder="your-name"
-            value={form.username}
-            onChange={(event) => setForm({ ...form, username: event.target.value.toLowerCase() })}
-          />
-          <p className="mt-1 text-[11.5px] text-zinc-400">Lowercase letters, numbers and hyphens.</p>
-        </div>
+        <UsernameField
+          id="cp-username"
+          label="Username"
+          value={form.username}
+          onChange={(username) => setForm((current) => ({ ...current, username }))}
+        />
         <div>
           <Label htmlFor="cp-display-name" className="mb-1.5 block text-[13px]">Display name</Label>
           <Input

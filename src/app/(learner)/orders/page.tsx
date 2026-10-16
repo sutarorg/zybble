@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CreditCard, Receipt, ShieldCheck } from "lucide-react";
+import { CreditCard, Receipt } from "lucide-react";
 import { getOrders } from "@/lib/server/learner";
 import { formatInr } from "@/lib/money";
 import { formatDate } from "@/lib/format";
@@ -12,10 +12,9 @@ export const dynamic = "force-dynamic";
 const STATUS_TONE: Record<string, string> = {
   paid: "bg-emerald-100 text-emerald-700",
   created: "bg-zinc-100 text-zinc-600",
+  pending: "bg-zinc-100 text-zinc-600",
   failed: "bg-red-100 text-red-700",
   cancelled: "bg-zinc-100 text-zinc-600",
-  refunded: "bg-orange-100 text-orange-700",
-  partially_refunded: "bg-orange-100 text-orange-700",
 };
 
 export default async function LearnerOrdersPage() {
@@ -94,10 +93,6 @@ export default async function LearnerOrdersPage() {
         </ul>
       )}
 
-      <p className="flex items-start gap-2 text-[12px] text-zinc-400">
-        <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
-        Access to a course is granted by a verified Razorpay payment or webhook — never by a browser redirect.
-      </p>
     </div>
   );
 }

@@ -9,9 +9,14 @@
  */
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test, before } from "node:test";
 import { register } from "node:module";
 import { pathToFileURL } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 before(async () => {
   register(new URL("./helpers/loader.mjs", import.meta.url), pathToFileURL("./"));
@@ -135,37 +140,41 @@ test("exact formatting always shows both decimal places for reconciliation", () 
   assert.doesNotMatch(money.formatInrExact(129900), /USD|EUR|GBP/);
 });
 
-test("refund split proportionally debits creator share and commission in integer paise", () => {
-  // ₹1,499.00 course at 10% commission -> ₹149.90 commission, ₹1,349.10 creator share
-  const full = payouts.computeCreatorRefundAdjustmentPaise({
-    unitPricePaise: 149900,
-    creatorSharePaise: 134910,
-    refundAmountPaise: 149900,
-  });
-  assert.equal(full.refundAmountPaise, 149900);
-  assert.equal(full.creatorRefundDebitPaise, 134910);
-  assert.equal(full.commissionReversalPaise, 14990);
-  assert.equal(full.creatorRefundDebitPaise + full.commissionReversalPaise, full.refundAmountPaise);
+test("the refund machinery is gone, not merely hidden", () => {
+  // Zybble has no refund flow: no split maths, no refund field on a balance, and
+  // no source file that can write to a `refunds` table that no longer exists.
+  assert.equal(payouts.computeCreatorRefundAdjustmentPaise, undefined);
 
-  // Partial 50% refund -> exact paise sum
-  const half = payouts.computeCreatorRefundAdjustmentPaise({
-    unitPricePaise: 149900,
-    creatorSharePaise: 134910,
-    refundAmountPaise: 74950,
+  const balance = payouts.computeCreatorPayoutBalance({
+    capturedOrderItems: [{ unitPricePaise: 100000, commissionPaise: 10000, creatorSharePaise: 90000 }],
+    payoutRequests: [],
   });
-  assert.equal(half.refundAmountPaise, 74950);
-  assert.equal(half.creatorRefundDebitPaise + half.commissionReversalPaise, 74950);
-  assert.equal(half.creatorRefundDebitPaise, 67455);
+  assert.equal(balance.refundPaise, undefined);
+  assert.equal(balance.refundedCreatorSharePaise, undefined);
+  // A captured creator share is never debited back.
+  assert.equal(balance.netEarnedPaise, balance.grossEarnedPaise);
+
+  for (const file of [
+    "src/lib/server/checkout.ts",
+    "src/lib/server/razorpay.ts",
+    "src/lib/server/payouts.ts",
+    "src/lib/server/admin.ts",
+    "src/lib/server/creator.ts",
+    "src/app/admin/actions.ts",
+  ]) {
+    const source = fs.readFileSync(path.join(ROOT, file), "utf8").replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.doesNotMatch(source, /from\("refunds"\)/, `${file} still reads or writes the dropped refunds table`);
+    assert.doesNotMatch(source, /\brefundOrder\b|\bcreateRefund\b/, `${file} still exposes a refund code path`);
+  }
 });
 
-test("creator manual payout balance reconciles sales, refunds, reserved requests, and paid payouts", () => {
+test("creator manual payout balance reconciles sales, reserved requests, and paid payouts", () => {
   // Two captured sales of ₹1,000.00 each (10% commission => ₹900.00 creator share each)
   const balance = payouts.computeCreatorPayoutBalance({
     capturedOrderItems: [
       { unitPricePaise: 100000, commissionPaise: 10000, creatorSharePaise: 90000 },
       { unitPricePaise: 100000, commissionPaise: 10000, creatorSharePaise: 90000 },
     ],
-    processedRefunds: [],
     payoutRequests: [
       { amountPaise: 50000, status: "paid" },
       { amountPaise: 40000, status: "requested" },
@@ -186,23 +195,36 @@ test("creator manual payout balance reconciles sales, refunds, reserved requests
   assert.equal(balance.negativeAdjustmentPaise, 0);
 });
 
-test("post-payout refund surfaces negativeAdjustmentPaise without faking a bank clawback", () => {
-  // Creator sold ₹1,000.00 (earned ₹900.00), was paid ₹900.00 manually, then learner was refunded ₹1,000.00
-  const postRefund = payouts.computeCreatorPayoutBalance({
+test("a reversed historical settlement surfaces negativeAdjustmentPaise without faking a bank clawback", () => {
+  // Creator sold ₹1,000.00 (earned ₹900.00) and was paid ₹900.00 manually. A
+  // historical Razorpay Route transfer of ₹900.00 was then reversed by the
+  // provider. Zybble records the receivable; it never claims money was taken
+  // back out of the creator's bank account.
+  const reversed = payouts.computeCreatorPayoutBalance({
     capturedOrderItems: [
       { unitPricePaise: 100000, commissionPaise: 10000, creatorSharePaise: 90000 },
     ],
-    processedRefunds: [
-      { unitPricePaise: 100000, creatorSharePaise: 90000, refundAmountPaise: 100000 },
-    ],
     payoutRequests: [{ amountPaise: 90000, status: "paid" }],
+    legacyReversedPaise: 90000,
   });
 
-  assert.equal(postRefund.grossEarnedPaise, 90000);
-  assert.equal(postRefund.refundedCreatorSharePaise, 90000);
-  assert.equal(postRefund.netEarnedPaise, 0);
-  assert.equal(postRefund.paidOutPaise, 90000);
-  assert.equal(postRefund.availablePaise, 0);
-  assert.equal(postRefund.outstandingPayablePaise, 0);
-  assert.equal(postRefund.negativeAdjustmentPaise, 90000);
+  assert.equal(reversed.grossEarnedPaise, 90000);
+  assert.equal(reversed.netEarnedPaise, 0);
+  assert.equal(reversed.paidOutPaise, 90000);
+  assert.equal(reversed.availablePaise, 0);
+  assert.equal(reversed.outstandingPayablePaise, 0);
+  assert.equal(reversed.negativeAdjustmentPaise, 90000);
+});
+
+test("an over-paid creator never shows a negative available balance", () => {
+  const overpaid = payouts.computeCreatorPayoutBalance({
+    capturedOrderItems: [{ unitPricePaise: 50000, commissionPaise: 5000, creatorSharePaise: 45000 }],
+    payoutRequests: [
+      { amountPaise: 45000, status: "paid" },
+      { amountPaise: 10000, status: "paid" },
+    ],
+  });
+  assert.equal(overpaid.availablePaise, 0);
+  assert.equal(overpaid.negativeAdjustmentPaise, 10000);
+  assert.equal(overpaid.outstandingPayablePaise, 0);
 });

@@ -398,9 +398,9 @@ export function PayoutRequestPanel({
 
         {negativeAdjustmentPaise > 0 ? (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300">
-            <strong>Refund / reversal adjustment:</strong> {formatInr(negativeAdjustmentPaise)} from a
-            post-payout learner refund is currently offsetting future earnings. New course sales
-            automatically reduce this adjustment before additional balance becomes available.
+            <strong>Balance adjustment:</strong> {formatInr(negativeAdjustmentPaise)} more has been paid
+            out or reserved than the earnings on record. New course sales reduce this adjustment first,
+            before additional balance becomes available.
           </div>
         ) : null}
 

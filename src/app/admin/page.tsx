@@ -61,13 +61,6 @@ export default async function AdminOverviewPage() {
         <StatCard icon={IndianRupee} label="Commission earned" value={money(overview.commissionPaise)} />
       </div>
 
-      {overview.refundedPaise > 0 ? (
-        <div className="rounded-xl border border-orange-200 bg-orange-50/60 px-4 py-3 text-[13px] text-orange-900">
-          Razorpay has recorded {money(overview.refundedPaise)} in refunds against marketplace payments. These are
-          provider events recorded for accurate accounting — Zybble publishes no customer-facing refund policy.
-        </div>
-      ) : null}
-
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-border bg-white p-5 shadow-card">
           <div className="flex items-center justify-between gap-3">

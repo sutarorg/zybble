@@ -24,6 +24,17 @@ export default async function CreatorPayoutsPage() {
         </p>
       </div>
 
+      {!finance.earningsAvailable ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] text-amber-900">
+          <p className="font-semibold">Balance could not be read</p>
+          <p className="mt-1 text-amber-800">
+            The figures below are zeros because the captured-sales totals did not come back — not
+            because your balance is empty, and nothing here is estimated. A payout request needs a
+            readable available balance, so reload this page before requesting one.
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Metric
           label="Gross course sales"
@@ -33,11 +44,7 @@ export default async function CreatorPayoutsPage() {
         <Metric
           label="Net creator share"
           value={formatInr(finance.netEarnedPaise)}
-          sub={
-            finance.refundedCreatorSharePaise > 0
-              ? `After ${formatInr(finance.refundedCreatorSharePaise)} refund adjustments`
-              : "Captured sales less commission"
-          }
+          sub="Captured sales less commission"
         />
         <Metric
           label="Available to request"

@@ -328,6 +328,7 @@ export function LearnPlayer({
             <VideoPlayer
               key={current.id}
               lessonId={current.id}
+              courseId={course.id}
               title={current.title}
               hasVideo={current.hasVideo}
               videoReady={current.videoReady}

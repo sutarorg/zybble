@@ -381,7 +381,10 @@ export const en = {
 
   /* ---------------------------------------------------------- learner shell */
   dailyGoal: (minutes: number) => `Daily goal: ${minutes} min`,
-  streakNote: "Simulated 4-day streak — small sessions compound.",
+  streakSummary: (days: number, lessons: number) =>
+    `${days}-day streak · ${lessons} ${lessons === 1 ? "lesson" : "lessons"} completed this week`,
+  streakEmpty: "Complete a lesson today to start a streak.",
+  lastSevenDays: "Last seven days",
 };
 
 export type Dictionary = typeof en;

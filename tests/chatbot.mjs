@@ -1,5 +1,5 @@
 /**
- * Contract tests for Zybble AI.
+ * Contract tests for Zybble 2.0.
  *
  * These cover the parts that must never regress: which routes may show the
  * assistant, how the catalog is grounded, and the guarantee that a slug the
@@ -27,7 +27,14 @@ before(async () => {
 // import below. It is a stand-in: no test here reaches OpenRouter.
 process.env.OPENROUTER_API_KEY ||= "test-key-not-a-credential";
 
-const { isChatbotPage, MAX_MESSAGE_CHARS, MAX_CONVERSATION_ENTRIES } = await import("../src/lib/chatbot.ts");
+const {
+  isChatbotPage,
+  MAX_MESSAGE_CHARS,
+  MAX_CONVERSATION_ENTRIES,
+  ASSISTANT_NAME,
+  WELCOME_MESSAGE,
+  PLATFORM_KNOWLEDGE,
+} = await import("../src/lib/chatbot.ts");
 const ai = await import("../src/lib/server/ai.ts");
 
 const catalog = [
@@ -91,6 +98,45 @@ test("message and conversation caps match the server", () => {
   assert.equal(MAX_CONVERSATION_ENTRIES, 60);
 });
 
+test("the assistant is Zybble 2.0 everywhere it introduces itself", () => {
+  assert.equal(ASSISTANT_NAME, "Zybble 2.0");
+  assert.match(WELCOME_MESSAGE, /Zybble 2\.0/);
+  // The server prompt and the browser panel share one identity string.
+  assert.match(ai.ASSISTANT_IDENTITY, /You are Zybble 2\.0/);
+  assert.match(ai.ASSISTANT_IDENTITY, /Your name is Zybble 2\.0/);
+});
+
+test("the model is briefed on the platform, and told what it cannot do", () => {
+  const system = ai.buildSystemMessage(catalog);
+
+  // Platform knowledge the assistant is allowed to state.
+  for (const fact of [
+    "India-only marketplace",
+    "Razorpay",
+    "Indian Rupees",
+    "certificate",
+    "Creator Studio",
+    "Help Center",
+    "free previews",
+  ]) {
+    assert.match(system, new RegExp(fact, "i"), `platform brief is missing "${fact}"`);
+  }
+
+  // Its own limits, so it never pretends to have account access.
+  assert.match(system, /cannot see accounts/i);
+  assert.match(system, /no self-service refund flow/i);
+
+  // The grounded catalog is still part of the same system message.
+  assert.match(system, /CATALOG:/);
+  assert.match(system, /n8n-workflows/);
+});
+
+test("the platform brief carries no secrets, prices of real courses or personal data", () => {
+  assert.doesNotMatch(PLATFORM_KNOWLEDGE, /sk-or-|Bearer |service_role|API key/i);
+  assert.doesNotMatch(PLATFORM_KNOWLEDGE, /\$/);
+  assert.doesNotMatch(PLATFORM_KNOWLEDGE, /\b(USD|EUR|GBP)\b/);
+});
+
 test("the prompt catalog is derived only from grounded courses, in INR", () => {
   const rendered = ai.renderCatalogForPrompt(catalog);
   assert.match(rendered, /chatgpt-basics/);
@@ -141,7 +187,7 @@ test("a parsed assistant reply is clamped to an allow-listed same-origin link", 
 
 test("a malformed or content-free model reply fails closed", () => {
   for (const content of ["not json at all", "{}", JSON.stringify({ text: "   " })]) {
-    assert.throws(() => ai.parseAssistantAnswer(content), /Zybble AI is unavailable/);
+    assert.throws(() => ai.parseAssistantAnswer(content), /Zybble 2\.0 is unavailable/);
   }
 });
 
@@ -203,8 +249,8 @@ test("parseAssistantContent accepts both wire formats", () => {
 });
 
 test("a content-free plain reply fails closed rather than rendering nothing", () => {
-  assert.throws(() => ai.parseAssistantContent("   "), /Zybble AI is unavailable/);
-  assert.throws(() => ai.parsePlainAnswer("SLUGS: n8n-workflows"), /Zybble AI is unavailable/);
+  assert.throws(() => ai.parseAssistantContent("   "), /Zybble 2\.0 is unavailable/);
+  assert.throws(() => ai.parsePlainAnswer("SLUGS: n8n-workflows"), /Zybble 2\.0 is unavailable/);
 });
 
 test("the streaming filter withholds a trailer that has not finished arriving", () => {

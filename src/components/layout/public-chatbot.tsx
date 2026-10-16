@@ -8,9 +8,12 @@ import { ArrowUpRight, Bot, MessageCircle, RotateCcw, Send, Sparkles, X } from "
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/lib/config/catalog";
 import {
+  ASSISTANT_NAME,
+  ASSISTANT_TAGLINE,
   isChatbotPage,
   MAX_CONVERSATION_ENTRIES,
   MAX_MESSAGE_CHARS,
+  WELCOME_MESSAGE,
   type ChatRecommendation,
   type ChatReply,
 } from "@/lib/chatbot";
@@ -23,9 +26,11 @@ interface Message {
   recommendations?: ChatRecommendation[];
   link?: { href: string; label: string };
 }
+/** The opening bubble. Wording lives in `@/lib/chatbot` so the panel and the
+ *  server-side system prompt introduce the same assistant by the same name. */
 const WELCOME: Message = {
   role: "assistant",
-  text: "Hi! I’m Zybble AI, your course guide. Tell me what you’d like to learn and I’ll help you find a course. I can also help with enrollment and other questions.",
+  text: WELCOME_MESSAGE,
 };
 /** Must cover the suggested-question collapse transition below. */
 const SETTLE_MS = 320;
@@ -106,7 +111,12 @@ function ChatbotPanel({ categorySlug }: { categorySlug?: string }) {
   const logRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const settleRef = useRef<number | null>(null);
-  const suggestions = [category ? `Explore ${category.name}` : "Find a beginner course", "Any free courses?", "How do I enroll?"];
+  const suggestions = [
+    category ? `Explore ${category.name}` : "Find a beginner course",
+    "Any free courses?",
+    "How do I enroll?",
+    "How do certificates work?",
+  ];
   // The suggested questions are a one-time offer: they greet the visitor, then the first
   // answer collapses them for the rest of the conversation. `chipsMounted` keeps the block
   // in the DOM only while the collapse runs, so the chips leave the tab order afterwards.
@@ -198,7 +208,7 @@ function ChatbotPanel({ categorySlug }: { categorySlug?: string }) {
         const final = await readChatStream(response.body, appendDelta);
 
         if (!final) {
-          patchLastMessage({ text: "Zybble AI did not finish that answer. Please try again." });
+          patchLastMessage({ text: `${ASSISTANT_NAME} did not finish that answer. Please try again.` });
         } else if (final.type === "done") {
           patchLastMessage({ recommendations: final.recommendations, link: final.link });
         } else {
@@ -218,7 +228,7 @@ function ChatbotPanel({ categorySlug }: { categorySlug?: string }) {
         ...previous,
         {
           role: "assistant",
-          text: "Zybble AI is not answering right now. You can browse the catalog directly, or email us and a human will reply.",
+          text: `${ASSISTANT_NAME} is not answering right now. You can browse the catalog directly, or open the Help Center and a human will reply.`,
         },
       ]);
     } finally {
@@ -241,7 +251,7 @@ function ChatbotPanel({ categorySlug }: { categorySlug?: string }) {
     <Dialog.Root open={open} onOpenChange={setOpen} modal={false}>
       <Dialog.Trigger asChild>
         <Button
-          aria-label="Chat with Zybble AI"
+          aria-label={`Chat with ${ASSISTANT_NAME}`}
           // While the panel is open the launcher steps aside (fade + shrink) instead of
           // sitting under it. `aria-hidden`/`tabIndex` keep the invisible button out of the
           // tab order and the a11y tree; Radix still restores focus to it on close.
@@ -264,15 +274,15 @@ function ChatbotPanel({ categorySlug }: { categorySlug?: string }) {
           <div className="flex shrink-0 items-center gap-3 border-b border-border bg-accent/70 px-4 py-4">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white"><Bot className="size-5" aria-hidden /></span>
             <div className="min-w-0 flex-1">
-              <Dialog.Title className="font-display text-[15px] font-semibold">Zybble AI</Dialog.Title>
-              <Dialog.Description className="mt-0.5 text-xs text-muted-foreground">Course discovery, answered from the live catalog</Dialog.Description>
+              <Dialog.Title className="font-display text-[15px] font-semibold">{ASSISTANT_NAME}</Dialog.Title>
+              <Dialog.Description className="mt-0.5 text-xs text-muted-foreground">{ASSISTANT_TAGLINE}</Dialog.Description>
             </div>
             <Button variant="ghost" size="icon-sm" aria-label="Start a new chat" onClick={reset}><RotateCcw aria-hidden /></Button>
             <Dialog.Close asChild><Button variant="ghost" size="icon-sm" aria-label="Close chat"><X aria-hidden /></Button></Dialog.Close>
           </div>
 
           <div ref={logRef} role="log" aria-label="Chat conversation" aria-live="polite" aria-relevant="additions" className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5 scrollbar-thin">
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground"><Sparkles className="size-3" aria-hidden /> Let’s find your next course</div>
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground"><Sparkles className="size-3" aria-hidden /> Powered by the live Zybble catalog</div>
             {/* Shown only until the first token lands; the live bubble takes over. */}
             {thinking && !streaming ? (
               <div className="flex justify-start">
@@ -284,7 +294,7 @@ function ChatbotPanel({ categorySlug }: { categorySlug?: string }) {
                       style={{ animationDelay: `${dot * 120}ms` }}
                     />
                   ))}
-                  <span className="sr-only">Zybble AI is thinking</span>
+                  <span className="sr-only">{ASSISTANT_NAME} is thinking</span>
                 </div>
               </div>
             ) : null}
@@ -300,7 +310,7 @@ function ChatbotPanel({ categorySlug }: { categorySlug?: string }) {
                 )}
               >
                 <div className={cn("max-w-[92%] space-y-2.5 rounded-2xl px-3.5 py-3 text-[13px] leading-relaxed", message.role === "user" ? "rounded-br-md bg-primary text-white" : "rounded-bl-md bg-muted text-foreground")}>
-                  <span className="sr-only">{message.role === "user" ? "You: " : "Zybble AI: "}</span>
+                  <span className="sr-only">{message.role === "user" ? "You: " : `${ASSISTANT_NAME}: `}</span>
                   <p className="whitespace-pre-wrap break-anywhere">
                     {message.text}
                     {/* A caret tracks the write head while tokens are arriving. */}

@@ -15,6 +15,12 @@ export interface UploadResult {
   fileUrl?: string;
   fileName?: string;
   fileSize?: number;
+  /**
+   * The R2 key the bytes were stored under. The caller passes this to a server
+   * action, which re-checks ownership and existence before attaching it to a
+   * profile — an upload on its own changes nothing.
+   */
+  objectKey?: string;
 }
 
 export function validateProfilePicture(file: File): UploadResult {
@@ -70,6 +76,7 @@ export async function uploadAvatarFile(file: File): Promise<UploadResult> {
     success: true,
     fileName: file.name,
     fileSize: file.size,
+    objectKey: grant.key,
     fileUrl: `/api/media/avatars?key=${encodeURIComponent(grant.key)}`,
   };
 }

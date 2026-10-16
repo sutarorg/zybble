@@ -42,7 +42,7 @@ export const SERVICE_LABELS: Record<ServiceId, string> = {
   bunny: "Bunny Stream (video)",
   r2: "Cloudflare R2 (resources)",
   resend: "Resend (email)",
-  openrouter: "OpenRouter (Zybble AI)",
+  openrouter: "OpenRouter (Zybble 2.0)",
   analytics: "Analytics (GA4 / PostHog)",
   sentry: "Sentry (error monitoring)",
 };
@@ -94,7 +94,7 @@ const SERVICE_VARIABLES: Record<
   },
   openrouter: {
     variables: ["OPENROUTER_API_KEY"],
-    impact: "The Zybble AI assistant is unavailable and says so.",
+    impact: "Zybble 2.0 is unavailable and says so — it never guesses.",
   },
   analytics: {
     variables: ["NEXT_PUBLIC_GA_MEASUREMENT_ID", "NEXT_PUBLIC_POSTHOG_KEY"],
@@ -158,7 +158,7 @@ export const serverEnv = {
   resendApiKey: read("RESEND_API_KEY"),
   resendFromEmail: read("RESEND_FROM_EMAIL"),
   openrouterApiKey: read("OPENROUTER_API_KEY"),
-  // DeepSeek is Zybble AI's model. Override with `OPENROUTER_MODEL` for any
+  // DeepSeek is Zybble 2.0's model. Override with `OPENROUTER_MODEL` for any
   // other OpenRouter slug (e.g. `deepseek/deepseek-chat-v3.1`).
   openrouterModel: read("OPENROUTER_MODEL") ?? "deepseek/deepseek-chat",
   openrouterSiteUrl: read("OPENROUTER_SITE_URL") ?? publicEnv.siteUrl,

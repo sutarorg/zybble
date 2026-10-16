@@ -105,9 +105,12 @@ async function handleUpload(request: Request, body: unknown, session: Awaited<Re
 
   const url = await createPresignedUploadUrl(key, contentType, sizeBytes);
 
-  // Thumbnails and avatars attach straight to their owner record.
+  // Thumbnails and resources attach straight to their owner record. An avatar
+  // deliberately does not: it is confirmed by `updateAvatar` only after the
+  // browser's PUT has actually landed, so a failed upload can never leave a
+  // profile pointing at an object that does not exist.
   if (kind === "avatar") {
-    await service.from("profiles").update({ avatar_key: key }).eq("id", session.id);
+    // Nothing to persist yet — the response carries the key back to the caller.
   } else if (kind === "thumbnail" && courseId) {
     await service.from("courses").update({ thumbnail_key: key }).eq("id", courseId).eq("creator_id", session.id);
   } else if (kind === "resource" && courseId) {

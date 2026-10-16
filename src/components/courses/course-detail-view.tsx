@@ -22,6 +22,7 @@ import { CourseCard } from "@/components/courses/course-card";
 import { SectionHeader } from "@/components/courses/section-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { trackCourseEvent } from "@/lib/analytics-events";
 
 function Section({
   id,
@@ -77,6 +78,13 @@ export function CourseDetailView({
   // local and rendering it as JSX makes the compiler treat it as a
   // "component created during render".
   const isNew = course.ratingsCount === 0;
+
+  // A "view" is this page actually mounting in a browser, not a server render:
+  // link prefetching renders server components only, so it never inflates the
+  // creator's numbers. Deduplicated per page load by the tracker.
+  React.useEffect(() => {
+    trackCourseEvent({ courseId: course.id, kind: "view", source: "course-page" });
+  }, [course.id]);
   const { session } = useApp();
   // Reviews are already filtered server-side by the `reviews_public_read` RLS
   // policy (published + on a published course), so no client-side trust is needed.

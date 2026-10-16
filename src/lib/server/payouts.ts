@@ -7,20 +7,19 @@
  * Core accounting identities:
  *   1. For every captured order item:
  *        unit_price_paise = commission_paise + creator_share_paise
- *   2. For every processed refund on a captured order item:
- *        refund_amount_paise = commission_reversal_paise + creator_refund_debit_paise
- *   3. For every creator:
- *        netEarnedPaise          = grossEarnedPaise - refundedCreatorSharePaise
+ *   2. For every creator:
+ *        netEarnedPaise          = grossEarnedPaise
  *        unallocatedBalancePaise = netEarnedPaise - paidOutPaise - reservedPendingPaise
  *        availablePaise          = max(0, unallocatedBalancePaise)
  *        negativeAdjustmentPaise = max(0, -unallocatedBalancePaise)
  *        outstandingPayablePaise = max(0, netEarnedPaise - paidOutPaise)
  *
- * When a refund happens after a creator payout has already been marked `paid`,
- * `unallocatedBalancePaise` becomes negative and is surfaced as
- * `negativeAdjustmentPaise` (an explicit post-payout refund receivable that is
- * offset against future earnings or settled off-platform), never pretending
- * that funds were automatically clawed back from the creator's bank account.
+ * Zybble has **no refund flow**, so a captured creator share is never debited
+ * back. The only way `unallocatedBalancePaise` can go negative is a historical
+ * Route settlement that was reversed by the provider, or a payout recorded
+ * against earnings that were later corrected; that is surfaced as
+ * `negativeAdjustmentPaise` — an explicit receivable offset against future
+ * earnings — never as a claim that funds were clawed back from a bank account.
  */
 
 import "server-only";
@@ -89,71 +88,13 @@ export function assertValidPayoutTransition(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Refund & balance calculations                                               */
+/* Balance calculations                                                        */
 /* -------------------------------------------------------------------------- */
-
-export interface RefundSplitResult {
-  refundAmountPaise: number;
-  creatorRefundDebitPaise: number;
-  commissionReversalPaise: number;
-}
-
-/**
- * Splits a learner refund proportionally between the creator's share and
- * Zybble's commission so the two parts always sum back to `refundAmountPaise`
- * in integer paise.
- */
-export function computeCreatorRefundAdjustmentPaise(input: {
-  unitPricePaise: number;
-  creatorSharePaise: number;
-  refundAmountPaise: number;
-}): RefundSplitResult {
-  assertIntegerPaise(input.unitPricePaise);
-  assertIntegerPaise(input.creatorSharePaise);
-  assertIntegerPaise(input.refundAmountPaise);
-
-  if (input.unitPricePaise <= 0 || input.refundAmountPaise <= 0) {
-    return {
-      refundAmountPaise: 0,
-      creatorRefundDebitPaise: 0,
-      commissionReversalPaise: 0,
-    };
-  }
-
-  const clampedRefund = Math.min(input.unitPricePaise, input.refundAmountPaise);
-  if (clampedRefund === input.unitPricePaise) {
-    const creatorDebit = Math.max(0, Math.min(input.unitPricePaise, input.creatorSharePaise));
-    return {
-      refundAmountPaise: clampedRefund,
-      creatorRefundDebitPaise: creatorDebit,
-      commissionReversalPaise: clampedRefund - creatorDebit,
-    };
-  }
-
-  const creatorDebit = Math.max(
-    0,
-    Math.min(
-      input.creatorSharePaise,
-      Math.round((clampedRefund * input.creatorSharePaise) / input.unitPricePaise)
-    )
-  );
-  return {
-    refundAmountPaise: clampedRefund,
-    creatorRefundDebitPaise: creatorDebit,
-    commissionReversalPaise: clampedRefund - creatorDebit,
-  };
-}
 
 export interface CapturedSaleItemInput {
   unitPricePaise: number;
   commissionPaise: number;
   creatorSharePaise: number;
-}
-
-export interface ProcessedRefundInput {
-  unitPricePaise: number;
-  creatorSharePaise: number;
-  refundAmountPaise: number;
 }
 
 export interface PayoutRequestBalanceInput {
@@ -166,13 +107,12 @@ export interface CreatorPayoutBalance {
   grossPaise: number;
   /** Sum of snapshotted platform commissions on captured sales. */
   commissionPaise: number;
-  /** Sum of snapshotted creator shares on captured sales (before refunds). */
+  /** Sum of snapshotted creator shares on captured sales. */
   grossEarnedPaise: number;
-  /** Gross amount refunded to learners across processed refunds. */
-  refundPaise: number;
-  /** Creator share debited due to processed refunds/reversals. */
-  refundedCreatorSharePaise: number;
-  /** Eligible net creator earnings (`grossEarnedPaise - refundedCreatorSharePaise`). */
+  /**
+   * Eligible net creator earnings. Equal to `grossEarnedPaise`: Zybble has no
+   * refund flow, so a captured creator share is never debited back.
+   */
   netEarnedPaise: number;
   /** Amount locked in open (`requested` or `approved`) payout requests. */
   reservedPendingPaise: number;
@@ -183,8 +123,10 @@ export interface CreatorPayoutBalance {
   /** Balance currently available for a new payout request (`max(0, netEarnedPaise - paidOutPaise - reservedPendingPaise)`). */
   availablePaise: number;
   /**
-   * Post-payout negative adjustment / receivable when refunds after a completed
-   * payout reduce `netEarnedPaise` below `paidOutPaise + reservedPendingPaise`.
+   * Receivable recorded when more has been paid out or reserved than the
+   * creator has earned — a historical reversed Route settlement or an
+   * administrative correction. Offset against future earnings, never presented
+   * as an automatic bank clawback.
    */
   negativeAdjustmentPaise: number;
 }
@@ -194,10 +136,10 @@ export interface CreatorPayoutBalance {
  */
 export function computeCreatorPayoutBalance(input: {
   capturedOrderItems: CapturedSaleItemInput[];
-  processedRefunds?: ProcessedRefundInput[];
   payoutRequests: PayoutRequestBalanceInput[];
   legacySettledPaise?: number;
   legacyPendingPaise?: number;
+  /** Historical Route transfers the provider reversed. Not a refund. */
   legacyReversedPaise?: number;
 }): CreatorPayoutBalance {
   let grossPaise = 0;
@@ -216,15 +158,9 @@ export function computeCreatorPayoutBalance(input: {
     grossEarnedPaise += creator;
   }
 
-  let refundPaise = 0;
-  let refundedCreatorSharePaise = Number(input.legacyReversedPaise ?? 0);
-  assertIntegerPaise(refundedCreatorSharePaise);
-
-  for (const refund of input.processedRefunds ?? []) {
-    const split = computeCreatorRefundAdjustmentPaise(refund);
-    refundPaise += split.refundAmountPaise;
-    refundedCreatorSharePaise += split.creatorRefundDebitPaise;
-  }
+  // Only a historical Route reversal can reduce earnings below gross.
+  const legacyReversedPaise = Number(input.legacyReversedPaise ?? 0);
+  assertIntegerPaise(legacyReversedPaise);
 
   const legacySettled = Number(input.legacySettledPaise ?? 0);
   const legacyPending = Number(input.legacyPendingPaise ?? 0);
@@ -245,7 +181,7 @@ export function computeCreatorPayoutBalance(input: {
     // `rejected`, `failed`, and `cancelled` release their reservation.
   }
 
-  const netEarnedPaise = grossEarnedPaise - refundedCreatorSharePaise;
+  const netEarnedPaise = grossEarnedPaise - legacyReversedPaise;
   const paidOutPaise = manualPaidPaise + legacySettled;
   const reservedPendingPaise = manualReservedPaise + legacyPending;
   const unallocatedBalancePaise = netEarnedPaise - paidOutPaise - reservedPendingPaise;
@@ -258,8 +194,6 @@ export function computeCreatorPayoutBalance(input: {
     grossPaise,
     commissionPaise,
     grossEarnedPaise,
-    refundPaise,
-    refundedCreatorSharePaise,
     netEarnedPaise,
     reservedPendingPaise,
     paidOutPaise,

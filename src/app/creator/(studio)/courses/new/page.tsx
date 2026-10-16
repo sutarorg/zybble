@@ -1,4 +1,5 @@
-import { getRouteOnboardingState } from "@/lib/server/creator";
+import { getCreatorStudioPreferences, getRouteOnboardingState } from "@/lib/server/creator";
+import { rupeesInputFromPaise } from "@/lib/creator";
 import { CourseDetailsForm } from "./course-details-form";
 import { RouteBlockedNotice } from "../../route-blocked-notice";
 
@@ -6,7 +7,7 @@ export const metadata = { title: "New course" };
 export const dynamic = "force-dynamic";
 
 export default async function NewCoursePage() {
-  const route = await getRouteOnboardingState();
+  const [route, preferences] = await Promise.all([getRouteOnboardingState(), getCreatorStudioPreferences()]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -20,7 +21,24 @@ export default async function NewCoursePage() {
 
       <RouteBlockedNotice route={route} />
 
-      <CourseDetailsForm routeActive={route.settlementVerified} />
+      {/* The creator's studio defaults are the starting point; every field stays
+          editable here, and nothing about an existing course is touched. */}
+      <CourseDetailsForm
+        routeActive={route.settlementVerified}
+        initial={{
+          title: "",
+          subtitle: "",
+          description: "",
+          categorySlug: "",
+          level: preferences.defaultCourseLevel,
+          language: preferences.defaultCourseLanguage,
+          priceRupees: rupeesInputFromPaise(preferences.defaultPricePaise),
+          compareAtRupees: "",
+          whatYouLearn: [""],
+          requirements: [""],
+          audience: [""],
+        }}
+      />
     </div>
   );
 }

@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { Download, Receipt, Undo2 } from "lucide-react";
+import { Receipt } from "lucide-react";
 import { getAdminOrders } from "@/lib/server/admin";
 import { money } from "@/lib/admin";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ExportOrdersCsv } from "./export-orders-csv";
-import { RefundOrderDialog } from "./refund-order-dialog";
 
 export const metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
@@ -16,15 +15,11 @@ export default async function AdminOrdersPage({
 }) {
   const { status } = await searchParams;
   const all = await getAdminOrders();
-  const active = status && ["paid", "created", "failed", "refunded", "partially_refunded"].includes(status) ? status : "all";
+  const active = status && ["paid", "created", "failed", "cancelled"].includes(status) ? status : "all";
   const orders = active === "all" ? all : all.filter((order) => order.status === active);
 
-  const totalsSource =
-    active === "all"
-      ? orders.filter((order) =>
-          ["paid", "partially_refunded", "refunded"].includes(order.status)
-        )
-      : orders;
+  // Only captured money is totalled: an unpaid or failed order is not revenue.
+  const totalsSource = active === "all" ? orders.filter((order) => order.status === "paid") : orders;
   const totals = totalsSource.reduce(
     (acc, order) => {
       acc.gross += order.grossPaise;
@@ -35,7 +30,7 @@ export default async function AdminOrdersPage({
     { gross: 0, commission: 0, creator: 0 }
   );
 
-  const FILTERS = ["all", "paid", "created", "failed", "refunded", "partially_refunded"];
+  const FILTERS = ["all", "paid", "created", "failed", "cancelled"];
 
   return (
     <div className="space-y-6">
@@ -101,7 +96,6 @@ export default async function AdminOrdersPage({
                 <th className="px-4 py-3 text-right font-medium">Creator</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Razorpay ids</th>
-                <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -127,8 +121,8 @@ export default async function AdminOrdersPage({
                       className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
                         order.status === "paid"
                           ? "bg-emerald-100 text-emerald-700"
-                          : order.status === "refunded"
-                            ? "bg-orange-100 text-orange-700"
+                          : order.status === "failed"
+                            ? "bg-red-100 text-red-700"
                             : "bg-zinc-100 text-zinc-600"
                       }`}
                     >
@@ -140,16 +134,6 @@ export default async function AdminOrdersPage({
                     {order.razorpayPaymentId ? <p>pay: {order.razorpayPaymentId}</p> : null}
                     {!order.razorpayOrderId ? "—" : null}
                   </td>
-                  <td className="px-4 py-3">
-                    {order.status === "paid" && order.razorpayPaymentId ? (
-                      <RefundOrderDialog
-                        publicOrderId={order.publicId}
-                        grossPaise={order.grossPaise}
-                      />
-                    ) : (
-                      <span className="text-[12px] text-zinc-400">—</span>
-                    )}
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -158,8 +142,8 @@ export default async function AdminOrdersPage({
       )}
 
       <p className="text-[12px] text-zinc-400">
-        Zybble publishes no refund policy. The dialog above is an administrative correction that calls Razorpay&apos;s
-        refund API and records whatever the provider actually returns.
+        Every row is a captured Razorpay payment, and the CSV export is the accounting record. Money leaves the
+        platform only through a reviewed creator payout.
       </p>
     </div>
   );

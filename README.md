@@ -27,11 +27,13 @@ and a fake certificate renderer. Everything below replaced that.
 | Entitlement | A local `completedOrder` call | Created only from verified payment or webhook state |
 | Video | A simulated player with a thumbnail | Bunny Stream token URLs, authorised per request |
 | Files | A generated `.txt` in the browser | Private R2, pre-signed URLs after an entitlement check |
-| Email | None | Outbox-backed Resend dispatch |
-| Chatbot | Rule-based, answered locally | DeepSeek via OpenRouter, streamed, grounded on published courses, slugs re-resolved server-side |
+| Email | None | Outbox-backed Resend dispatch, per-template consent, and a server-generated verification link (`/auth/confirm`) that works even with Supabase SMTP unconfigured |
+| Chatbot | Rule-based, answered locally | "Zybble 2.0": DeepSeek via OpenRouter, streamed, briefed on how the platform actually works, grounded on published courses, slugs re-resolved server-side |
 | Certificates | Rendered in the browser | Server-issued records with verification codes |
 | Earnings | Mock arrays | Snapshotted commission/creator shares and a paise ledger |
 | Search | Client-side over a mock array | `/api/catalog/search` against the published catalog |
+| Creator analytics | Views and enrollments that were never measured | `course_events` written from real card impressions, course views and lesson-player watch seconds, aggregated by SQL |
+| Creator settings | Learner preferences under a Studio heading, silently unsaved | `creator_studio_preferences`: alert choices, plus new-course defaults the new-course form actually prefills |
 
 Deliberately **preserved**: the design system, layouts, six interface languages,
 course structure, category set, and the creator content (which is not machine
@@ -86,7 +88,7 @@ Everything else follows from these.
 | Learner | `/dashboard`, `/my-learning`, `/learn/[courseId]`, `/wishlist`, `/certificates`, `/messages`, `/orders`, `/orders/[orderId]`, `/settings` |
 | Creator | `/creator/signup`, `/creator`, `/creator/onboarding`, `/creator/courses/*`, `/creator/profile`, `/creator/payouts`, `/creator/earnings`, `/creator/analytics`, `/creator/reviews`, `/creator/settings` |
 | Admin | `/admin`, `/admin/courses`, `/admin/users`, `/admin/orders`, `/admin/payouts`, `/admin/categories`, `/admin/reports`, `/admin/reviews`, `/admin/settings`, `/admin/analytics` |
-| API | `/api/health`, `/api/checkout`, `/api/razorpay/webhook`, `/api/webhooks/bunny`, `/api/chat`, `/api/catalog/search`, `/api/learn/[lessonId]/playback`, `/api/media/[kind]`, `/api/media/video/{grant,status}`, `/api/storage`, `/api/learner/*`, `/api/email/outbox` |
+| API | `/api/health`, `/api/checkout`, `/api/razorpay/webhook`, `/api/webhooks/bunny`, `/api/chat`, `/api/catalog/search`, `/api/analytics/track`, `/api/learn/[lessonId]/playback`, `/api/media/[kind]`, `/api/media/video/{grant,status}`, `/api/storage`, `/api/learner/*`, `/api/email/outbox` |
 
 ---
 
@@ -131,37 +133,45 @@ See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the full sequence.
   destination snapshot, execute the bank/UPI transfer off-platform, and can mark
   a request `paid` only after entering the bank/UPI UTR reference and confirming
   both the exact INR amount and transfer completion.
-- **Refund & reversal adjustments:** Refunds debit the creator's share
-  proportionally (`computeCreatorRefundAdjustmentPaise`). If a refund occurs
-  after a manual payout has already been paid, the negative balance is tracked
-  explicitly as `negativeAdjustmentPaise` against future earnings rather than
-  pretending funds were automatically recovered from the creator's bank account.
+- **No refunds, and reversals are still honest:** Zybble has no refund policy, so
+  nothing sells one and Razorpay `refund.*` webhooks are acknowledged and
+  ignored. What *can* still take money back is a provider transfer reversal
+  (`transfer.reversed` / `transfer.partially_reversed`): it debits the creator's
+  legacy earnings and revokes the access it bought. If that happens after a
+  manual payout has already been paid, the negative balance is tracked explicitly
+  as `negativeAdjustmentPaise` against future earnings rather than pretending
+  funds were automatically recovered from the creator's bank account.
 
 Full detail: [`PAYMENT_FLOW.md`](./PAYMENT_FLOW.md) and [`LAUNCH_BLOCKERS.md`](./LAUNCH_BLOCKERS.md).
 
 ---
 
-## Zybble AI
+## Zybble 2.0 (the assistant)
 
-The launcher appears only on `/`, `/explore` and `/categories/[slug]` — public
-discovery, never on course detail, checkout, learner, creator or admin routes.
+The assistant introduces itself as **Zybble 2.0**. Its launcher appears only on
+`/`, `/explore` and `/categories/[slug]` — public discovery, never on course
+detail, checkout, learner, creator or admin routes.
 
 Requests go to `POST /api/chat`, which:
 
 1. rate-limits per client,
 2. reads **only published courses** from the `published_courses` view,
-3. sends that as the *entire* catalog context to DeepSeek and streams the
-   reply back token by token,
+3. sends a fixed `PLATFORM_KNOWLEDGE` brief (what Zybble sells, how checkout and
+   access work, creator payouts, moderation, certificates, the route map, the six
+   interface languages, where support lives) plus that live catalog to the model,
+   and streams the reply back token by token,
 4. re-resolves every slug the model returns against that same list — **an
    invented slug is dropped, never rendered**,
 5. clamps any link to a small same-origin allowlist,
 6. falls back to an honest "temporarily unavailable" message rather than
    guessing when OpenRouter is unconfigured or fails.
 
-Set `OPENROUTER_API_KEY` and Zybble AI is live; `OPENROUTER_MODEL` defaults to
-`deepseek/deepseek-chat`.
+Set `OPENROUTER_API_KEY` and Zybble 2.0 is live; `OPENROUTER_MODEL` defaults to
+`deepseek/deepseek-chat`. The platform brief is static, so the model cannot
+invent a policy — and it is kept in sync with the product, including the absence
+of a refund policy, which it states and then points at `/help`.
 
-It cannot see accounts, orders or progress.
+It still cannot see accounts, orders or progress.
 
 ---
 

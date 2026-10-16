@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  BadgeCheck,
   BellRing,
   Check,
   ChevronRight,
   Globe,
   LogOut,
+  MailWarning,
   Save,
   ShieldAlert,
   Target,
@@ -18,6 +20,7 @@ import {
 } from "lucide-react";
 import {
   requestAccountDeletion,
+  resendVerificationEmail,
   updateLearnerPreferences,
   updateProfile,
 } from "@/app/(learner)/actions";
@@ -25,9 +28,7 @@ import { signOutAction } from "@/app/(auth)/actions";
 import { useApp } from "@/components/providers/app-providers";
 import { LANGUAGES } from "@/lib/config/catalog";
 import { getDictionary } from "@/lib/i18n";
-import { initialsOf } from "@/lib/format";
-import { imagePath } from "@/lib/image-path";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AvatarUpload } from "@/components/creator/avatar-upload";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -45,14 +46,49 @@ import { cn } from "@/lib/utils";
 
 const GOALS = [15, 30, 45, 60, 90, 120];
 
+/**
+ * Optional email, keyed to the `learner_preferences` column it controls. Each
+ * entry names what turning it on actually causes — see `EMAIL_CONSENT` in
+ * `src/lib/server/email.ts` for the templates each key gates.
+ */
 const PREFS = [
-  { key: "emailCourseUpdates", title: "Course updates", text: "New lessons and announcements from your courses." },
-  { key: "weeklyReport", title: "Weekly learning report", text: "Your progress summary every Monday morning." },
-  { key: "studyReminders", title: "Study reminders", text: "Gentle nudges to keep your streak alive." },
-  { key: "emailPromos", title: "Promotions", text: "Price drops and launches in the catalog." },
+  {
+    key: "emailCourseUpdates",
+    title: "Course updates",
+    text: "New lessons and announcements from courses you are enrolled in.",
+    on: "Course update emails turned on",
+    off: "Course update emails turned off",
+  },
+  {
+    key: "weeklyReport",
+    title: "Weekly learning report",
+    text: "Your progress summary, sent every Monday morning.",
+    on: "Weekly learning report turned on",
+    off: "Weekly learning report turned off",
+  },
+  {
+    key: "studyReminders",
+    title: "Study reminders",
+    text: "A daily nudge on the days you have not completed a lesson.",
+    on: "Study reminders turned on",
+    off: "Study reminders turned off",
+  },
+  {
+    key: "emailPromos",
+    title: "Promotions",
+    text: "Price drops and new launches in the catalog.",
+    on: "Catalog promotion emails turned on",
+    off: "Catalog promotion emails turned off",
+  },
 ] as const;
 
-type PrefKey = (typeof PREFS)[number]["key"];
+type Preferences = {
+  goalMinutesPerDay: number;
+  emailCourseUpdates: boolean;
+  emailPromos: boolean;
+  weeklyReport: boolean;
+  studyReminders: boolean;
+};
 
 export function LearnerSettingsClient({
   accountName,
@@ -66,13 +102,7 @@ export function LearnerSettingsClient({
   accountEmail: string;
   emailVerified: boolean;
   avatarKey: string | null;
-  preferences: {
-    goalMinutesPerDay: number;
-    emailCourseUpdates: boolean;
-    emailPromos: boolean;
-    weeklyReport: boolean;
-    studyReminders: boolean;
-  };
+  preferences: Preferences;
   shortcuts: Array<{ href: string; label: string; text: string }>;
 }) {
   const router = useRouter();
@@ -85,21 +115,31 @@ export function LearnerSettingsClient({
   const [savingPrefs, setSavingPrefs] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [resending, setResending] = React.useState(false);
+
+  // The last value the server accepted. A failed save rolls back to this rather
+  // than to the original props, so one rejected toggle cannot undo an earlier
+  // change that did persist. State, not a ref: the rollback has to render.
+  const [savedPrefs, setSavedPrefs] = React.useState(preferences);
 
   const nameDirty = name.trim() !== savedName.trim();
-  const prefsDirty = JSON.stringify(prefs) !== JSON.stringify(preferences);
 
   const persistPrefs = React.useCallback(
-    (next: typeof preferences) => {
+    (next: Preferences, message: string) => {
       setSavingPrefs(true);
       void updateLearnerPreferences(next)
         .then((result) => {
-          if (!result.ok) toast.error(result.error ?? "Could not save your preferences");
-          else toast.success("Preferences saved");
+          if (!result.ok) {
+            setPrefs(savedPrefs);
+            toast.error(result.error ?? "Could not save your preferences");
+            return;
+          }
+          setSavedPrefs(next);
+          toast.success(result.message ?? message);
         })
         .finally(() => setSavingPrefs(false));
     },
-    []
+    [savedPrefs]
   );
 
   return (
@@ -116,32 +156,54 @@ export function LearnerSettingsClient({
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <UserRound className="size-4.5 text-primary" aria-hidden /> Profile
         </h2>
-        <div className="mt-4 flex items-center gap-4">
-          {avatarKey ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imagePath("avatars", avatarKey)}
-              alt=""
-              className="size-14 rounded-full object-cover ring-1 ring-border"
-            />
-          ) : (
-            <Avatar className="size-14 ring-1 ring-border">
-              <AvatarFallback className="bg-primary text-sm text-white">{initialsOf(name)}</AvatarFallback>
-            </Avatar>
-          )}
-          <div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <AvatarUpload avatarKey={avatarKey} name={name} onUploaded={() => router.refresh()} />
+
+          <div className="min-w-0">
             <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-              Signed in as <span className="font-medium text-foreground">{accountEmail}</span>
+              Signed in as <span className="font-medium text-foreground break-anywhere">{accountEmail}</span>
             </p>
-            {!emailVerified ? (
-              <p className="mt-1 inline-flex items-center gap-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
-                <ShieldAlert className="size-3" aria-hidden /> Email not verified yet
+            <p className="mt-1 text-[11.5px] text-zinc-400">
+              Click your photo to change it · JPEG, PNG or WebP up to 5 MB
+            </p>
+            {emailVerified ? (
+              <p className="mt-1.5 inline-flex items-center gap-1.5 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">
+                <BadgeCheck className="size-3" aria-hidden /> Email verified
               </p>
-            ) : null}
+            ) : (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <p className="inline-flex items-center gap-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
+                  <ShieldAlert className="size-3" aria-hidden /> Email not verified yet
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={resending}
+                  onClick={() => {
+                    setResending(true);
+                    void resendVerificationEmail()
+                      .then((result) => {
+                        if (!result.ok) {
+                          toast.error(result.error ?? "Could not send the verification email");
+                          return;
+                        }
+                        toast.success(result.message ?? "Verification email sent", {
+                          description: result.message ? undefined : `Check ${accountEmail}`,
+                        });
+                        router.refresh();
+                      })
+                      .finally(() => setResending(false));
+                  }}
+                >
+                  <MailWarning aria-hidden /> Resend verification email
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="space-y-1.5">
             <Label htmlFor="ls-name">Display name</Label>
             <Input id="ls-name" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
@@ -159,7 +221,7 @@ export function LearnerSettingsClient({
                       return;
                     }
                     setSavedName(name.trim());
-                    toast.success("Profile saved");
+                    toast.success(result.message ?? "Profile saved");
                     router.refresh();
                   })
                   .finally(() => setSavingProfile(false));
@@ -175,19 +237,25 @@ export function LearnerSettingsClient({
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <Target className="size-4.5 text-primary" aria-hidden /> Daily learning goal
         </h2>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
+          Shown in your sidebar and used to pace your study reminders.
+        </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {GOALS.map((goal) => (
             <button
               key={goal}
               type="button"
               aria-pressed={prefs.goalMinutesPerDay === goal}
+              disabled={savingPrefs}
               onClick={() => {
+                if (prefs.goalMinutesPerDay === goal) return;
                 const next = { ...prefs, goalMinutesPerDay: goal };
                 setPrefs(next);
-                persistPrefs(next);
+                persistPrefs(next, `Daily goal set to ${goal} minutes`);
               }}
               className={cn(
-                "flex h-11 cursor-pointer items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium transition-all sm:h-10",
+                "flex h-11 items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium transition-all sm:h-10",
+                savingPrefs ? "cursor-wait" : "cursor-pointer",
                 prefs.goalMinutesPerDay === goal
                   ? "border-primary bg-primary text-white shadow-sm"
                   : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:text-foreground"
@@ -230,8 +298,8 @@ export function LearnerSettingsClient({
           <BellRing className="size-4.5 text-primary" aria-hidden /> Email preferences
         </h2>
         <p className="mt-1 text-[12.5px] text-muted-foreground">
-          Transactional email such as receipts and moderation decisions is always sent. These control optional
-          messages.
+          Transactional email such as receipts, certificates and moderation decisions is always sent. These control
+          the optional messages, and each change is saved as soon as you make it.
         </p>
         <ul className="mt-3 space-y-1">
           {PREFS.map((item) => (
@@ -239,11 +307,13 @@ export function LearnerSettingsClient({
               <label className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60">
                 <Checkbox
                   className="mt-0.5"
-                  checked={Boolean(prefs[item.key])}
+                  checked={prefs[item.key]}
+                  disabled={savingPrefs}
                   onCheckedChange={(value) => {
-                    const next = { ...prefs, [item.key]: value === true } as typeof prefs;
+                    const enabled = value === true;
+                    const next = { ...prefs, [item.key]: enabled } as Preferences;
                     setPrefs(next);
-                    persistPrefs(next);
+                    persistPrefs(next, enabled ? item.on : item.off);
                   }}
                 />
                 <span>
@@ -254,7 +324,7 @@ export function LearnerSettingsClient({
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[12px] text-zinc-400" aria-live="polite">
+        <p className="mt-3 text-[12px] text-zinc-400" role="status" aria-live="polite">
           {savingPrefs ? "Saving…" : ""}
         </p>
       </section>
@@ -349,12 +419,6 @@ export function LearnerSettingsClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {prefsDirty ? (
-        <p className="text-[11.5px] text-zinc-400" role="status">
-          Preferences save as soon as you change them.
-        </p>
-      ) : null}
     </div>
   );
 }

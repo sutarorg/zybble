@@ -6,6 +6,7 @@ import { getDictionary, localeOf, translateCourse } from "@/lib/i18n";
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { CirclePlay, Clock3, Signal, Star } from "lucide-react";
 import type { Course } from "@/types";
 import { getCourseInstructor, courseCategory, LEVEL_LABELS } from "@/lib/courses";
@@ -17,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BookmarkButton } from "@/components/courses/bookmark-button";
 import { cn } from "@/lib/utils";
 import { CURRENCY } from "@/lib/money";
+import { impressionSource, trackCourseEvent } from "@/lib/analytics-events";
 
 const STATUS_BADGE: Record<string, { label: string; variant: "amber" | "violet" | "emerald" }> = {
   bestseller: { label: "Bestseller", variant: "amber" },
@@ -48,6 +50,30 @@ export function CourseCard({
     currency: CURRENCY,
     maximumFractionDigits: 2,
   });
+  const cardRef = React.useRef<HTMLElement | null>(null);
+  const pathname = usePathname();
+
+  // A card only counts as an impression once it is genuinely on screen, and only
+  // once per course per page load — scrolling a grid up and down is not reach.
+  React.useEffect(() => {
+    const node = cardRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        trackCourseEvent({
+          courseId: authoredCourse.id,
+          kind: "impression",
+          source: impressionSource(pathname),
+        });
+        observer.disconnect();
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [authoredCourse.id, pathname]);
+
   const instructor = getCourseInstructor(course)!;
   const category = courseCategory(course);
   const CategoryIcon = categoryIcon(category.icon);
@@ -55,6 +81,7 @@ export function CourseCard({
 
   return (
     <article
+      ref={cardRef}
       className={cn(
         "group relative flex h-full flex-col overflow-hidden rounded-xl border border-border bg-white shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-card-hover",
         className

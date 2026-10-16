@@ -383,21 +383,6 @@ export async function fetchTransfer(transferId: string): Promise<RouteTransferRe
   return normaliseTransfer(response as unknown as Record<string, unknown>);
 }
 
-export async function reverseTransfer(
-  transferId: string,
-  amountPaise: number,
-  currency = "INR"
-): Promise<RouteTransferResult> {
-  assertInr(currency);
-  assertIntegerPaise(amountPaise);
-  // `POST /v1/transfers/:id/reversals` — reversals are always denominated in
-  // the parent transfer's currency, which Zybble fixes to INR.
-  const response = await getRazorpay().transfers.reverse(transferId, {
-    amount: amountPaise,
-  });
-  return normaliseTransfer(response as unknown as Record<string, unknown>);
-}
-
 function normaliseTransfer(raw: Record<string, unknown>): RouteTransferResult {
   return {
     id: String(raw.id),
@@ -438,54 +423,6 @@ export async function fetchTransferSettlements(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Refunds                                                                     */
-/* -------------------------------------------------------------------------- */
-
-export interface RefundResult {
-  id: string;
-  payment_id: string;
-  amount: number;
-  currency: string;
-  status: string;
-}
-
-export async function createRefund(params: {
-  paymentId: string;
-  amountPaise: number;
-  speed?: "normal" | "optimum";
-  notes?: Record<string, string>;
-  currency?: "INR";
-}): Promise<RefundResult> {
-  assertInr(params.currency ?? "INR");
-  assertIntegerPaise(params.amountPaise);
-  // `POST /v1/payments/:id/refund`
-  const response = await getRazorpay().payments.refund(params.paymentId, {
-    amount: params.amountPaise,
-    speed: params.speed ?? "normal",
-    ...(params.notes ? { notes: params.notes } : {}),
-  });
-  const raw = response as unknown as Record<string, unknown>;
-  return {
-    id: String(raw.id),
-    payment_id: String(raw.payment_id ?? params.paymentId),
-    amount: Number(raw.amount ?? params.amountPaise),
-    currency: String(raw.currency ?? "INR"),
-    status: String(raw.status ?? "pending"),
-  };
-}
-
-export async function fetchRefund(paymentId: string, refundId: string): Promise<RefundResult> {
-  const raw = (await getRazorpay().payments.fetchRefund(paymentId, refundId)) as unknown as Record<string, unknown>;
-  return {
-    id: String(raw.id),
-    payment_id: String(raw.payment_id ?? paymentId),
-    amount: Number(raw.amount ?? 0),
-    currency: String(raw.currency ?? "INR"),
-    status: String(raw.status ?? "pending"),
-  };
-}
-
-/* -------------------------------------------------------------------------- */
 /* Webhook payloads                                                            */
 /* -------------------------------------------------------------------------- */
 
@@ -508,7 +445,6 @@ export interface RazorpayWebhookPayload {
       error_description?: string;
       order_id?: string;
     };
-    refund?: { entity: string; id: string; amount: number; currency: string; status: string };
     transfer?: {
       entity: string;
       id: string;
@@ -532,13 +468,18 @@ export interface RazorpayWebhookPayload {
   };
 }
 
-/** Webhook events Zybble subscribes to. Anything else is recorded and ignored. */
+/**
+ * Webhook events Zybble subscribes to. Anything else is recorded and ignored.
+ *
+ * Razorpay `refund.*` / `payment.refunded` events are deliberately absent: the
+ * marketplace has no refund flow. They are still durably recorded in
+ * `webhook_events` so an administrator can see one happened, but no code path
+ * acts on them.
+ */
 export const SUPPORTED_WEBHOOK_EVENTS = [
   "payment.captured",
   "payment.authorized",
   "payment.failed",
-  "refund.processed",
-  "refund.failed",
   "transfer.processed",
   "transfer.failed",
   "transfer.reversed",

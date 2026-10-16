@@ -72,7 +72,7 @@ supabase link --project-ref <project-ref>
 supabase db push
 ```
 
-Six migrations, in order:
+Eleven migrations, in order:
 
 | File | Contents |
 | --- | --- |
@@ -82,6 +82,15 @@ Six migrations, in order:
 | `20260101000400_seed_configuration.sql` | **categories only** |
 | `20260101000500_learner_rls_policies.sql` | owner-scoped policies for the eight learner-owned tables |
 | `20260101000600_manual_payouts.sql` | encrypted manual payout destinations (`creator_payout_destinations`), payout requests (`payout_requests`), audit events (`payout_audit_events`), transition guards, and atomic reservation RPC (`create_creator_payout_request`) |
+| `20260101000700_remove_refunds.sql` | drops the `refunds` table, rebuilds the refund-free enums, recreates `create_creator_payout_request` against them |
+| `20260101000800_course_analytics_events.sql` | `course_events` (impressions / views / watch seconds), RLS enabled with **no** policies so only the service role can write, `prune_course_events`, and the service-only engagement aggregates |
+| `20260101000900_creator_studio_preferences.sql` | `creator_studio_preferences`: creator alert choices, in-app bell switch and new-course defaults, own-row RLS plus admin read |
+| `20260101001000_sync_email_verified.sql` | backfills `profiles.email_verified` from `auth.users.email_confirmed_at` |
+| `20260101001100_creator_earnings_aggregates.sql` | `security definer` aggregates over **captured** sales for the calling creator (`creator_earnings_totals`, `_by_course`, `_daily`, `_monthly`), granted to `authenticated` only |
+
+Migration `20260101000700_remove_refunds.sql` **destroys data**: it drops the
+`refunds` table. Zybble has no refund policy, so this is intended, but take a
+backup first if the project ever held live refund rows.
 
 The fifth and sixth migrations are **not optional**. `20260101000300_rls.sql` grants those
 tables to `authenticated` while enabling RLS globally, and `20260101000600_manual_payouts.sql`
@@ -90,6 +99,16 @@ from `anon` and `authenticated`.
 
 `npm run test:rls` asserts grant/policy parity so this cannot silently recur: if
 you add a table to the grants without giving it a policy, the suite fails.
+
+`20260101001100_creator_earnings_aggregates.sql` is what Creator Studio's money
+figures are built from, and it is granted to `authenticated` **only**. Those
+functions derive the creator from `auth.uid()`, so they must be called with the
+creator's own session client — under `service_role` there is no `auth.uid()` and
+they would return zeros, which is why the grant is withheld rather than the
+behaviour left to chance. They exist because `orders_own_read` hides an order
+from its own creator, so no browser-role query can filter order items on
+`orders.status`; the studio says "earnings could not be read" if they ever fail,
+instead of showing ₹0.
 
 The seed deliberately contains **categories and nothing else** — no courses, no
 users, no reviews. Shipping demo business records would mean shipping fake ones.
@@ -122,6 +141,14 @@ already exists and the ids match.
   production and any preview deployments.
 - **Email confirmation**: leave **on**. The confirm route exchanges the code for
   a session server-side.
+- **Supabase SMTP is not required for the verification mail.** After `/signup`,
+  the app generates the confirmation link itself with the service role
+  (`auth.admin.generateLink`) and sends it as a branded Resend template, so a
+  signed-up learner gets mail even with Supabase's own SMTP unconfigured.
+  `SUPABASE_SERVICE_ROLE_KEY` is therefore load-bearing for signup, not just for
+  media and analytics. If the link cannot be generated the signup still succeeds
+  and `/settings` offers **Resend verification email** (rate-limited to three
+  attempts per ten minutes).
 - Add the production domain to the allowlist, or password reset silently fails.
 
 ---
@@ -151,11 +178,15 @@ Dashboard → Webhooks, add `https://<domain>/api/razorpay/webhook`.
 | Setting | Value |
 | --- | --- |
 | Secret | same value as `RAZORPAY_WEBHOOK_SECRET` |
-| Active events | `payment.captured`, `payment.failed`, `order.paid`, `refund.created`, `refund.processed` |
+| Active events | `payment.captured`, `payment.failed`, `order.paid`, `transfer.reversed`, `transfer.partially_reversed`, `settlement.processed`, `settlement.failed` |
 | Content type | `application/json` |
 
 The handler reads the body as **text before parsing** — re-serialising changes
 the bytes and breaks the HMAC.
+
+Do **not** subscribe `refund.*` or `payment.refunded`: Zybble has no refund
+policy. If they arrive anyway the handler records the event, answers `200` so
+Razorpay stops retrying, and logs a warning — it never processes a refund.
 
 ### 4.3 Manual Creator Payouts (No Razorpay Route Dependency)
 
@@ -235,11 +266,39 @@ Only `moderator` and `admin` may call it, because the outbox holds learner email
 addresses and receipt contents. Failures retry up to five times, then stay
 `failed` for inspection rather than looping forever.
 
+### 7.1 Scheduled mail rides the same call
+
+There is no separate scheduler in this codebase. Every `POST /api/email/outbox`
+first runs `queueScheduledLearnerEmails()`, then drains the outbox. Schedule that
+one endpoint **daily** (a Vercel Cron, GitHub Action or any external timer) and
+both halves work:
+
+| Mail | When it is queued | Idempotency key |
+| --- | --- | --- |
+| Weekly learning report | UTC Mondays only | `weekly-report:<userId>:<yyyy-Www>` |
+| Catalogue digest (new + discounted published courses) | UTC Mondays only | `catalog-digest:<userId>:<yyyy-Www>` |
+| Study reminder | any day, skipped when the learner has no active entitlement or already completed a lesson today | `study-reminder:<userId>:<yyyy-mm-dd>` |
+
+Bounds, so a large table cannot make one request unbounded: at most 200 learners
+are considered per run, 10 000 preference rows and 5 000 already-queued keys are
+read, and writes go in chunks of 50. Candidates are ordered so a run that hits
+the cap does not always serve the same first 200 learners — the keys already
+queued this period are excluded *before* the cap is applied.
+
+**Consent is enforced twice.** Every template is gated by a learner preference
+(`email_course_updates`, `email_promos`, weekly report, study reminders) or a
+creator studio preference (new enrollment, new review, moderation decisions,
+payout updates). `sendEmail` checks at dispatch, `enqueueEmail` checks before
+writing the row, and `enqueueEmailBatch` resolves both preference tables in two
+batched reads. A skipped mail is reported as `skipped: "consent"`, never as an
+error, and never as a success.
+
 ---
 
-## 8. OpenRouter (Zybble AI)
+## 8. OpenRouter (Zybble 2.0)
 
-Zybble AI runs on **DeepSeek**, reached with one OpenRouter key.
+Zybble 2.0 — the public course-discovery assistant — runs on **DeepSeek**,
+reached with one OpenRouter key.
 
 | Env | Value |
 | --- | --- |
@@ -281,8 +340,17 @@ single `data: {"type":"done",…}`.
 When a key is absent the script is not loaded at all. A DSN is write-only by
 design; keep the Sentry auth token server-side.
 
+This section is about **third-party** product analytics. It is unrelated to
+Creator Studio analytics, which is first-party and needs no extra key: the
+browser posts impressions, views and lesson watch seconds to
+`/api/analytics/track`, the route writes them to `course_events` with the service
+role, and `/creator/analytics` aggregates them in SQL. `course_events` has RLS
+enabled with **no** policies, so no signed-in user can read or write it directly
+— only `SUPABASE_SERVICE_ROLE_KEY` can. Without that key the page says the data
+is unavailable instead of showing zeros.
+
 > **Before enabling analytics for real traffic**, implement a consent banner
-> with deny-by-default. This is an open item in `LAUNCH_BLOCKERS.md` §8.
+> with deny-by-default. This is an open item in `LAUNCH_BLOCKERS.md` §4.
 
 ---
 

@@ -9,11 +9,20 @@ import { NotificationsMenu, type NotificationItem } from "@/components/layout/no
 import { LanguageMenu } from "@/components/layout/language-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { LearnerSidebarContent } from "@/components/learner/learner-sidebar";
+import type { SidebarCounts } from "@/components/learner/learner-counts";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { IconButton } from "@/components/ui/icon-button";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
-export function LearnerHeader({ notifications = [] }: { notifications?: NotificationItem[] }) {
+export function LearnerHeader({
+  notifications = [],
+  counts,
+}: {
+  notifications?: NotificationItem[];
+  /** The same server-read counters the fixed sidebar shows, so the mobile
+    *  navigation sheet never renders a goal or streak it does not have. */
+  counts?: SidebarCounts;
+}) {
   const translateUi = useTranslate();
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -33,7 +42,7 @@ export function LearnerHeader({ notifications = [] }: { notifications?: Notifica
             <VisuallyHidden.Root>
               <SheetTitle><LocalizedText text={"Navigation"} /></SheetTitle>
             </VisuallyHidden.Root>
-            <LearnerSidebarContent onNavigate={() => setNavOpen(false)} />
+            <LearnerSidebarContent onNavigate={() => setNavOpen(false)} counts={counts} />
           </SheetContent>
         </Sheet>
 

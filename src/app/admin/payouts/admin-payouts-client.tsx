@@ -659,8 +659,8 @@ export function AdminPayoutsClient({
           <div>
             <h2 className="text-sm font-semibold">Creator balances & saved destinations</h2>
             <p className="text-xs text-muted-foreground">
-              Reconciled per-creator earnings, commission, refund adjustments, reserved requests, and
-              masked destinations.
+              Reconciled per-creator earnings, commission, reserved requests, paid payouts and masked
+              destinations.
             </p>
           </div>
           <span className="text-xs text-muted-foreground">{creatorBalances.length} creators</span>

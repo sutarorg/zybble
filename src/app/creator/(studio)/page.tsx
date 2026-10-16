@@ -60,8 +60,6 @@ export default async function CreatorDashboardPage({
       sub: course.ratingsCount > 0 ? `${course.rating.toFixed(1)} ★ from ${course.ratingsCount} ratings` : "No ratings yet",
     }));
 
-  const firstName = courses.length > 0 ? "" : "";
-
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -79,6 +77,17 @@ export default async function CreatorDashboardPage({
           </Link>
         </Button>
       </header>
+
+      {!finance.earningsAvailable ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] text-amber-900">
+          <p className="font-semibold">Earnings could not be read</p>
+          <p className="mt-1 text-amber-800">
+            The revenue trend and money figures below are zeros because the captured-sales totals
+            did not come back — not because you have earned nothing. Course and payout data is
+            unaffected.
+          </p>
+        </div>
+      ) : null}
 
       {!route.hasAccount && finance.netEarnedPaise > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] text-amber-900">
@@ -203,7 +212,6 @@ export default async function CreatorDashboardPage({
               { label: "Available to request", value: finance.availablePaise },
               { label: "Reserved in pending requests", value: finance.reservedPendingPaise },
               { label: "Paid out to you", value: finance.paidOutPaise },
-              { label: "Refund adjustments", value: finance.refundedCreatorSharePaise },
             ].map((row) => (
               <div key={row.label} className="flex items-baseline justify-between gap-4 text-[13px]">
                 <dt className="text-muted-foreground">{row.label}</dt>
@@ -212,12 +220,10 @@ export default async function CreatorDashboardPage({
             ))}
           </dl>
           <p className="mt-4 text-[12px] text-zinc-400">
-            Figures reconcile captured orders, processed refunds, and confirmed manual payouts in INR paise.
+            Figures reconcile captured orders and confirmed manual payouts in integer INR paise.
           </p>
         </section>
       </div>
-
-      {firstName ? null : null}
 
       <section className="rounded-xl border border-border bg-white p-5 shadow-card">
         <h2 className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-tight">

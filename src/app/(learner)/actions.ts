@@ -6,11 +6,17 @@ import { z } from "zod";
 import { createServerClient, createServiceClient } from "@/lib/supabase/server";
 import { requireSession, AuthorizationError } from "@/lib/server/session";
 import { issueCertificateIfComplete } from "@/lib/server/learner";
+import { confirmAvatarUpload } from "@/lib/server/account";
+import { alertCreator } from "@/lib/server/creator-alerts";
+import { sendVerificationEmail } from "@/lib/server/verification";
+import { rateLimit } from "@/lib/rate-limit";
 import { signOutAction } from "@/app/(auth)/actions";
 
 export interface ActionResult {
   ok: boolean;
   error?: string;
+  /** Confirmation the UI shows as a toast — the learner is told what changed. */
+  message?: string;
   certificateCode?: string;
 }
 
@@ -214,16 +220,99 @@ export async function updateLearnerPreferences(input: unknown): Promise<ActionRe
     if (!parsed.success) return { ok: false, error: "Invalid preferences" };
 
     const supabase = await createServerClient();
+    // The form speaks camelCase, the table speaks snake_case. Spreading the
+    // parsed object here used to name columns that do not exist, so Postgres
+    // rejected the write and every toggle looked like it saved and then reverted.
     const { error } = await supabase.from("learner_preferences").upsert(
-      { user_id: session.id, ...parsed.data },
+      {
+        user_id: session.id,
+        goal_minutes_per_day: parsed.data.goalMinutesPerDay,
+        email_course_updates: parsed.data.emailCourseUpdates,
+        email_promos: parsed.data.emailPromos,
+        weekly_report: parsed.data.weeklyReport,
+        study_reminders: parsed.data.studyReminders,
+      },
       { onConflict: "user_id" }
     );
     if (error) return { ok: false, error: "Could not save your preferences" };
 
+    // The sidebar's goal and the settings form both read this row.
     revalidatePath("/settings");
-    return { ok: true };
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
+    return { ok: true, message: "Preferences saved" };
   } catch (error) {
     return fail(error, "Could not save your preferences");
+  }
+}
+
+/**
+ * Attaches an uploaded image as the learner's avatar.
+ *
+ * The bytes went to R2 through a pre-signed PUT the browser obtained from
+ * `/api/storage`; this action is what makes the image official. It re-checks that
+ * the key is inside the caller's own avatar namespace and that the object really
+ * exists, so a key copied from somebody else's upload cannot be attached here.
+ */
+export async function updateAvatar(key: unknown): Promise<ActionResult> {
+  try {
+    const session = await requireSession();
+    const result = await confirmAvatarUpload(session.id, key);
+    if (!result.ok) return { ok: false, error: result.error };
+
+    revalidatePath("/", "layout");
+    revalidatePath("/settings");
+    return { ok: true, message: "Profile photo updated" };
+  } catch (error) {
+    return fail(error, "Could not update your profile photo");
+  }
+}
+
+/**
+ * Sends a fresh email-verification link to the signed-in learner.
+ *
+ * Supabase's own confirmation email depends on the project's SMTP being
+ * configured, so Zybble generates the link server-side and delivers it through
+ * Resend — see `src/lib/server/verification.ts`. Resending is rate limited: the
+ * token is real, and a button that mints one on every click is a mail bomb.
+ */
+export async function resendVerificationEmail(): Promise<ActionResult> {
+  try {
+    const session = await requireSession();
+    if (session.emailVerified) {
+      return { ok: true, message: "Your email address is already verified" };
+    }
+
+    const limit = rateLimit(`verify:user:${session.id}`, 3, 10 * 60_000);
+    if (!limit.allowed) {
+      return {
+        ok: false,
+        error: `Too many attempts — try again in ${Math.max(1, limit.retryAfterSeconds)} seconds`,
+      };
+    }
+
+    const outcome = await sendVerificationEmail({
+      email: session.email,
+      name: session.fullName,
+      userId: session.id,
+    });
+
+    switch (outcome.status) {
+      case "sent":
+        return { ok: true, message: `Verification email sent to ${session.email}` };
+      case "queued":
+        return {
+          ok: true,
+          message: "We could not send it just now — the email is queued and will arrive shortly",
+        };
+      case "already_verified":
+        revalidatePath("/", "layout");
+        return { ok: true, message: "Your email address is already verified" };
+      default:
+        return { ok: false, error: "We could not send the verification email. Please try again later." };
+    }
+  } catch (error) {
+    return fail(error, "We could not send the verification email");
   }
 }
 
@@ -316,6 +405,16 @@ export async function submitReview(input: unknown): Promise<ActionResult> {
     if (!parsed.success) return { ok: false, error: "Invalid review" };
 
     const supabase = await createServerClient();
+
+    // An edited review is not a new one, and only a new review is worth
+    // interrupting a creator for.
+    const { data: previous } = await supabase
+      .from("reviews")
+      .select("id")
+      .eq("course_id", parsed.data.courseId)
+      .eq("user_id", session.id)
+      .maybeSingle();
+
     // The `reviews_insert_entitled` RLS policy is the authority: a learner can
     // only review a course they hold an entitlement to.
     const { error } = await supabase.from("reviews").upsert(
@@ -337,7 +436,38 @@ export async function submitReview(input: unknown): Promise<ActionResult> {
     }
 
     revalidatePath(`/courses`);
-    return { ok: true };
+
+    if (!previous) {
+      const { data: course } = await supabase
+        .from("courses")
+        .select("id, title, creator_id")
+        .eq("id", parsed.data.courseId)
+        .maybeSingle();
+      const creatorId = (course?.creator_id as string | null) ?? null;
+      if (creatorId) {
+        const courseTitle = String(course?.title ?? "your course");
+        // Best-effort and gated by the creator's studio settings; a review that
+        // saved must never fail because its announcement did not.
+        await alertCreator({
+          creatorId,
+          kind: "new_review",
+          notification: {
+            title: `New review on ${courseTitle}`,
+            body: `${parsed.data.rating} out of 5 from a learner.`,
+            href: "/creator/reviews",
+          },
+          payload: {
+            courseTitle,
+            rating: parsed.data.rating,
+            reviewTitle: parsed.data.title ?? "",
+            reviewBody: parsed.data.body ?? "",
+          },
+          idempotencyKey: `creator-review:${parsed.data.courseId}:${session.id}`,
+        });
+      }
+    }
+
+    return { ok: true, message: "Review published" };
   } catch (error) {
     return fail(error, "Could not save your review");
   }

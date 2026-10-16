@@ -80,13 +80,7 @@ export default function PrivacyPage() {
           </p>
         </LegalSection>
 
-        <LegalSection index={8} title="Refunds">
-          <p>
-            <LocalizedText text={"The Zybble marketplace publishes no refund policy and offers no refund flow. If a payment is reversed by your bank or by Razorpay, the financial ledger is corrected automatically and the corresponding access ends. That is an accounting correction, not a customer refund promise."} />
-          </p>
-        </LegalSection>
-
-        <LegalSection index={9} title="Changes and contact">
+        <LegalSection index={8} title="Changes and contact">
           <p>
             <LocalizedText text={"Material changes to this policy are announced in the product and by email before they take effect. Privacy questions go to the Help Center."} />
           </p>

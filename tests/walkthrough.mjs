@@ -213,9 +213,9 @@ try {
     assert.equal(res.status(), 200);
     await assert.doesNotReject(() => page.waitForSelector("header", { timeout: 10000 }));
 
-    // Public discovery pages show the Zybble AI launcher.
-    const aiLauncher = page.locator('button[aria-label*="Zybble AI"], button:has-text("Ask Zybble AI")');
-    assert.ok((await aiLauncher.count()) >= 1, "Expected Zybble AI launcher on /");
+    // Public discovery pages show the Zybble 2.0 launcher.
+    const aiLauncher = page.locator('button[aria-label*="Zybble 2.0"], button[aria-label*="Zybble AI"], button:has-text("Ask Zybble AI")');
+    assert.ok((await aiLauncher.count()) >= 1, "Expected the Zybble 2.0 launcher on /");
 
     const exploreRes = await page.goto(`${server.baseUrl}/explore`, { waitUntil: "networkidle" });
     assert.equal(exploreRes.status(), 200);
@@ -264,8 +264,8 @@ try {
     assert.match(text, /add payout details whenever you are ready to withdraw/i);
     assert.doesNotMatch(text, /Paid courses are disabled until Razorpay Route status is Active/i);
 
-    const aiLauncher = page.locator('button[aria-label*="Zybble AI"], button:has-text("Ask Zybble AI")');
-    assert.equal(await aiLauncher.count(), 0, "Zybble AI launcher must be hidden on /creator/signup");
+    const aiLauncher = page.locator('button[aria-label*="Zybble 2.0"], button[aria-label*="Zybble AI"], button:has-text("Ask Zybble AI")');
+    assert.equal(await aiLauncher.count(), 0, "the Zybble 2.0 launcher must be hidden on /creator/signup");
   });
 
   await step("6. Privileged creator and admin payout routes enforce server-side session guards and redirect to /login", async () => {

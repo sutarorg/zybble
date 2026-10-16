@@ -377,5 +377,8 @@ export const ja: Dictionary = {
 
   /* ---------------------------------------------------------- learner shell */
   dailyGoal: (minutes) => `1日の目標: ${minutes}分`,
-  streakNote: "4日連続（シミュレーション）— 短い学習の積み重ねが力になります。",
+  streakSummary: (days: number, lessons: number) =>
+    `${days}日連続 · 今週${lessons}レッスンを完了`,
+  streakEmpty: "今日レッスンを完了して連続記録を始めましょう。",
+  lastSevenDays: "過去7日間",
 };
