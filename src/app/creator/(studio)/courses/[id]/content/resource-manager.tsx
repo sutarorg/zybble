@@ -2,11 +2,18 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Download, FileText, ImageIcon, Trash2, Upload } from "lucide-react";
+import { Download, FileText, ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 import { deleteResource } from "@/app/creator/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { imagePath } from "@/lib/image-path";
+import {
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  MAX_RESOURCE_BYTES,
+  MAX_RESOURCE_MB,
+} from "@/lib/upload-limits";
 
 export interface CourseResource {
   id: string;
@@ -17,15 +24,14 @@ export interface CourseResource {
   createdAt: string;
 }
 
-const MAX_RESOURCE_MB = 50;
-const MAX_THUMBNAIL_MB = 8;
-
 /**
- * Course thumbnail and downloadable resources.
+ * Course thumbnail and downloadable resources — wizard step 3.
  *
  * Uploads are pre-signed PUTs issued by `/api/storage` after the server verifies
  * ownership; the R2 bucket is private, so a download link is minted per request
- * and only for an owner or an entitled learner.
+ * and only for an owner or an entitled learner. The size and type limits here
+ * mirror the server's exactly (`@/lib/upload-limits`) — success is reported only
+ * after the storage service has actually accepted the bytes.
  */
 export function ResourceManager({
   courseId,
@@ -41,19 +47,22 @@ export function ResourceManager({
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [status, setStatus] = React.useState<string | null>(null);
   const [title, setTitle] = React.useState("");
   const resourceInput = React.useRef<HTMLInputElement>(null);
   const thumbnailInput = React.useRef<HTMLInputElement>(null);
 
   async function upload(file: File, kind: "thumbnail" | "resource") {
-    const limitMb = kind === "thumbnail" ? MAX_THUMBNAIL_MB : MAX_RESOURCE_MB;
-    if (file.size > limitMb * 1024 * 1024) {
-      setError(`That file is larger than ${limitMb} MB.`);
+    const limitBytes = kind === "thumbnail" ? MAX_IMAGE_BYTES : MAX_RESOURCE_BYTES;
+    const limitMb = kind === "thumbnail" ? MAX_IMAGE_MB : MAX_RESOURCE_MB;
+    if (file.size > limitBytes) {
+      setError(`“${file.name}” is larger than ${limitMb} MB. Choose a smaller file.`);
       return;
     }
 
     setBusy(true);
     setError(null);
+    setStatus(`Uploading “${file.name}”…`);
     try {
       const grantResponse = await fetch("/api/storage", {
         method: "POST",
@@ -71,6 +80,7 @@ export function ResourceManager({
       if (!grantResponse.ok) {
         const payload = (await grantResponse.json().catch(() => ({}))) as { error?: string };
         setError(payload.error ?? "Could not start the upload");
+        setStatus(null);
         return;
       }
       const grant = (await grantResponse.json()) as { url: string };
@@ -80,13 +90,16 @@ export function ResourceManager({
         body: file,
       });
       if (!putResponse.ok) {
-        setError("The file store rejected the upload.");
+        setError("The file store rejected the upload. Please try again.");
+        setStatus(null);
         return;
       }
       if (kind === "resource") setTitle("");
+      setStatus(`“${file.name}” uploaded.`);
       router.refresh();
     } catch {
       setError("The upload failed. Please try again.");
+      setStatus(null);
     } finally {
       setBusy(false);
     }
@@ -116,11 +129,22 @@ export function ResourceManager({
   return (
     <div className="space-y-5">
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-700">{error}</p>
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-700">
+          {error}
+        </p>
+      ) : null}
+      {status ? (
+        <p role="status" className="flex items-center gap-2 text-[13px] text-muted-foreground">
+          {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+          {status}
+        </p>
       ) : null}
 
       <section className="rounded-xl border border-border bg-white p-5 shadow-card">
         <h2 className="font-display text-[15px] font-semibold tracking-tight">Course thumbnail</h2>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
+          Required before submission. JPEG, PNG or WebP up to {MAX_IMAGE_MB} MB.
+        </p>
         <div className="mt-4 flex flex-wrap items-center gap-4">
           {thumbnailKey ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -130,8 +154,9 @@ export function ResourceManager({
               className="h-24 w-40 rounded-lg border border-border object-cover"
             />
           ) : (
-            <div className="flex h-24 w-40 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-zinc-400">
+            <div className="flex h-24 w-40 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-zinc-300 text-zinc-400">
               <ImageIcon className="size-6" aria-hidden />
+              <span className="text-[11px]">No thumbnail yet</span>
             </div>
           )}
           {editable ? (
@@ -139,7 +164,7 @@ export function ResourceManager({
               <input
                 ref={thumbnailInput}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={ALLOWED_IMAGE_TYPES.join(",")}
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -155,19 +180,25 @@ export function ResourceManager({
           ) : null}
         </div>
         <p className="mt-3 text-[12px] text-zinc-400">
-          JPEG, PNG or WebP up to {MAX_THUMBNAIL_MB} MB. Stored in a private bucket and served through an
-          authenticated image route.
+          Stored in a private bucket and served through an authenticated image route — the file is never
+          publicly addressable.
         </p>
       </section>
 
       <section className="rounded-xl border border-border bg-white p-5 shadow-card">
         <h2 className="font-display text-[15px] font-semibold tracking-tight">Downloadable resources</h2>
         <p className="mt-1 text-[12.5px] text-muted-foreground">
-          Learners who own this course get a short-lived signed link. Files are never publicly addressable.
+          Optional. Learners who own this course get a short-lived signed link ({MAX_RESOURCE_MB} MB per file).
         </p>
 
         {resources.length === 0 ? (
-          <p className="mt-4 text-[13px] text-muted-foreground">No resources uploaded yet.</p>
+          <div className="mt-4 rounded-lg border border-dashed border-zinc-300 bg-muted/40 px-4 py-6 text-center">
+            <FileText className="mx-auto size-5 text-zinc-400" aria-hidden />
+            <p className="mt-1.5 text-[13px] text-muted-foreground">
+              No resources yet. Worksheets, templates or starter code make a course more useful — but they are
+              optional.
+            </p>
+          </div>
         ) : (
           <ul className="mt-4 divide-y divide-border">
             {resources.map((resource) => (
@@ -185,8 +216,10 @@ export function ResourceManager({
                 {editable ? (
                   <Button
                     type="button"
-                    size="sm"
+                    size="icon-sm"
                     variant="ghost"
+                    aria-label={`Delete resource “${resource.title}”`}
+                    title="Delete resource"
                     disabled={busy}
                     onClick={() => {
                       if (!window.confirm(`Delete “${resource.title}”?`)) return;
@@ -195,7 +228,7 @@ export function ResourceManager({
                         .finally(() => router.refresh());
                     }}
                   >
-                    <Trash2 className="size-4" aria-hidden />
+                    <Trash2 className="size-4 text-red-600" aria-hidden />
                   </Button>
                 ) : null}
               </li>

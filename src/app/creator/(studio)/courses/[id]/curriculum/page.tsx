@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ListVideo } from "lucide-react";
 import { getCreatorCourse, getCreatorCurriculum } from "@/lib/server/creator";
 import { CurriculumEditor, type CurriculumSection, type CurriculumLesson } from "./curriculum-editor";
+import { StatusBadge } from "@/components/creator/status-badge";
 
 export const metadata = { title: "Curriculum" };
 export const dynamic = "force-dynamic";
@@ -33,21 +33,15 @@ export default async function CurriculumPage({ params }: { params: Promise<{ id:
   }));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href="/creator/courses" className="text-[12.5px] text-muted-foreground underline">
-            ← My courses
-          </Link>
-          <h1 className="font-display mt-1 text-[26px] leading-tight font-bold tracking-tight">Curriculum</h1>
-          <p className="mt-1.5 text-[14px] text-muted-foreground">{course.title}</p>
+          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Curriculum</h1>
+          <p className="mt-1.5 text-[14px] text-muted-foreground">
+            {course.title} · organise your material into sections and lessons.
+          </p>
         </div>
-        <Link
-          href={`/creator/courses/${course.id}/content`}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-primary underline"
-        >
-          Resources and thumbnail →
-        </Link>
+        <StatusBadge status={course.status} />
       </header>
 
       {course.status === "pending" ? (

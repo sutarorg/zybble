@@ -17,6 +17,14 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHash } from "node:crypto";
+// Shared with the browser pre-checks so the client and the server can never
+// advertise different limits. The server remains the authority.
+import {
+  ALLOWED_RESOURCE_TYPES,
+  ALLOWED_IMAGE_TYPES,
+  MAX_RESOURCE_BYTES,
+  MAX_IMAGE_BYTES,
+} from "@/lib/upload-limits";
 import { serverEnv } from "@/lib/env";
 
 export class R2NotConfiguredError extends Error {
@@ -86,24 +94,7 @@ export function buildObjectKey(params: {
 /* Uploads                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export const ALLOWED_RESOURCE_TYPES = [
-  "application/pdf",
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "text/plain",
-  "text/csv",
-  "text/markdown",
-];
-
-export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-export const MAX_RESOURCE_BYTES = 100 * 1024 * 1024;
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export { ALLOWED_RESOURCE_TYPES, ALLOWED_IMAGE_TYPES, MAX_RESOURCE_BYTES, MAX_IMAGE_BYTES };
 
 export type UploadKind = "thumbnail" | "resource" | "avatar";
 

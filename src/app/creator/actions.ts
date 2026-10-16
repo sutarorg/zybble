@@ -22,6 +22,12 @@ import { announceNewLesson } from "@/lib/server/course-updates";
 import { isReservedUsername } from "@/lib/creator";
 import { TEACHING_LANGUAGES } from "@/lib/config/catalog";
 import { rateLimit } from "@/lib/rate-limit";
+import {
+  computeCourseReadiness,
+  courseSchema,
+  lessonSchema,
+  sectionSchema,
+} from "@/lib/course-wizard";
 
 export interface CreatorActionResult {
   ok: boolean;
@@ -573,22 +579,6 @@ export async function refreshRouteStatus(): Promise<CreatorActionResult> {
 /* Courses                                                                     */
 /* -------------------------------------------------------------------------- */
 
-const courseSchema = z.object({
-  id: UUID.optional(),
-  title: z.string().trim().min(3, "Add a course title").max(140),
-  subtitle: z.string().trim().max(180).optional(),
-  description: z.string().trim().max(6000).optional(),
-  categorySlug: z.string().trim().min(2, "Choose a category").max(60),
-  level: z.enum(["beginner", "intermediate", "advanced"]),
-  language: z.string().trim().min(2).max(40),
-  /** Typed in rupees; converted to integer paise with exact decimal arithmetic. */
-  priceRupees: z.union([z.string(), z.number()]).default("0"),
-  compareAtRupees: z.union([z.string(), z.number()]).optional(),
-  whatYouLearn: z.array(z.string().max(400)).max(20).default([]),
-  requirements: z.array(z.string().max(400)).max(20).default([]),
-  audience: z.array(z.string().max(400)).max(20).default([]),
-});
-
 export async function saveCourse(input: unknown): Promise<CreatorActionResult> {
   try {
     const session = await requireCreator();
@@ -751,7 +741,9 @@ export async function submitCourseForReview(courseId: string): Promise<CreatorAc
 
     const { data: course } = await service
       .from("courses")
-      .select("creator_id, status, title, slug, lessons_count")
+      .select(
+        "creator_id, status, title, slug, description, thumbnail_key, price_paise, lessons_count, categories ( slug )"
+      )
       .eq("id", courseId)
       .maybeSingle();
     if (!course) return { ok: false, error: "Course not found" };
@@ -759,8 +751,37 @@ export async function submitCourseForReview(courseId: string): Promise<CreatorAc
     if (!["draft", "changes_requested", "rejected"].includes(course.status)) {
       return { ok: false, error: "This course is not in a state that can be submitted" };
     }
-    if (Number(course.lessons_count ?? 0) === 0) {
+
+    // The same readiness rules the review page shows in its checklist. The
+    // server re-checks them here so the checklist can never promise a submit
+    // the backend would refuse (or allow one the checklist calls incomplete).
+    const { data: lessonRows } = await service
+      .from("lessons")
+      .select("kind, bunny_playback_ready, bunny_video_id")
+      .eq("course_id", courseId);
+    // The untyped client types a to-one join as an array; normalise both shapes.
+    const categoryJoin = course.categories as { slug: string } | { slug: string }[] | null;
+    const categorySlug = Array.isArray(categoryJoin)
+      ? (categoryJoin[0]?.slug ?? null)
+      : (categoryJoin?.slug ?? null);
+    const readiness = computeCourseReadiness({
+      courseId,
+      title: String(course.title ?? ""),
+      description: String(course.description ?? ""),
+      categorySlug,
+      thumbnailKey: (course.thumbnail_key as string) ?? null,
+      pricePaise: Number(course.price_paise ?? 0),
+      lessons: ((lessonRows ?? []) as Array<Record<string, unknown>>).map((row) => ({
+        kind: String(row.kind ?? "video"),
+        playbackReady: Boolean(row.bunny_playback_ready),
+        hasVideo: Boolean(row.bunny_video_id),
+      })),
+    });
+    if (!readiness.checks.find((check) => check.id === "lessons")!.done) {
       return { ok: false, error: "Add at least one lesson before submitting" };
+    }
+    if (!readiness.ready) {
+      return { ok: false, error: `Finish these before submitting: ${readiness.missing.join(", ")}.` };
     }
 
     await service
@@ -798,25 +819,6 @@ export async function submitCourseForReview(courseId: string): Promise<CreatorAc
 /* -------------------------------------------------------------------------- */
 /* Curriculum                                                                  */
 /* -------------------------------------------------------------------------- */
-
-const sectionSchema = z.object({
-  courseId: UUID,
-  id: UUID.optional(),
-  title: z.string().trim().min(1, "Section title is required").max(120),
-  sortOrder: z.number().int().min(0).max(999),
-});
-
-const lessonSchema = z.object({
-  courseId: UUID,
-  id: UUID.optional(),
-  sectionId: UUID.optional().nullable(),
-  title: z.string().trim().min(1, "Lesson title is required").max(160),
-  description: z.string().trim().max(2000).optional(),
-  kind: z.enum(["video", "reading", "quiz"]).default("video"),
-  sortOrder: z.number().int().min(0).max(9999),
-  durationMinutes: z.number().int().min(0).max(600).default(0),
-  isPreview: z.boolean().default(false),
-});
 
 async function assertOwnsCourse(courseId: string, userId: string): Promise<void> {
   const service = createServiceClient();
@@ -985,6 +987,88 @@ export async function deleteLesson(lessonId: string, courseId: string): Promise<
   } catch (error) {
     return fail(error, "Could not delete the lesson");
   }
+}
+
+const reorderSchema = z.object({
+  courseId: z.string().uuid(),
+  ids: z.array(z.string().uuid()).min(1).max(200),
+});
+
+/**
+ * Persists a new section order. `ids` must be the course's complete set of
+ * sections in their new order; `sort_order` becomes the array index.
+ *
+ * The submitted list is checked against the rows that actually exist, so a
+ * stale reorder (someone deleted a section in another tab) can never scramble
+ * the curriculum — it is rejected and the editor refreshes instead.
+ */
+export async function reorderSections(input: unknown): Promise<CreatorActionResult> {
+  try {
+    const session = await requireCreator();
+    const parsed = reorderSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "Invalid section order" };
+    await assertOwnsCourse(parsed.data.courseId, session.id);
+    const service = createServiceClient()!;
+
+    const { data: rows } = await service
+      .from("course_sections")
+      .select("id")
+      .eq("course_id", parsed.data.courseId);
+    const existing = ((rows ?? []) as Array<{ id: string }>).map((row) => String(row.id));
+    if (!sameIdSet(existing, parsed.data.ids)) {
+      return { ok: false, error: "The curriculum changed while you were editing. Refresh and try again." };
+    }
+
+    for (const [index, id] of parsed.data.ids.entries()) {
+      await service.from("course_sections").update({ sort_order: index }).eq("id", id).eq("course_id", parsed.data.courseId);
+    }
+    revalidatePath(`/creator/courses/${parsed.data.courseId}/curriculum`);
+    return { ok: true };
+  } catch (error) {
+    return fail(error, "Could not reorder the sections");
+  }
+}
+
+const reorderLessonsSchema = reorderSchema.extend({
+  sectionId: z.string().uuid(),
+});
+
+/**
+ * Persists a new lesson order inside one section. Same completeness check as
+ * `reorderSections`: `ids` is the section's full lesson list in the new order.
+ */
+export async function reorderLessons(input: unknown): Promise<CreatorActionResult> {
+  try {
+    const session = await requireCreator();
+    const parsed = reorderLessonsSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: "Invalid lesson order" };
+    await assertOwnsCourse(parsed.data.courseId, session.id);
+    const service = createServiceClient()!;
+
+    const { data: rows } = await service
+      .from("lessons")
+      .select("id")
+      .eq("course_id", parsed.data.courseId)
+      .eq("section_id", parsed.data.sectionId);
+    const existing = ((rows ?? []) as Array<{ id: string }>).map((row) => String(row.id));
+    if (!sameIdSet(existing, parsed.data.ids)) {
+      return { ok: false, error: "The curriculum changed while you were editing. Refresh and try again." };
+    }
+
+    for (const [index, id] of parsed.data.ids.entries()) {
+      await service.from("lessons").update({ sort_order: index }).eq("id", id).eq("course_id", parsed.data.courseId);
+    }
+    revalidatePath(`/creator/courses/${parsed.data.courseId}/curriculum`);
+    return { ok: true };
+  } catch (error) {
+    return fail(error, "Could not reorder the lessons");
+  }
+}
+
+function sameIdSet(existing: string[], submitted: string[]): boolean {
+  if (existing.length !== submitted.length) return false;
+  const set = new Set(existing);
+  return submitted.every((id) => set.has(id)) && new Set(submitted).size === submitted.length;
 }
 
 async function refreshCourseAggregates(service: NonNullable<ReturnType<typeof createServiceClient>>, courseId: string) {
