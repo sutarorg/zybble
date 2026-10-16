@@ -56,7 +56,7 @@ export function CreatorProfileForm({ accountEmail, initial }: Props) {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+    <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
       <h2 className="font-display text-[15px] font-semibold tracking-tight">Edit your profile</h2>
       <p className="mt-1 text-[12.5px] text-muted-foreground">
         Signed in as <span className="font-medium text-foreground">{accountEmail}</span>. Your learner account and

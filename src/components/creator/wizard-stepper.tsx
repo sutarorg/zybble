@@ -43,7 +43,7 @@ export function WizardStepper({ steps }: { steps: StepperStep[] }) {
   return (
     <nav
       aria-label="Wizard progress"
-      className="rounded-xl border border-border bg-white p-4 shadow-card sm:p-5"
+      className="rounded-2xl border border-border bg-white p-4 shadow-card sm:p-5"
     >
       {/* Compact indicator for small screens. */}
       <div className="lg:hidden">

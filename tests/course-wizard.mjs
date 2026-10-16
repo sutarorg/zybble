@@ -49,7 +49,7 @@ test("steps stay locked until the course record exists", () => {
   assert.equal(steps.length, 4);
   assert.deepEqual(
     steps.map((step) => step.title),
-    ["Details & pricing", "Curriculum", "Thumbnail & resources", "Review & submit"]
+    ["Details & thumbnail", "Curriculum", "Pricing", "Review & submit"]
   );
 
   // Only step 1 is open, and it points at the create route.
@@ -81,7 +81,7 @@ test("completion follows saved state only — no step is done before its record 
   const afterFirstSave = wizard.buildCourseWizardSteps(draftState({ lessonsCount: 0, thumbnailKey: null }));
   assert.equal(afterFirstSave[0].done, true, "saved details complete step 1");
   assert.equal(afterFirstSave[1].done, false);
-  assert.equal(afterFirstSave[2].done, false);
+  assert.equal(afterFirstSave[2].done, true);
   assert.equal(afterFirstSave[3].done, false);
 
   // An unsaved title alone must not complete the step (e.g. details without
@@ -93,10 +93,10 @@ test("completion follows saved state only — no step is done before its record 
   const withLesson = wizard.buildCourseWizardSteps(draftState({ lessonsCount: 1, thumbnailKey: null }));
   assert.equal(withLesson[1].done, true);
 
-  // Resources completes only when the thumbnail is really stored.
+  // Pricing is informational: the step is complete for any saved course.
   const withThumb = wizard.buildCourseWizardSteps(draftState({ thumbnailKey: "k" }));
   assert.equal(withThumb[2].done, true);
-  assert.equal(wizard.buildCourseWizardSteps(draftState({ thumbnailKey: null }))[2].done, false);
+  assert.equal(wizard.buildCourseWizardSteps(draftState({ thumbnailKey: null }))[2].done, true);
 });
 
 test("the review step is done only while a review is open or concluded", () => {
@@ -163,7 +163,6 @@ test("an empty course is not ready and names every missing requirement", () => {
   const fixes = readiness.checks.filter((check) => !check.done).map((check) => check.fixStep);
   assert.ok(fixes.includes("details"));
   assert.ok(fixes.includes("curriculum"));
-  assert.ok(fixes.includes("resources"));
 });
 
 test("a complete course satisfies every check", () => {

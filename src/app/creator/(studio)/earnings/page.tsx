@@ -57,7 +57,7 @@ export default async function CreatorEarningsPage() {
   const transfers = finance.transfers;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [animation:fadeSlide_.35s_ease_both]">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Earnings</h1>
@@ -187,7 +187,7 @@ export default async function CreatorEarningsPage() {
         />
       </div>
 
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-display text-[15px] font-semibold tracking-tight">Your share by month</h2>
           <p className="text-[12px] text-muted-foreground">
@@ -236,7 +236,7 @@ export default async function CreatorEarningsPage() {
         )}
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
+      <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-5 py-4">
           <div>
             <h2 className="font-display text-[15px] font-semibold tracking-tight">Course revenue</h2>
@@ -290,7 +290,7 @@ export default async function CreatorEarningsPage() {
         )}
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
+      <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-5 py-4">
           <div>
             <h2 className="font-display text-[15px] font-semibold tracking-tight">Payout ledger</h2>
@@ -368,7 +368,7 @@ export default async function CreatorEarningsPage() {
       </section>
 
       {transfers.length > 0 ? (
-        <section className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
+        <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-card">
           <div className="border-b border-border px-5 py-4">
             <h2 className="font-display text-[15px] font-semibold tracking-tight">Legacy transfers</h2>
             <p className="mt-1 text-[12px] text-muted-foreground">

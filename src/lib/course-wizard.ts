@@ -27,8 +27,8 @@ export interface CourseWizardStepMeta {
 export const COURSE_WIZARD_STEP_META: readonly CourseWizardStepMeta[] = [
   {
     id: "details",
-    title: "Details & pricing",
-    description: "Title, category, level, language, outcomes and pricing.",
+    title: "Details & thumbnail",
+    description: "Title, category, level, language, outcomes and thumbnail.",
   },
   {
     id: "curriculum",
@@ -37,8 +37,8 @@ export const COURSE_WIZARD_STEP_META: readonly CourseWizardStepMeta[] = [
   },
   {
     id: "resources",
-    title: "Thumbnail & resources",
-    description: "Add the course thumbnail and any downloadable files.",
+    title: "Pricing",
+    description: "Set the course price in INR or keep it free.",
   },
   {
     id: "review",
@@ -112,7 +112,7 @@ export function buildCourseWizardSteps(state: CourseWizardState): CourseWizardSt
         done = state.lessonsCount > 0;
         break;
       case "resources":
-        done = Boolean(state.thumbnailKey);
+        done = true;
         break;
       case "review":
         // The step's job is to submit. It is done while a review is open or
@@ -125,7 +125,7 @@ export function buildCourseWizardSteps(state: CourseWizardState): CourseWizardSt
     return {
       ...meta,
       href,
-      done,
+      done: locked ? false : done,
       locked,
       lockedReason: locked ? "Save the course details first to unlock this step." : undefined,
     };
@@ -224,7 +224,7 @@ export function computeCourseReadiness(input: CourseReadinessInput): CourseReadi
       label: "Thumbnail uploaded",
       detail: "Courses without a thumbnail look unfinished in the catalog.",
       done: Boolean(input.thumbnailKey),
-      fixStep: "resources",
+      fixStep: "details",
     },
     {
       id: "pricing",
@@ -234,7 +234,7 @@ export function computeCourseReadiness(input: CourseReadinessInput): CourseReadi
           ? `Priced at integer paise (${input.pricePaise}). Learners pay in INR through Razorpay Checkout.`
           : "This course is free — learners enrol without payment.",
       done: true,
-      fixStep: "details",
+      fixStep: "resources",
     },
   ];
 

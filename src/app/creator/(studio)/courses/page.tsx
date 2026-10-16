@@ -30,7 +30,7 @@ export default async function CreatorCoursesPage({
   const courses = active === "all" ? all : all.filter((course) => course.status === active);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [animation:fadeSlide_.35s_ease_both]">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">My courses</h1>
@@ -87,7 +87,7 @@ export default async function CreatorCoursesPage({
       ) : (
         <ul className="space-y-3">
           {courses.map((course) => (
-            <li key={course.id} className="rounded-xl border border-border bg-white p-4 shadow-card">
+            <li key={course.id} className="rounded-2xl border border-border bg-white p-4 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">

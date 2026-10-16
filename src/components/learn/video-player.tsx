@@ -11,7 +11,7 @@ import { WATCH_HEARTBEAT_SECONDS, flushCourseEvents, trackCourseEvent } from "@/
  *
  * Playback is authorised per request: the browser asks
  * `/api/learn/[lessonId]/playback`, which checks the learner's entitlement (or
- * the lesson's preview flag) and returns a short-lived Bunny Stream token URL.
+ * the lesson's preview flag) and returns a short-lived signed playback URL.
  * A lesson id guessed in the URL therefore yields nothing.
  */
 export function VideoPlayer({
@@ -29,7 +29,7 @@ export function VideoPlayer({
   title: string;
   /** Server-decided: entitled learners see video, others only previews. */
   hasVideo: boolean;
-  /** True only when Bunny Stream has finished encoding. */
+  /** True only when video processing has finished. */
   videoReady: boolean;
   onEnded?: () => void;
   onProgress?: (seconds: number) => void;
@@ -49,7 +49,7 @@ export function VideoPlayer({
       return;
     }
     if (!videoReady) {
-      setState({ kind: "error", message: "This video is still being processed by Bunny Stream.", retryable: false });
+      setState({ kind: "error", message: "This video is still being processed.", retryable: false });
       return;
     }
     setState({ kind: "loading" });

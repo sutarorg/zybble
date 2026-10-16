@@ -85,7 +85,7 @@ export default async function AdminCoursePage({ params }: { params: Promise<{ id
             {pendingVideos.length > 0 ? (
               <li>
                 {pendingVideos.length} video{pendingVideos.length === 1 ? " is" : "s are"} still encoding in
-                Bunny Stream.
+                our video host.
               </li>
             ) : null}
           </ul>

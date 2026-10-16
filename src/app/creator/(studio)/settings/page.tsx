@@ -33,7 +33,7 @@ export default async function CreatorSettingsPage() {
 
       <CreatorSettingsForm preferences={preferences} />
 
-      <section className="rounded-xl border border-border bg-white p-2 shadow-card">
+      <section className="rounded-2xl border border-border bg-white p-2 shadow-card">
         <Link
           href="/settings"
           className="flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-muted"
@@ -72,7 +72,7 @@ export default async function CreatorSettingsPage() {
         </Link>
       </section>
 
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <Settings2 className="size-4.5 text-primary" aria-hidden /> Not configurable here
         </h2>

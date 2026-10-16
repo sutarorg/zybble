@@ -25,10 +25,10 @@ export interface CourseResource {
 }
 
 /**
- * Course thumbnail and downloadable resources — wizard step 3.
+ * Downloadable resources manager (used from the curriculum).
  *
  * Uploads are pre-signed PUTs issued by `/api/storage` after the server verifies
- * ownership; the R2 bucket is private, so a download link is minted per request
+ * ownership; files are stored privately, so a download link is minted per request
  * and only for an owner or an entitled learner. The size and type limits here
  * mirror the server's exactly (`@/lib/upload-limits`) — success is reported only
  * after the storage service has actually accepted the bytes.
@@ -140,52 +140,7 @@ export function ResourceManager({
         </p>
       ) : null}
 
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
-        <h2 className="font-display text-[15px] font-semibold tracking-tight">Course thumbnail</h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          Required before submission. JPEG, PNG or WebP up to {MAX_IMAGE_MB} MB.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          {thumbnailKey ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imagePath("thumbnails", thumbnailKey)}
-              alt="Current course thumbnail"
-              className="h-24 w-40 rounded-lg border border-border object-cover"
-            />
-          ) : (
-            <div className="flex h-24 w-40 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-zinc-300 text-zinc-400">
-              <ImageIcon className="size-6" aria-hidden />
-              <span className="text-[11px]">No thumbnail yet</span>
-            </div>
-          )}
-          {editable ? (
-            <>
-              <input
-                ref={thumbnailInput}
-                type="file"
-                accept={ALLOWED_IMAGE_TYPES.join(",")}
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = "";
-                  if (file) void upload(file, "thumbnail");
-                }}
-              />
-              <Button type="button" variant="outline" disabled={busy} onClick={() => thumbnailInput.current?.click()}>
-                <Upload className="size-4" aria-hidden />
-                {thumbnailKey ? "Replace thumbnail" : "Upload thumbnail"}
-              </Button>
-            </>
-          ) : null}
-        </div>
-        <p className="mt-3 text-[12px] text-zinc-400">
-          Stored in a private bucket and served through an authenticated image route — the file is never
-          publicly addressable.
-        </p>
-      </section>
-
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+<section className="rounded-2xl border border-border bg-white p-5 shadow-card">
         <h2 className="font-display text-[15px] font-semibold tracking-tight">Downloadable resources</h2>
         <p className="mt-1 text-[12.5px] text-muted-foreground">
           Optional. Learners who own this course get a short-lived signed link ({MAX_RESOURCE_MB} MB per file).

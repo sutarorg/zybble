@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { AddLessonDialog } from "./add-lesson-dialog";
 
 export interface CurriculumSection {
   id: string;
@@ -67,8 +68,8 @@ const KIND_META: Record<string, { label: string; icon: React.ComponentType<{ cla
 const LESSON_KINDS = ["video", "reading", "quiz"] as const;
 
 const VIDEO_STATE_META: Record<string, { label: string; tone: "busy" | "ready" | "error" }> = {
-  uploading: { label: "Uploading to Bunny Stream…", tone: "busy" },
-  processing: { label: "Encoding — playback unlocks when Bunny finishes", tone: "busy" },
+  uploading: { label: "Uploading video…", tone: "busy" },
+  processing: { label: "Processing — playback unlocks when processing finishes", tone: "busy" },
   ready: { label: "Ready to play", tone: "ready" },
   error: { label: "Processing failed — upload the video again", tone: "error" },
   deleted: { label: "Video removed — upload a new one", tone: "error" },
@@ -79,10 +80,10 @@ const VIDEO_STATE_META: Record<string, { label: string; tone: "busy" | "ready" |
  *
  * Structure is persisted by server actions that re-check ownership; ordering is
  * persisted through `reorderSections` / `reorderLessons`, so the Move up/down
- * controls change the real saved order. Video bytes go straight to Bunny Stream
+ * controls change the real saved order. Video bytes go straight to the video host
  * over a short-lived, video-scoped TUS grant minted by `/api/media/video/grant`
- * — the Bunny API key never reaches the browser, and a lesson is only marked
- * playable once Bunny itself reports encoding finished.
+ * — the hosting key never reaches the browser, and a lesson is only marked
+ * playable once processing is reported finished.
  */
 export function CurriculumEditor({
   courseId,
@@ -101,6 +102,12 @@ export function CurriculumEditor({
   const [newSection, setNewSection] = React.useState("");
 
   const sortedSections = [...sections].sort((a, b) => a.sortOrder - b.sortOrder);
+  const defaultSectionStarted = React.useRef(false);
+  React.useEffect(() => {
+    if (!editable || sortedSections.length > 0 || defaultSectionStarted.current) return;
+    defaultSectionStarted.current = true;
+    void saveSection({ courseId, title: "Getting Started!", sortOrder: 0 }).then(() => router.refresh());
+  }, [editable, sortedSections.length, courseId, router]);
 
   async function run<T>(action: () => Promise<T>): Promise<T | null> {
     setBusy(true);
@@ -155,11 +162,7 @@ export function CurriculumEditor({
       {sortedSections.length === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-300 bg-muted/40 px-6 py-10 text-center">
           <ClipboardList className="mx-auto size-6 text-zinc-400" aria-hidden />
-          <p className="mt-2 text-[14px] font-medium">No sections yet</p>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Structure the course into sections — even one “Getting started” section is a good start — then add
-            lessons inside it.
-          </p>
+          <p className="mt-2 text-[14px] font-medium">Setting up your first section…</p>
         </div>
       ) : null}
 
@@ -193,7 +196,7 @@ export function CurriculumEditor({
       })}
 
       {editable ? (
-        <div className="rounded-xl border border-border bg-white p-4 shadow-card">
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
           <Label htmlFor="new-section" className="mb-1.5 block text-[13px]">
             Add a section
           </Label>
@@ -269,7 +272,7 @@ function SectionCard({
   const totalMinutes = lessons.reduce((sum, lesson) => sum + lesson.durationMinutes, 0);
 
   return (
-    <section className="rounded-xl border border-border bg-white shadow-card">
+    <section className="rounded-2xl border border-border bg-white shadow-card">
       <header className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
         <span
           className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[11px] font-semibold text-zinc-600"
@@ -404,75 +407,9 @@ function SectionCard({
       )}
 
       {editable ? (
-        <AddLessonForm
-          courseId={courseId}
-          sectionId={section.id}
-          sortOrder={lessons.length}
-          busy={busy}
-          onError={onError}
-          run={run}
-        />
+        <AddLessonDialog courseId={courseId} sectionId={section.id} sortOrder={lessons.length} disabled={busy} />
       ) : null}
     </section>
-  );
-}
-
-function AddLessonForm({
-  courseId,
-  sectionId,
-  sortOrder,
-  busy,
-  onError,
-  run,
-}: {
-  courseId: string;
-  sectionId: string;
-  sortOrder: number;
-  busy: boolean;
-  onError: (message: string | null) => void;
-  run: <T>(action: () => Promise<T>) => Promise<T | null>;
-}) {
-  const [title, setTitle] = React.useState("");
-  const [kind, setKind] = React.useState<(typeof LESSON_KINDS)[number]>("video");
-
-  return (
-    <form
-      className="border-t border-border px-4 py-3"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void run(async () => {
-          const result = await saveLesson({ courseId, sectionId, title, kind, sortOrder, durationMinutes: 0, isPreview: false });
-          if (!result.ok) onError(result.error ?? "Could not add the lesson");
-          else setTitle("");
-        });
-      }}
-    >
-      <div className="flex flex-wrap gap-2">
-        <Input
-          aria-label="New lesson title"
-          className="min-w-40 flex-1"
-          value={title}
-          maxLength={160}
-          placeholder="Add a lesson…"
-          onChange={(event) => setTitle(event.target.value)}
-        />
-        <select
-          aria-label="New lesson type"
-          className="h-9.5 rounded-lg border border-input bg-white px-3 text-sm"
-          value={kind}
-          onChange={(event) => setKind(event.target.value as (typeof LESSON_KINDS)[number])}
-        >
-          {LESSON_KINDS.map((value) => (
-            <option key={value} value={value}>
-              {KIND_META[value].label}
-            </option>
-          ))}
-        </select>
-        <Button type="submit" size="sm" disabled={busy || !title.trim()}>
-          Add lesson
-        </Button>
-      </div>
-    </form>
   );
 }
 
@@ -528,9 +465,9 @@ function LessonRow({
         return;
       }
       const grant = (await grantResponse.json()) as UploadGrant;
-      setUploadState("Uploading to Bunny Stream…");
+      setUploadState("Uploading video…");
       await tusUpload(grant, file);
-      setUploadState("Upload complete — waiting for Bunny to finish encoding…");
+      setUploadState("Upload complete — processing will finish shortly…");
       // Bunny encodes asynchronously; the webhook flips the lesson to playable.
       const status = await fetch("/api/media/video/status", {
         method: "POST",
@@ -542,7 +479,7 @@ function LessonRow({
         setUploadState(
           payload.ready
             ? "Ready to play."
-            : `Bunny reports “${payload.status}”. Playback unlocks when encoding finishes.`
+            : `Status: “${payload.status}”. Playback unlocks when processing finishes.`
         );
       }
       router.refresh();
