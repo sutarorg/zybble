@@ -14,12 +14,12 @@ export function ZybbleMark({ className }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- static brand asset, see above
     <img
-      src="/zybble-mark.png"
+      src="/zybble-mark.png?v=2"
       alt=""
       width={32}
       height={32}
       decoding="async"
-      className={cn("size-8 shrink-0 rounded-[10px] object-contain", className)}
+      className={cn("size-8 shrink-0 object-contain", className)}
       aria-hidden
     />
   );

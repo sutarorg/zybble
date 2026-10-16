@@ -9,8 +9,8 @@
   "background_color": "#ffffff",
   "theme_color": "#7c3aed",
   "icons": [
-    { "src": "/zybble-favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/zybble-favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/zybble-favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/zybble-favicon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/zybble-favicon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/zybble-favicon-maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
