@@ -211,8 +211,8 @@ export function CourseBrowser({
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {shown.map((course) => (
-                <CourseCard key={course.id} course={course} />
+              {shown.map((course, index) => (
+                <CourseCard key={course.id} course={course} priority={index < 4} />
               ))}
             </div>
             {remaining > 0 && (

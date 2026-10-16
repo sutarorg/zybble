@@ -3,8 +3,8 @@
 An India-only marketplace for practical AI courses, built on Next.js App Router
 with a real backend: Supabase Postgres + Auth, Razorpay Payments and Route for
 INR settlement, Bunny Stream for video, private Cloudflare R2 for files, Resend
-for transactional email, and OpenRouter for the public course-discovery
-assistant.
+for transactional email, and DeepSeek (via OpenRouter) for the public
+course-discovery assistant.
 
 **Read [`LAUNCH_BLOCKERS.md`](./LAUNCH_BLOCKERS.md) before trusting any of this.**
 No provider integration in this repository has been executed against a live
@@ -28,7 +28,7 @@ and a fake certificate renderer. Everything below replaced that.
 | Video | A simulated player with a thumbnail | Bunny Stream token URLs, authorised per request |
 | Files | A generated `.txt` in the browser | Private R2, pre-signed URLs after an entitlement check |
 | Email | None | Outbox-backed Resend dispatch |
-| Chatbot | Rule-based, answered locally | OpenRouter, grounded on published courses, slugs re-resolved server-side |
+| Chatbot | Rule-based, answered locally | DeepSeek via OpenRouter, streamed, grounded on published courses, slugs re-resolved server-side |
 | Certificates | Rendered in the browser | Server-issued records with verification codes |
 | Earnings | Mock arrays | Snapshotted commission/creator shares and a paise ledger |
 | Search | Client-side over a mock array | `/api/catalog/search` against the published catalog |
@@ -58,7 +58,7 @@ Server (Node runtime)
         ├─ Bunny Stream                      ── src/lib/server/bunny.ts
         ├─ Cloudflare R2 (private)           ── src/lib/server/r2.ts
         ├─ Resend                            ── src/lib/server/email.ts
-        └─ OpenRouter                        ── src/lib/server/ai.ts
+        └─ OpenRouter (DeepSeek)             ── src/lib/server/ai.ts
 ```
 
 ### The four invariants
@@ -143,14 +143,36 @@ Requests go to `POST /api/chat`, which:
 
 1. rate-limits per client,
 2. reads **only published courses** from the `published_courses` view,
-3. sends that as the *entire* catalog context to OpenRouter,
+3. sends that as the *entire* catalog context to DeepSeek and streams the
+   reply back token by token,
 4. re-resolves every slug the model returns against that same list — **an
    invented slug is dropped, never rendered**,
 5. clamps any link to a small same-origin allowlist,
 6. falls back to an honest "temporarily unavailable" message rather than
    guessing when OpenRouter is unconfigured or fails.
 
+Set `OPENROUTER_API_KEY` and Zybble AI is live; `OPENROUTER_MODEL` defaults to
+`deepseek/deepseek-chat`.
+
 It cannot see accounts, orders or progress.
+
+---
+
+## Performance
+
+Navigation speed is a product feature here, so the hot path is deliberately
+kept small. What the app does:
+
+| Where | What | Why |
+| --- | --- | --- |
+| `next.config.ts` | `experimental.staleTimes.dynamic: 30` | The default is `0`, which refetches a page on every visit. Thirty seconds makes back/forward and repeat visits instant. |
+| `next.config.ts` | `experimental.dynamicOnHover` | Hovering a link starts the server render, so the click has nothing to wait for. |
+| `loading.tsx` per shell | Streaming skeletons | A click paints immediately and the page streams into place. |
+| `AppShell` | Suspense around the sidebar count and the notification bell | Page content no longer waits on per-user reads for chrome. |
+| `AppShell` | `next/dynamic` for the assistant | The chatbot's dialog and icons stay out of the first-load bundle. |
+| `instrumentation-client.ts` | Sentry behind a DSN check | ~390 KB of error-reporting JavaScript is not fetched when no DSN is set. |
+| `app/layout.tsx` | Fonts loaded non-blocking | The Google Fonts stylesheet is fetched without blocking first paint; text renders in the system stack and settles onto Inter. |
+| catalog grids | `priority` on the first card thumbnails | The LCP image is fetched with the document rather than after layout. |
 
 ---
 

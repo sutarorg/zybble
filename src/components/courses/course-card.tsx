@@ -27,11 +27,14 @@ const STATUS_BADGE: Record<string, { label: string; variant: "amber" | "violet" 
 export function CourseCard({
   course: authoredCourse,
   wishlisted = false,
+  priority = false,
   className,
 }: {
   course: Course;
   /** Server-read wishlist membership so the icon matches the database. */
   wishlisted?: boolean;
+  /** Set on the first cards in view: they are the LCP element on a catalog page. */
+  priority?: boolean;
   className?: string;
 }) {
   const translateUi = useTranslate();
@@ -68,6 +71,7 @@ export function CourseCard({
             src={course.thumbnail}
             alt={translateUi(course.title)}
             fill
+            priority={priority}
             sizes="(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 320px"
             className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
           />

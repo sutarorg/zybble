@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { createServerClient } from "@/lib/supabase/server";
-import { isOpenRouterConfigured } from "@/lib/env";
+import { isOpenRouterConfigured, isSupabaseConfigured } from "@/lib/env";
 import {
   AiUnavailableError,
   MAX_USER_MESSAGE_CHARS,
   askZybbleAi,
   fallbackAnswer,
   resolveRecommendations,
+  streamZybbleAi,
   toRecommendation,
   type ChatMessageInput,
   type GroundedCourse,
@@ -28,6 +29,8 @@ const requestSchema = z.object({
     .min(1)
     .max(12),
   category: z.string().max(64).optional(),
+  /** Stream tokens as they arrive. Ignored when the key is missing. */
+  stream: z.boolean().optional(),
 });
 
 /**
@@ -37,6 +40,10 @@ const requestSchema = z.object({
  * receives published course rows, and every slug it returns is resolved against
  * the same database read before it is sent to the browser. A hallucinated slug
  * is dropped, never rendered.
+ *
+ * With `stream: true` the reply is sent as Server-Sent Events — the visitor
+ * sees words as DeepSeek writes them, and the validated course cards arrive
+ * with the final `done` event.
  */
 export async function POST(request: Request) {
   const limit = rateLimit(clientKey(request, "chat"), LIMITS.chat.limit, LIMITS.chat.windowMs);
@@ -68,11 +75,56 @@ export async function POST(request: Request) {
   const catalog = await loadGroundedCatalog(parsed.data.category);
 
   if (!isOpenRouterConfigured()) {
-    return Response.json(
-      { ...fallbackAnswer("unavailable", catalog.length), recommendations: [] },
-      { status: 200, headers: rateLimitHeaders(limit) }
-    );
+    const answer = fallbackAnswer("unavailable", catalog.length);
+    if (parsed.data.stream) return sseResponse([{ type: "error", ...answer, recommendations: [] }], limit);
+    return Response.json({ ...answer, recommendations: [] }, { status: 200, headers: rateLimitHeaders(limit) });
   }
+
+  /* ------------------------------- streaming ------------------------------ */
+
+  if (parsed.data.stream) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (event: Record<string, unknown>) =>
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+
+        try {
+          for await (const event of streamZybbleAi({ messages, catalog })) {
+            if (event.type === "delta") {
+              send({ type: "delta", text: event.text });
+            } else {
+              const recommendations = resolveRecommendations(event.answer.recommendedSlugs, catalog);
+              send({
+                type: "done",
+                recommendations: recommendations.map(toRecommendation),
+                link: event.answer.link,
+              });
+            }
+          }
+        } catch (error) {
+          const reason = error instanceof AiUnavailableError ? error.reason : "unavailable";
+          send({ type: "error", ...fallbackAnswer(reason, catalog.length), recommendations: [] });
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-store, no-transform",
+        connection: "keep-alive",
+        // Stops nginx-style proxies from buffering the stream into one chunk.
+        "x-accel-buffering": "no",
+        ...rateLimitHeaders(limit),
+      },
+    });
+  }
+
+  /* ------------------------------- one-shot ------------------------------- */
 
   try {
     const answer = await askZybbleAi({ messages, catalog });
@@ -90,12 +142,33 @@ export async function POST(request: Request) {
   }
 }
 
+function sseResponse(
+  events: Array<Record<string, unknown>>,
+  limit: ReturnType<typeof rateLimit>
+): Response {
+  const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-store, no-transform",
+      "x-accel-buffering": "no",
+      ...rateLimitHeaders(limit),
+    },
+  });
+}
+
 /**
  * Reads only published courses. `published_courses` is a view restricted to
  * `status = 'published'`, so drafts, rejected courses and creator KYC can never
  * reach the model.
  */
 async function loadGroundedCatalog(categorySlug?: string): Promise<GroundedCourse[]> {
+  // Without Supabase there is no catalog to ground on. The client throws if it
+  // is constructed unconfigured, so bail out first — the assistant then answers
+  // from the model alone and says there is nothing published yet.
+  if (!isSupabaseConfigured()) return [];
+
   const supabase = await createServerClient();
   let query = supabase
     .from("published_courses")

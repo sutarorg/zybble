@@ -72,9 +72,11 @@ export function CourseCarousel({
                 <CourseCardSkeleton className="h-full" />
               </li>
             ))
-          : courses.map((course) => (
+          : courses.map((course, index) => (
               <li key={course.id} className="w-[248px] shrink-0 snap-start sm:w-[300px]">
-                <CourseCard course={course} className="h-full" />
+                {/* The first three cards are above the fold: fetch their
+                    thumbnails with the document rather than after layout. */}
+                <CourseCard course={course} priority={index < 3} className="h-full" />
               </li>
             ))}
       </ul>

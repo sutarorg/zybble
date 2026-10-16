@@ -249,15 +249,34 @@ addresses and receipt contents. Failures retry up to five times, then stay
 
 ## 8. OpenRouter (Zybble AI)
 
+Zybble AI runs on **DeepSeek**, reached with one OpenRouter key.
+
 | Env | Value |
 | --- | --- |
-| `OPENROUTER_API_KEY` | **secret** |
-| `OPENROUTER_MODEL` | e.g. `openai/gpt-4o-mini` |
+| `OPENROUTER_API_KEY` | **secret** — from <https://openrouter.ai/keys> |
+| `OPENROUTER_MODEL` | `deepseek/deepseek-chat` (the default; any OpenRouter slug works) |
 | `OPENROUTER_SITE_URL` | your origin, sent as `HTTP-Referer` |
 | `OPENROUTER_APP_NAME` | `Zybble` |
 
+Replies stream to the browser as tokens arrive, so the visitor reads along
+instead of watching a spinner. Suggestions come from a `SLUGS:` trailer the
+model appends, and every slug is re-resolved against `published_courses`
+before a card is rendered — a hallucinated course is dropped, never shown.
+
 Without a key the chatbot replies honestly and links to the Help Center. It
 never invents an answer.
+
+Verify after deploying:
+
+```bash
+curl -sN https://<host>/api/chat \
+  -H 'content-type: application/json' \
+  -d '{"sessionId":"deploy-check-0001","stream":true,
+       "messages":[{"role":"user","content":"Any free AI courses?"}]}'
+```
+
+You should see a sequence of `data: {"type":"delta",…}` frames followed by a
+single `data: {"type":"done",…}`.
 
 ---
 

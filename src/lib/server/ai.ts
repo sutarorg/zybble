@@ -114,19 +114,30 @@ export interface ChatMessageInput {
   content: string;
 }
 
+/**
+ * The wire format is plain text with an optional trailer, not JSON.
+ *
+ * Reasons: it streams cleanly (the visitor sees words, not `{"text":"…`),
+ * and DeepSeek reliably honours it. The trailer is the only part that is
+ * machine-read, and it is validated before anything is rendered.
+ */
 const SYSTEM_PROMPT = `You are Zybble AI, the course-discovery assistant for Zybble, an AI-course marketplace in India.
 
 Rules you must follow:
 - Answer only from the CATALOG below. Every course you mention MUST appear there.
 - Recommend at most 3 courses. Copy their "slug" values exactly.
-- All prices are Indian Rupees (INR, ₹). Never mention dollars, euros or any other currency.
+- All prices are Indian Rupees (INR, INR symbol ₹). Never mention dollars, euros or any other currency.
 - If the catalog has no good match, say so and offer to broaden the search.
 - You cannot see learner accounts, take payments, issue refunds or contact support.
 - For enrollment, billing, refunds, certificates or account questions, point to the Help Center.
 - Reply in the same language the visitor used, keeping it under 90 words.
-- Return ONLY a JSON object with this exact shape:
-  {"text": "...", "recommended_slugs": ["..."], "link": {"href": "/help", "label": "Help Center"}}
-  "link" is optional and may only be /help, /login, /signup, /my-learning or /dashboard.`;
+- Write plain prose. No markdown, no headings, no code fences.
+
+Output format — exactly two parts, nothing else:
+1. Your reply to the visitor.
+2. An optional final line, only if you are naming courses:
+   SLUGS: slug-one, slug-two
+Use only slugs copied from the CATALOG. Omit the line entirely if you recommend nothing.`;
 
 export interface OpenRouterOptions {
   messages: ChatMessageInput[];
@@ -134,6 +145,189 @@ export interface OpenRouterOptions {
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
 }
+
+/** Builds the request payload shared by the streaming and one-shot paths. */
+function buildRequestBody(options: OpenRouterOptions, stream: boolean): string {
+  const history = options.messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 1000) }));
+
+  const messages = [
+    {
+      role: "system",
+      content: `${SYSTEM_PROMPT}\n\nCATALOG:\n${renderCatalogForPrompt(options.catalog) || "(the catalog is currently empty)"}`,
+    },
+    ...history,
+  ];
+
+  return JSON.stringify({
+    model: serverEnv.openrouterModel,
+    messages,
+    stream,
+    temperature: 0.4,
+    max_tokens: 500,
+  });
+}
+
+function openRouterHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${serverEnv.openrouterApiKey}`,
+    ...(serverEnv.openrouterSiteUrl ? { "HTTP-Referer": serverEnv.openrouterSiteUrl } : {}),
+    "X-Title": serverEnv.openrouterAppName,
+  };
+}
+
+/** Maps an OpenRouter HTTP status onto the honest failure it represents. */
+function statusToReason(status: number): AssistantAnswer["error"] {
+  if (status === 429 || status === 402) return "rate_limited";
+  return "unavailable";
+}
+
+/* -------------------------------------------------------------------------- */
+/* Streaming                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type AssistantStreamEvent =
+  | { type: "delta"; text: string }
+  | { type: "done"; answer: AssistantAnswer };
+
+/**
+ * Incremental SSE reader.
+ *
+ * Yields `data:` payloads one at a time so the caller can react to each token
+ * instead of waiting for the whole body. Handles chunks that split a line.
+ */
+async function* readSse(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let index: number;
+      while ((index = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, index).trim();
+        buffer = buffer.slice(index + 1);
+        if (line.startsWith("data:")) yield line.slice(5).trim();
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/** Pulls `choices[0].delta.content` out of an SSE payload. Returns null on `[DONE]`. */
+export function readDeltaContent(payload: string): string | null {
+  if (!payload || payload === "[DONE]") return null;
+  try {
+    const parsed = JSON.parse(payload) as {
+      choices?: Array<{ delta?: { content?: string | null; reasoning?: string | null } }>;
+    };
+    // DeepSeek's reasoning trace is never shown to the visitor.
+    const content = parsed.choices?.[0]?.delta?.content;
+    return typeof content === "string" ? content : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Streams the assistant reply.
+ *
+ * Text is emitted as it arrives. The trailer (`SLUGS:`) is held back until the
+ * stream ends, parsed, validated against the catalog, and returned with the
+ * final event — so a slug is only ever surfaced once it is known to be real.
+ */
+export async function* streamZybbleAi(
+  options: OpenRouterOptions
+): AsyncGenerator<AssistantStreamEvent> {
+  if (!isOpenRouterConfigured()) throw new AiUnavailableError("unavailable");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const doFetch = options.fetchImpl ?? fetch;
+
+  try {
+    const response = await doFetch(OPENROUTER_ENDPOINT, {
+      method: "POST",
+      headers: openRouterHeaders(),
+      body: buildRequestBody(options, true),
+      signal: options.signal ?? controller.signal,
+    });
+
+    if (!response.ok || !response.body) {
+      throw new AiUnavailableError(statusToReason(response.status));
+    }
+
+    let full = "";
+    let emitted = 0;
+
+    for await (const payload of readSse(response.body)) {
+      const delta = readDeltaContent(payload);
+      if (delta === null) break; // [DONE]
+      if (!delta) continue;
+      full += delta;
+
+      // Hold back the trailer and anything that could still turn into one, so
+      // the visitor never sees `SLUGS: prompt-engineering-101`.
+      const visible = visiblePrefix(full);
+      if (visible.length > emitted) {
+        const text = visible.slice(emitted);
+        emitted = visible.length;
+        if (text) yield { type: "delta", text };
+      }
+    }
+
+    const answer = parseAssistantContent(full);
+    // Anything the trailer filter withheld is by definition not prose.
+    const tail = answer.text.slice(emitted);
+    if (tail) yield { type: "delta", text: tail };
+    yield { type: "done", answer };
+  } catch (error) {
+    if (error instanceof AiUnavailableError) throw error;
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new AiUnavailableError("unavailable");
+    }
+    throw new AiUnavailableError("unavailable");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * How much of a partial reply is safe to show.
+ *
+ * A trailing `SLUGS:` line is machine output, not prose, so the moment a line
+ * looks like it is starting one we stop — and resume if it turns out to be
+ * ordinary text after all.
+ */
+export function visiblePrefix(text: string): string {
+  const newline = text.lastIndexOf("\n");
+  if (newline === -1) {
+    // Single line so far: only withhold it if it is already a trailer.
+    return /^\s*(SLUGS|LINK)\s*:/i.test(text) ? "" : text;
+  }
+  const lastLine = text.slice(newline + 1);
+  if (/^\s*(SLUGS|LINK)\s*:/i.test(lastLine)) {
+    // Drop the blank space ahead of the trailer along with the trailer itself.
+    return text.slice(0, newline + 1).replace(/\s+$/, "");
+  }
+  // A partially-streamed `SLUG` prefix could still become `SLUGS:`.
+  if (/^\s*$/.test(lastLine) || /^\s*(S|SL|SLU|SLUG|SLUGS|L|LI|LIN|LINK)\s*:?\s*$/i.test(lastLine)) {
+    return text.slice(0, newline + 1).replace(/\s+$/, "");
+  }
+  return text;
+}
+
+/* -------------------------------------------------------------------------- */
+/* One-shot                                                                    */
+/* -------------------------------------------------------------------------- */
 
 /** Calls OpenRouter and parses the structured answer. Exported for testing. */
 export async function askZybbleAi(options: OpenRouterOptions): Promise<AssistantAnswer> {
@@ -143,32 +337,11 @@ export async function askZybbleAi(options: OpenRouterOptions): Promise<Assistant
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const doFetch = options.fetchImpl ?? fetch;
 
-  const history = options.messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .slice(-MAX_HISTORY_MESSAGES)
-    .map((m) => ({ role: m.role, content: m.content.slice(0, 1000) }));
-
-  const messages = [
-    { role: "system", content: `${SYSTEM_PROMPT}\n\nCATALOG:\n${renderCatalogForPrompt(options.catalog) || "(the catalog is currently empty)"}` },
-    ...history,
-  ];
-
   try {
     const response = await doFetch(OPENROUTER_ENDPOINT, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${serverEnv.openrouterApiKey}`,
-        ...(serverEnv.openrouterSiteUrl ? { "HTTP-Referer": serverEnv.openrouterSiteUrl } : {}),
-        "X-Title": serverEnv.openrouterAppName,
-      },
-      body: JSON.stringify({
-        model: serverEnv.openrouterModel,
-        messages,
-        temperature: 0.3,
-        max_tokens: 400,
-        response_format: { type: "json_object" },
-      }),
+      headers: openRouterHeaders(),
+      body: buildRequestBody(options, false),
       signal: options.signal ?? controller.signal,
     });
 
@@ -181,7 +354,7 @@ export async function askZybbleAi(options: OpenRouterOptions): Promise<Assistant
     const content = json.choices?.[0]?.message?.content;
     if (typeof content !== "string") throw new AiUnavailableError("invalid_response");
 
-    return parseAssistantAnswer(content);
+    return parseAssistantContent(content);
   } catch (error) {
     if (error instanceof AiUnavailableError) throw error;
     throw new AiUnavailableError("unavailable");
@@ -214,6 +387,70 @@ export function parseAssistantAnswer(content: string): AssistantAnswer {
       : [],
     link: sanitiseLink(raw.link),
   };
+}
+
+/** Matches the machine-read trailer lines a model may append to its reply. */
+const TRAILER_LINE = /^\s*(SLUGS|LINK)\s*:\s*(.*)$/i;
+
+/**
+ * Parses the plain-text wire format.
+ *
+ * Everything before the trailer is the reply; `SLUGS:` and `LINK:` are stripped
+ * so they can never leak into the conversation as visible text.
+ */
+export function parsePlainAnswer(content: string): AssistantAnswer {
+  const lines = content.replace(/\r/g, "").split("\n");
+
+  let slugs: string[] = [];
+  let link: { href: string; label: string } | undefined;
+
+  // Walk backwards, consuming trailer lines until the first line of prose.
+  let end = lines.length;
+  while (end > 0) {
+    const match = TRAILER_LINE.exec(lines[end - 1] ?? "");
+    if (!match) break;
+    const key = match[1].toUpperCase();
+    const value = match[2].trim();
+    if (key === "SLUGS") {
+      slugs = value
+        .split(",")
+        .map((slug) => slug.trim())
+        .filter(Boolean);
+    } else if (!link) {
+      const [href, label] = value.split("|").map((part) => part.trim());
+      link = sanitiseLink({ href, label: label || undefined });
+    }
+    end -= 1;
+  }
+
+  const text = lines
+    .slice(0, end)
+    .join("\n")
+    .replace(/```/g, "")
+    .trim()
+    .slice(0, 900);
+
+  if (!text) throw new AiUnavailableError("invalid_response");
+
+  return { text, recommendedSlugs: slugs.slice(0, 3), link };
+}
+
+/**
+ * Parses whatever the model returned.
+ *
+ * The JSON shape is still accepted (older prompts, other providers); anything
+ * else is read as plain text. Both paths validate before they return.
+ */
+export function parseAssistantContent(content: string): AssistantAnswer {
+  const trimmed = content.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      return parseAssistantAnswer(trimmed);
+    } catch {
+      // Fall through — a partial or malformed object is still readable as text.
+    }
+  }
+  return parsePlainAnswer(trimmed);
 }
 
 /** Human fallback used when the model is unavailable — still grounded, never invented. */
