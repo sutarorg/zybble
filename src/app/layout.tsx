@@ -30,14 +30,16 @@ export const metadata: Metadata = {
     "Zybble is India's marketplace for practical AI courses: automation, development, generative AI, creation, marketing, data science, business and productivity. All prices in INR (₹).",
   keywords: ["AI courses", "learn AI", "online learning India", "automation", "ChatGPT", "machine learning"],
   icons: {
+    // `v=2` busts caches of the previous Z mark. Assets are the uploaded
+    // open-book icon (public/zybble-mark.png and the favicon set).
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/zybble-favicon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/zybble-favicon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.ico?v=2", sizes: "any" },
+      { url: "/icon.svg?v=2", type: "image/svg+xml" },
+      { url: "/zybble-favicon-192.png?v=2", sizes: "192x192", type: "image/png" },
+      { url: "/zybble-favicon-512.png?v=2", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
-    shortcut: ["/favicon.ico"],
+    apple: [{ url: "/apple-touch-icon.png?v=2", sizes: "180x180" }],
+    shortcut: ["/favicon.ico?v=2"],
   },
   manifest: "/site.webmanifest",
   metadataBase: publicEnv.siteUrl ? new URL(publicEnv.siteUrl) : undefined,
