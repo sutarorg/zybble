@@ -402,17 +402,6 @@ export function LearnPlayer({
                     when you are done.
                   </p>
                 )}
-                {next ? (
-                  <button
-                    type="button"
-                    onClick={() => setCurrentLessonId(next.id)}
-                    className="mt-5 cursor-pointer rounded-xl border border-border bg-white p-4 text-left shadow-card transition-all hover:border-violet-200 hover:shadow-card-hover"
-                  >
-                    <p className="text-[11px] font-bold tracking-[0.1em] text-zinc-400 uppercase">Up next</p>
-                    <p className="mt-1.5 truncate text-[13px] font-semibold text-primary">{next.title}</p>
-                    <p className="mt-1 text-[12.5px] text-muted-foreground">{formatDuration(next.durationMinutes)}</p>
-                  </button>
-                ) : null}
               </TabsContent>
 
               <TabsContent value="resources" className="max-w-2xl">
