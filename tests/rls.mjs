@@ -28,6 +28,7 @@ const manualPayoutsSql = readMigration("20260101000600_manual_payouts.sql");
 const refundRemovalSql = readMigration("20260101000700_remove_refunds.sql");
 const analyticsSql = readMigration("20260101000800_course_analytics_events.sql");
 const studioPrefsSql = readMigration("20260101000900_creator_studio_preferences.sql");
+const earningsAggregatesSql = readMigration("20260101001100_creator_earnings_aggregates.sql");
 
 const schemaSql = [
   readMigration("20260101000200_schema.sql"),
@@ -728,6 +729,82 @@ test("studio preferences are scoped to the creator who owns them", () => {
   }
   // The studio table must not become a second home for learner preferences.
   assert.doesNotMatch(studioPrefsSql, /study_reminders|goal_minutes_per_day|email_promos/i);
+});
+
+// ===========================================================================
+// Captured creator earnings
+// ===========================================================================
+
+test("creator earnings are aggregated by SQL functions scoped to the caller", () => {
+  const signatures = [
+    { name: "creator_earnings_totals", args: "()" },
+    { name: "creator_earnings_by_course", args: "()" },
+    { name: "creator_earnings_daily", args: "(timestamptz, timestamptz)" },
+    { name: "creator_earnings_monthly", args: "(integer)" },
+  ];
+
+  for (const { name, args } of signatures) {
+    const signature = `${name}${args}`;
+    const escaped = args.replace(/[()]/g, "\\$&");
+    assert.match(
+      earningsAggregatesSql,
+      new RegExp(`create or replace function public\\.${name}\\s*\\(`, "i"),
+      `${signature} is not defined`
+    );
+    // Granted to the creator's own session, and to nobody else: under
+    // service_role there is no auth.uid(), so the function would return zeros
+    // and a missing key would look like "no earnings".
+    assert.match(
+      earningsAggregatesSql,
+      new RegExp(`revoke all on function public\\.${name}${escaped} from public, anon, service_role`, "i"),
+      `${signature} is not revoked from public, anon and service_role`
+    );
+    assert.match(
+      earningsAggregatesSql,
+      new RegExp(`grant execute on function public\\.${name}${escaped} to authenticated`, "i"),
+      `${signature} is not granted to authenticated`
+    );
+  }
+
+  // A security-definer function that does not pin search_path is hijackable, and
+  // one that trusts an argument instead of auth.uid() would let a creator read
+  // another creator's earnings.
+  const count = (re) => (earningsAggregatesSql.match(re) ?? []).length;
+  assert.equal(count(/security definer/gi), signatures.length, "every aggregate must be security definer");
+  assert.equal(count(/set search_path = public/gi), signatures.length, "every aggregate must pin search_path");
+  assert.equal(count(/oi\.creator_id = auth\.uid\(\)/g), signatures.length, "every aggregate must scope to the caller");
+  assert.equal(count(/o\.status = 'paid'/g), signatures.length, "every aggregate must count captured orders only");
+});
+
+test("studio money queries never filter through an order join a creator cannot read", () => {
+  const source = fs.readFileSync(path.join(ROOT, "src/lib/server/creator.ts"), "utf8");
+  const withoutComments = source.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // `orders_own_read` is `user_id = auth.uid()`, so an embedded order is always
+  // null for its creator and a status filter on it counts abandoned checkouts.
+  assert.doesNotMatch(
+    withoutComments,
+    /orders\s*\(\s*(?:[a-z_]+,\s*)*status\s*\)/,
+    "creator.ts still reads an embedded orders(status) it cannot see"
+  );
+  // `.select()` caps at 1000 rows, so lifetime totals must not be summed row by row.
+  assert.doesNotMatch(
+    withoutComments,
+    /from\("order_items"\)/,
+    "creator.ts still sums order_items row by row"
+  );
+
+  for (const call of [
+    'rpc("creator_earnings_totals")',
+    'rpc("creator_earnings_by_course")',
+    'rpc("creator_earnings_daily"',
+    'rpc("creator_earnings_monthly"',
+  ]) {
+    assert.ok(withoutComments.includes(call), `creator.ts no longer calls ${call}`);
+  }
+
+  // Zeros of unknown meaning must be distinguishable from a real zero balance.
+  assert.match(withoutComments, /earningsAvailable/, "finance must report whether the aggregates answered");
 });
 
 // ===========================================================================

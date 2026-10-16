@@ -941,12 +941,21 @@ export async function applyTransferState(
       direction: "debit",
       description: `Transfer ${status.replace("_", " ")} by Razorpay Route`,
     });
-    await service
-      .from("entitlements")
-      .update({ revoked_at: new Date().toISOString() })
-      .eq("user_id", (await service.from("orders").select("user_id").eq("id", transfer.order_id).maybeSingle()).data?.user_id ?? "")
-      .eq("course_id", (await service.from("order_items").select("course_id").eq("id", transfer.order_item_id ?? "").maybeSingle()).data?.course_id ?? "")
-      .is("revoked_at", null);
+    // The money that bought this access was taken back, so the access goes too.
+    const { data: order } = transfer.order_id
+      ? await service.from("orders").select("user_id").eq("id", transfer.order_id).maybeSingle()
+      : { data: null };
+    const { data: item } = transfer.order_item_id
+      ? await service.from("order_items").select("course_id").eq("id", transfer.order_item_id).maybeSingle()
+      : { data: null };
+    if (order?.user_id && item?.course_id) {
+      await service
+        .from("entitlements")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("user_id", order.user_id)
+        .eq("course_id", item.course_id)
+        .is("revoked_at", null);
+    }
   }
 
   return { status: "processed" };

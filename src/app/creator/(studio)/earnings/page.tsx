@@ -76,6 +76,17 @@ export default async function CreatorEarningsPage() {
         </Button>
       </header>
 
+      {!finance.earningsAvailable ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] text-amber-900">
+          <p className="font-semibold">Earnings could not be read</p>
+          <p className="mt-1 text-amber-800">
+            Every rupee figure below is zero because the captured-sales totals did not come back —
+            not because you have earned nothing, and nothing here is estimated. Try again shortly,
+            or write to us from <Link href="/messages">Messages</Link> if it persists.
+          </p>
+        </div>
+      ) : null}
+
       {/* Balance hero — the one number that decides whether a payout can be requested. */}
       <section className="overflow-hidden rounded-xl border border-primary/25 bg-gradient-to-br from-accent via-white to-white p-5 shadow-card sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-5">

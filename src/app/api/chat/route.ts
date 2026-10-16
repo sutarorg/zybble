@@ -34,7 +34,7 @@ const requestSchema = z.object({
 });
 
 /**
- * Public Zybble AI endpoint.
+ * Public Zybble 2.0 endpoint.
  *
  * Grounding is enforced here rather than in the prompt: the model only ever
  * receives published course rows, and every slug it returns is resolved against

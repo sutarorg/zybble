@@ -23,7 +23,7 @@ export const ASSISTANT_TAGLINE = "Zybble's AI guide to the course marketplace";
 
 /** First bubble in every new conversation. */
 export const WELCOME_MESSAGE =
-  "Hi! I'm Zybble 2.0, your guide to the Zybble AI course marketplace. Tell me what you want to learn and I'll match you to a real published course — I can also explain how enrollment, payments, certificates and Creator Studio work.";
+  "Hi! I'm Zybble 2.0, your guide to the Zybble course marketplace. Tell me what you want to learn and I'll match you to a real published course — I can also explain how enrollment, payments, certificates and Creator Studio work.";
 
 /* -------------------------------------------------------------------------- */
 /* Platform knowledge                                                          */

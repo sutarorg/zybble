@@ -26,7 +26,8 @@ Zybble is an India-only (`INR`, `₹`) digital course marketplace. All monetary 
    - **Signed Webhook (`handleRazorpayWebhook`)**:
      1. Verifies `x-razorpay-signature` over the raw request body using `RAZORPAY_WEBHOOK_SECRET`.
      2. Deduplicates delivery via `x-razorpay-event-id` stored in `webhook_events`.
-     3. Handles `payment.captured`, `order.paid`, `payment.failed`, `refund.created`, and `refund.processed` in any delivery order.
+     3. Handles `payment.captured`, `order.paid`, `payment.failed`, `transfer.reversed`, `transfer.partially_reversed`, `settlement.processed` and `settlement.failed` in any delivery order.
+     4. Acknowledges and **ignores** `refund.created`, `refund.processed`, `refund.failed` and `payment.refunded`: Zybble has no refund policy, so no refund is processed from a webhook. The event is still recorded in `webhook_events` and answered with HTTP 200 so Razorpay does not retry it, and a warning is logged for the operator.
    - **Idempotent Settlement (`markOrderPaid`)**:
      - Transitions `orders.status` to `'paid'` and `payments.status` to `'captured'`.
      - Upserts the learner's `entitlements` row (`onConflict: "user_id,course_id"`).
@@ -63,14 +64,17 @@ Creators configure **one active payout destination at a time** in `/creator/payo
 ## 3. Manual Payout Request & Admin Confirmation Lifecycle (`src/lib/server/payouts.ts`)
 
 ### Creator Balance Reconciliation
-For each creator, `computeCreatorPayoutBalance()` computes in integer paise:
-- `grossPaise`: sum of `unit_price_paise` on captured orders (`paid`, `partially_refunded`, `refunded`)
-- `commissionPaise`: sum of `commission_paise` on captured orders
-- `grossEarnedPaise`: sum of `creator_share_paise` on captured orders
-- `refundedCreatorSharePaise`: sum of proportional creator-share debits across processed `refunds`
-- `netEarnedPaise = grossEarnedPaise - refundedCreatorSharePaise`
+
+"Captured" is decided in SQL, not in TypeScript. `orders_own_read` is `user_id = auth.uid() or is_admin()`, so a creator reading their own `order_items` through the RLS client gets `null` for the embedded order and cannot distinguish a paid sale from an abandoned checkout — and a row-by-row read would stop at PostgREST's 1000-row limit anyway. Migration `20260101001100_creator_earnings_aggregates.sql` therefore provides four `security definer` aggregates (`creator_earnings_totals`, `creator_earnings_by_course`, `creator_earnings_daily`, `creator_earnings_monthly`) that join `orders` themselves, filter `o.status = 'paid'`, and scope to `auth.uid()`. They are granted to `authenticated` only: with `service_role` there is no `auth.uid()`, so a call would silently return zeros. If they cannot be read, `CreatorFinance.earningsAvailable` is `false` and Creator Studio says the earnings could not be read rather than displaying ₹0.
+
+For each creator, `computeCreatorPayoutBalance()` then computes in integer paise from those captured totals and the creator's payout requests:
+- `grossPaise`: sum of `unit_price_paise` on captured order items (`creator_earnings_totals`)
+- `commissionPaise`: sum of `commission_paise` on captured order items
+- `grossEarnedPaise`: sum of `creator_share_paise` on captured order items (`unit_price_paise = commission_paise + creator_share_paise` for every item)
+- `legacyReversedPaise`: sum of `route_transfers.reversed_paise` for historical Razorpay Route transfers the provider reversed. This is **not** a refund — see §4.
+- `netEarnedPaise = grossEarnedPaise - legacyReversedPaise`
 - `paidOutPaise`: sum of `payout_requests.amount_paise` where `status = 'paid'` (plus any historical `route_settlements` where `status = 'processed'`)
-- `reservedPendingPaise`: sum of `payout_requests.amount_paise` where `status in ('requested', 'approved')`
+- `reservedPendingPaise`: sum of `payout_requests.amount_paise` where `status in ('requested', 'approved')`; `rejected`, `failed` and `cancelled` release their reservation
 - `unallocatedBalancePaise = netEarnedPaise - paidOutPaise - reservedPendingPaise`
 - `availablePaise = Math.max(0, unallocatedBalancePaise)`
 - `negativeAdjustmentPaise = Math.max(0, -unallocatedBalancePaise)`
@@ -98,10 +102,18 @@ Allowed transitions (enforced both in `src/lib/server/payouts.ts` and by the Pos
 
 ---
 
-## 4. Refunds, Reversals & Post-Payout Adjustments
+## 4. Reversals & Post-Payout Adjustments (there is no refund flow)
 
-- When an admin initiates a refund (`refundOrder`) or Razorpay sends a `refund.processed` webhook (`reconcileProviderReversal`):
-  - `computeCreatorRefundAdjustmentPaise()` splits the refund proportionally between the creator's share (`creatorRefundDebitPaise`) and Zybble's commission (`commissionReversalPaise`) so `creatorRefundDebitPaise + commissionReversalPaise === refundAmountPaise`.
-  - `ledger_entries` records both the platform refund debit (`kind = 'refund'`) and the creator's proportional share debit (`kind = 'adjustment'`, `direction = 'debit'`, `account = 'creator:<creator_id>'`).
-  - **If the creator has not yet been paid out**, the refund debit immediately reduces `netEarnedPaise` and `availablePaise`.
-  - **If the creator was already paid out manually**, Zybble never pretends money was automatically clawed back from the creator's bank account. Instead, `unallocatedBalancePaise` becomes negative and surfaces as `negativeAdjustmentPaise` on both the Creator Studio and Admin Payouts portals, offsetting future course sales until recovered.
+Zybble has **no refund policy**. Nothing in the product offers a refund, the `refunds` table and its enums were dropped in `supabase/migrations/20260101000700_remove_refunds.sql`, and a captured creator share is never debited back by an admin action or a webhook.
+
+**Ignored provider events.** `refund.created`, `refund.processed`, `refund.failed` and `payment.refunded` are acknowledged with HTTP 200 and recorded in `webhook_events` so Razorpay stops retrying, then dropped with a `console.warn`. If one arrives, an operator has issued a refund outside Zybble and must reconcile it by hand; the platform will not silently invent an accounting entry for money it did not move.
+
+**What can still reduce a creator's earnings: a provider transfer reversal.** Historical Razorpay Route transfers (`route_transfers`) can be reversed by the provider. `applyTransferState()`:
+  - re-fetches the authoritative transfer state from Razorpay before trusting the payload, and refuses to mark anything `processed` when the provider is unreachable;
+  - writes `route_transfers.status` and `reversed_paise`;
+  - for `reversed` / `partially_reversed`, appends an immutable `ledger_entries` row (`kind = 'reversal'`, `direction = 'debit'`, `account = 'creator:<creator_id>'`, idempotency key `transfer-reversal:<transferId>:<amountPaise>`);
+  - revokes the entitlement that the reversed money bought (`entitlements.revoked_at`), because the access was paid for by funds that no longer exist.
+
+**Post-payout honesty.** If a reversal lands after the creator has already been paid out manually, Zybble never pretends money was clawed back from the creator's bank account. `unallocatedBalancePaise` goes negative and surfaces as `negativeAdjustmentPaise` on both the Creator Studio earnings page and `/admin/payouts`, offsetting future course sales until recovered. The earnings page states the offset in plain language and never labels it a refund.
+
+**Ledger kinds.** `ledger_entry_kind` is append-only, so the historical `'refund'` value still exists in the enum and in old rows; no code path writes it any more. New writes use `sale`, `commission`, `transfer`, `settlement`, `payout`, `reversal` or `adjustment`.

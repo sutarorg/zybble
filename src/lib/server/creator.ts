@@ -189,6 +189,12 @@ export interface CreatorFinance extends TransferSummary, CreatorPayoutBalance {
   destination: CreatorPayoutDestinationView | null;
   payoutRequests: CreatorPayoutRequestView[];
   courseBreakdown: CreatorCourseRevenueRow[];
+  /**
+   * False when the captured-earnings aggregates could not be read, so the money
+   * figures below are zeros of unknown meaning rather than a real ₹0 balance.
+   * The studio says so out loud instead of rendering them as earnings.
+   */
+  earningsAvailable: boolean;
   /** Legacy Route transfer rows kept for historical records. */
   transfers: Array<{
     transferId: string;
@@ -241,25 +247,30 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
     payoutRequests: [],
     courseBreakdown: [],
     transfers: [],
+    earningsAvailable: false,
   };
   if (!isSupabaseConfigured()) return empty;
 
   const supabase = await createServerClient();
 
   const [
-    { data: items },
+    { data: totalsRow, error: totalsError },
+    { data: breakdownRows, error: breakdownError },
     { data: destinationRow },
     { data: payoutRequestRows },
     { data: transfers },
     { data: settlements },
     { data: settings },
   ] = await Promise.all([
-    supabase
-      .from("order_items")
-      .select(
-        "id, order_id, course_id, unit_price_paise, commission_paise, creator_share_paise, course_title, created_at, orders ( id, status )"
-      )
-      .eq("creator_id", session.id),
+    // Captured earnings are aggregated in SQL (`creator_earnings_totals`,
+    // `creator_earnings_by_course`, migration 20260101001100). Two reasons this
+    // is not a `.from("order_items")` read: `orders_own_read` hides the order
+    // from its creator, so an embedded `orders ( status )` join is always null
+    // and any "only paid" filter on it silently counts abandoned checkouts as
+    // earnings; and `.select()` stops at 1000 rows, which would quietly drop a
+    // busy creator's oldest sales.
+    supabase.rpc("creator_earnings_totals"),
+    supabase.rpc("creator_earnings_by_course"),
     supabase
       .from("creator_payout_destinations")
       .select("method, masked_destination, masked_account_holder, bank_label, updated_at")
@@ -284,35 +295,32 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
   ]);
 
   const commissionBps = Number(settings?.commission_bps ?? 1000);
-  const rawItems = (items ?? []) as Array<Record<string, unknown>>;
 
-  // Only orders that were actually captured count toward creator earnings.
-  const capturedItems = rawItems.filter((row) => {
-    const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
-    const orderObj = Array.isArray(orderRel) ? orderRel[0] : orderRel;
-    if (!orderObj || !orderObj.status) return true;
-    return orderObj.status === "paid";
-  });
-
-  const breakdownMap = new Map<string, CreatorCourseRevenueRow>();
-
-  for (const item of capturedItems) {
-    const courseId = String(item.course_id ?? item.course_title ?? "course");
-    const courseTitle = String(item.course_title ?? "Course");
-    const current = breakdownMap.get(courseId) ?? {
-      courseId,
-      courseTitle,
-      salesCount: 0,
-      grossPaise: 0,
-      commissionPaise: 0,
-      creatorSharePaise: 0,
-    };
-    current.salesCount += 1;
-    current.grossPaise += Number(item.unit_price_paise ?? 0);
-    current.commissionPaise += Number(item.commission_paise ?? 0);
-    current.creatorSharePaise += Number(item.creator_share_paise ?? 0);
-    breakdownMap.set(courseId, current);
+  // `creator_earnings_totals` is an aggregate without GROUP BY, so it returns
+  // exactly one row — zeros for a creator with no captured sales. A missing row
+  // or an error means the aggregates could not be read at all (migration not
+  // applied, for instance), which is reported instead of being shown as ₹0.
+  const totals = asRows(totalsRow)[0] ?? null;
+  const earningsAvailable = !totalsError && !breakdownError && totals !== null;
+  if (totalsError || breakdownError) {
+    console.error("creator earnings aggregates failed", {
+      totals: totalsError?.message ?? null,
+      breakdown: breakdownError?.message ?? null,
+    });
   }
+
+  const grossPaise = Number(totals?.gross_paise ?? 0);
+  const commissionPaise = Number(totals?.commission_paise ?? 0);
+  const creatorSharePaise = Number(totals?.creator_share_paise ?? 0);
+
+  const courseBreakdown: CreatorCourseRevenueRow[] = asRows(breakdownRows).map((row) => ({
+    courseId: String(row.course_id ?? "course"),
+    courseTitle: String(row.course_title ?? "Course"),
+    salesCount: Number(row.sales ?? 0),
+    grossPaise: Number(row.gross_paise ?? 0),
+    commissionPaise: Number(row.commission_paise ?? 0),
+    creatorSharePaise: Number(row.creator_share_paise ?? 0),
+  }));
 
   const transferRows = (transfers ?? []) as Array<Record<string, unknown>>;
   const settlementByTransfer = new Map(
@@ -368,11 +376,12 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
   );
 
   const balance = computeCreatorPayoutBalance({
-    capturedOrderItems: capturedItems.map((row) => ({
-      unitPricePaise: Number(row.unit_price_paise ?? 0),
-      commissionPaise: Number(row.commission_paise ?? 0),
-      creatorSharePaise: Number(row.creator_share_paise ?? 0),
-    })),
+    // The lifetime sums arrive pre-aggregated from SQL. They are passed as one
+    // row so `computeCreatorPayoutBalance` still runs its integer-paise
+    // assertions over the exact figures the studio displays.
+    capturedOrderItems: earningsAvailable
+      ? [{ unitPricePaise: grossPaise, commissionPaise, creatorSharePaise }]
+      : [],
     payoutRequests: payoutRequests.map((req) => ({
       amountPaise: req.amountPaise,
       status: req.status,
@@ -403,9 +412,8 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
     commissionPercentLabel: formatCommissionPercent(commissionBps),
     destination,
     payoutRequests,
-    courseBreakdown: Array.from(breakdownMap.values()).sort(
-      (a, b) => b.creatorSharePaise - a.creatorSharePaise
-    ),
+    courseBreakdown,
+    earningsAvailable,
     transfers: transferRows.map((row) => {
       const settlement = settlementByTransfer.get(String(row.transfer_id));
       return {
@@ -427,58 +435,84 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
 /* -------------------------------------------------------------------------- */
 
 export interface CreatorAnalyticsPoint {
+  /** `12 Oct` — the UTC day this bucket covers. */
   label: string;
+  /** The creator's share of that day's captured sales, in integer paise. */
   revenuePaise: number;
-  enrollments: number;
+  /** Captured sales that day. */
+  sales: number;
 }
 
-export const getCreatorAnalytics = cache(async (range: "7d" | "30d" | "90d" | "1y" = "30d") => {
+/**
+ * Revenue trend for the creator dashboard — money, and only money that was
+ * actually captured.
+ *
+ * The daily buckets come from `creator_earnings_daily`
+ * (migration `20260101001100_creator_earnings_aggregates.sql`), which joins
+ * `orders` inside SQL. It has to: `orders_own_read` is `user_id = auth.uid()`,
+ * so a creator reading their own `order_items` gets a null for the embedded
+ * order and cannot tell a captured sale from an abandoned checkout.
+ *
+ * Reach — impressions, views, watch time and the enrollments they produced —
+ * lives in {@link getCreatorEngagement}, which is what `/creator/analytics`
+ * renders. The two are deliberately not mixed here.
+ *
+ * Every day of the window is returned, including empty ones: a flat zero line
+ * is the truth, while a gap would be indistinguishable from missing data.
+ */
+export const getCreatorAnalytics = cache(async (range: AnalyticsRange = "30d") => {
   const session = await requireCreator();
-  const days = range === "7d" ? 7 : range === "90d" ? 90 : range === "1y" ? 365 : 30;
-  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const days = RANGE_DAYS[range];
+  const empty = {
+    points: [] as CreatorAnalyticsPoint[],
+    totals: { revenuePaise: 0, sales: 0, courses: 0, students: 0 },
+  };
+  if (!isSupabaseConfigured()) return empty;
 
-  if (!isSupabaseConfigured()) {
-    return { points: [] as CreatorAnalyticsPoint[], totals: { revenuePaise: 0, enrollments: 0, courses: 0, students: 0 } };
-  }
-
+  const until = new Date();
+  const since = new Date(until.getTime() - days * 86_400_000);
   const supabase = await createServerClient();
-  const { data: courseRows } = await supabase
-    .from("courses")
-    .select("id, students_count, status")
-    .eq("creator_id", session.id);
 
-  const courseRowsTyped = (courseRows ?? []) as Array<{ id: string; students_count: number; status: string }>;
-  const [{ data: sales }, { data: enrollments }] = await Promise.all([
-    supabase
-      .from("order_items")
-      .select("created_at, creator_share_paise, orders ( status )")
-      .eq("creator_id", session.id)
-      .gte("created_at", since),
-    courseIdsOf(courseRowsTyped).length > 0
-      ? supabase.from("entitlements").select("id, created_at").in("course_id", courseIdsOf(courseRowsTyped))
-      : Promise.resolve({ data: [] as Array<{ id: string; created_at: string }>, error: null }),
+  const [{ data: courseRows }, { data: dailyRows, error }] = await Promise.all([
+    supabase.from("courses").select("id, students_count").eq("creator_id", session.id),
+    supabase.rpc("creator_earnings_daily", {
+      p_since: since.toISOString(),
+      p_until: until.toISOString(),
+    }),
   ]);
 
-  const capturedSales = ((sales ?? []) as Array<Record<string, unknown>>).filter((row) => {
-    const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
-    const orderObj = Array.isArray(orderRel) ? orderRel[0] : orderRel;
-    if (!orderObj || !orderObj.status) return true;
-    return orderObj.status === "paid";
-  });
+  if (error) {
+    // Logged, not thrown: the rest of the dashboard still renders, and the
+    // revenue panel falls back to its honest "no sales in this period" state.
+    console.error("creator_earnings_daily failed", error.message);
+  }
 
-  const points = buildSeries(
-    capturedSales as Array<{ created_at: string; creator_share_paise: number }>,
-    ((enrollments ?? []) as Array<{ created_at: string }>),
-    days
+  const courses = (courseRows ?? []) as Array<{ id: string; students_count: number }>;
+  const byDay = new Map(
+    asRows(dailyRows).map((row) => [
+      dayKey(String(row.day)),
+      { revenuePaise: Number(row.creator_share_paise ?? 0), sales: Number(row.sales ?? 0) },
+    ])
   );
+
+  const points: CreatorAnalyticsPoint[] = [];
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const key = dayKey(new Date(until.getTime() - i * 86_400_000));
+    const row = byDay.get(key);
+    points.push({
+      label: dayLabel(key),
+      revenuePaise: row?.revenuePaise ?? 0,
+      sales: row?.sales ?? 0,
+    });
+  }
 
   return {
     points,
     totals: {
       revenuePaise: points.reduce((sum, point) => sum + point.revenuePaise, 0),
-      enrollments: points.reduce((sum, point) => sum + point.enrollments, 0),
-      courses: courseRowsTyped.length,
-      students: courseRowsTyped.reduce((sum, row) => sum + Number(row.students_count ?? 0), 0),
+      sales: points.reduce((sum, point) => sum + point.sales, 0),
+      courses: courses.length,
+      students: courses.reduce((sum, course) => sum + Number(course.students_count ?? 0), 0),
     },
   };
 });
@@ -490,31 +524,15 @@ function courseIdsOf(courses: unknown): string[] {
     .filter((id): id is string => typeof id === "string" && id.length > 0);
 }
 
-function buildSeries(
-  sales: Array<{ created_at: string; creator_share_paise: number }>,
-  enrollments: Array<{ created_at: string }>,
-  days: number
-): CreatorAnalyticsPoint[] {
-  const buckets: CreatorAnalyticsPoint[] = [];
-  const today = new Date();
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date(today.getTime() - i * 86_400_000);
-    buckets.push({
-      label: date.toISOString().slice(0, 10),
-      revenuePaise: 0,
-      enrollments: 0,
-    });
-  }
-  const index = new Map(buckets.map((bucket, i) => [bucket.label, i]));
-  for (const sale of sales) {
-    const i = index.get(String(sale.created_at).slice(0, 10));
-    if (i !== undefined) buckets[i].revenuePaise += Number(sale.creator_share_paise ?? 0);
-  }
-  for (const enrollment of enrollments) {
-    const i = index.get(String(enrollment.created_at).slice(0, 10));
-    if (i !== undefined) buckets[i].enrollments += 1;
-  }
-  return buckets;
+/**
+ * A `returns table` RPC arrives as an array of rows. PostgREST can also hand
+ * back a single object for a one-row composite, so both are normalised here
+ * rather than at every call site.
+ */
+function asRows(data: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(data)) return data as Array<Record<string, unknown>>;
+  if (data && typeof data === "object") return [data as Record<string, unknown>];
+  return [];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -918,7 +936,9 @@ function monthLabel(key: string): string {
  * snapshot, not today's rate.
  */
 export const getCreatorEarningsSeries = cache(async (months = 6): Promise<CreatorEarningsPoint[]> => {
-  const session = await requireCreator();
+  // The gate, and the identity: `creator_earnings_monthly` scopes itself to
+  // `auth.uid()`, so this session is what makes the numbers this creator's.
+  await requireCreator();
   const buckets: CreatorEarningsPoint[] = [];
   const now = new Date();
 
@@ -937,28 +957,23 @@ export const getCreatorEarningsSeries = cache(async (months = 6): Promise<Creato
 
   if (!isSupabaseConfigured()) return buckets;
 
-  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
   const supabase = await createServerClient();
-  const { data } = await supabase
-    .from("order_items")
-    .select("created_at, unit_price_paise, quantity, commission_paise, creator_share_paise, orders ( status )")
-    .eq("creator_id", session.id)
-    .gte("created_at", since.toISOString());
+  const { data, error } = await supabase.rpc("creator_earnings_monthly", { p_months: months });
+  if (error) {
+    // Logged, not thrown: every bucket stays at zero and the earnings page says
+    // the figures could not be read rather than showing a chart that looks real.
+    console.error("creator_earnings_monthly failed", error.message);
+    return buckets;
+  }
 
   const index = new Map(buckets.map((bucket, i) => [bucket.key, i]));
-  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
-    const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
-    const order = Array.isArray(orderRel) ? orderRel[0] : orderRel;
-    if (order?.status && order.status !== "paid") continue;
-
-    const i = index.get(String(row.created_at).slice(0, 7));
+  for (const row of asRows(data)) {
+    const i = index.get(String(row.month_key ?? ""));
     if (i === undefined) continue;
-
-    const quantity = Math.max(1, Number(row.quantity ?? 1));
-    buckets[i].grossPaise += Number(row.unit_price_paise ?? 0) * quantity;
-    buckets[i].commissionPaise += Number(row.commission_paise ?? 0);
-    buckets[i].creatorSharePaise += Number(row.creator_share_paise ?? 0);
-    buckets[i].sales += quantity;
+    buckets[i].grossPaise = Number(row.gross_paise ?? 0);
+    buckets[i].commissionPaise = Number(row.commission_paise ?? 0);
+    buckets[i].creatorSharePaise = Number(row.creator_share_paise ?? 0);
+    buckets[i].sales = Number(row.sales ?? 0);
   }
 
   return buckets;
