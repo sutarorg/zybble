@@ -18,6 +18,7 @@ import {
   validatePayoutRequestCreation,
 } from "@/lib/server/payouts";
 import { getCreatorFinance } from "@/lib/server/creator";
+import { announceNewLesson } from "@/lib/server/course-updates";
 
 export interface CreatorActionResult {
   ok: boolean;
@@ -795,12 +796,53 @@ export async function saveLesson(input: unknown): Promise<CreatorActionResult> {
 
     if (parsed.data.id) {
       await service.from("lessons").update(payload).eq("id", parsed.data.id).eq("course_id", parsed.data.courseId);
-    } else {
-      await service.from("lessons").insert(payload);
+      await refreshCourseAggregates(service, parsed.data.courseId);
+      revalidatePath(`/creator/courses/${parsed.data.courseId}/curriculum`);
+      return { ok: true, id: parsed.data.id };
     }
+
+    const { data: created, error: insertError } = await service
+      .from("lessons")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (insertError || !created) {
+      console.error("[creator-action] could not add the lesson", { reason: insertError?.message.slice(0, 200) });
+      return { ok: false, error: "Could not save the lesson" };
+    }
+
     await refreshCourseAggregates(service, parsed.data.courseId);
+
+    // A new lesson on a published course is news to everybody holding a seat.
+    // Announcing it must never fail the save: the lesson exists, so the creator
+    // is told the truth about it either way.
+    let announcement: Awaited<ReturnType<typeof announceNewLesson>> | null = null;
+    try {
+      announcement = await announceNewLesson(service, {
+        courseId: parsed.data.courseId,
+        lessonId: String(created.id),
+        lessonTitle: parsed.data.title,
+      });
+    } catch (error) {
+      console.error("[creator-action] lesson announcement failed", {
+        course: parsed.data.courseId,
+        reason: error instanceof Error ? error.message.slice(0, 200) : "unknown",
+      });
+    }
+
     revalidatePath(`/creator/courses/${parsed.data.courseId}/curriculum`);
-    return { ok: true, id: parsed.data.id };
+
+    const notifiedLearners = announcement?.notified ?? 0;
+    return {
+      ok: true,
+      id: String(created.id),
+      message:
+        notifiedLearners > 0
+          ? `Lesson added · ${notifiedLearners} enrolled ${
+              notifiedLearners === 1 ? "learner" : "learners"
+            } notified`
+          : "Lesson added",
+    };
   } catch (error) {
     return fail(error, "Could not save the lesson");
   }

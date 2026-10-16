@@ -20,6 +20,11 @@ export type EmailTemplate =
   | "course_approved"
   | "course_changes_requested"
   | "course_rejected"
+  | "verify_email"
+  | "course_update"
+  | "weekly_learning_report"
+  | "study_reminder"
+  | "catalog_digest"
   | "security_password_reset_requested"
   | "security_email_changed"
   | "transfer_status"
@@ -36,6 +41,11 @@ export const EMAIL_TEMPLATES = [
   "course_approved",
   "course_changes_requested",
   "course_rejected",
+  "verify_email",
+  "course_update",
+  "weekly_learning_report",
+  "study_reminder",
+  "catalog_digest",
   "security_password_reset_requested",
   "security_email_changed",
   "transfer_status",
@@ -149,6 +159,91 @@ export function renderEmailTemplate(
            <blockquote style="margin:16px 0;padding:12px 16px;background:#fafafa;border-left:3px solid #d4d4d8;color:#52525b">${data.reason}</blockquote>`
         ) + button(`${origin}/creator/courses`, "Open Creator Studio"),
       };
+    case "verify_email":
+      return {
+        subject: "Confirm your Zybble email address",
+        html: shell(
+          "One last step",
+          `<p>Hi ${data.name ?? "there"},</p>
+           <p>Welcome to Zybble. Confirm your email address to finish setting up your account — it unlocks receipts, certificates and course updates.</p>
+           <p style="color:#71717a;font-size:13px">If you did not create a Zybble account, you can ignore this email.</p>`
+        ) + button(`${data.actionUrl ?? `${origin}/login`}`, "Confirm email address"),
+      };
+    case "course_update": {
+      const courseUrl = String(data.courseUrl ?? `${origin}/my-learning`);
+      return {
+        subject: `New lesson in ${data.courseTitle}`,
+        html: shell(
+          "A course you are enrolled in was updated",
+          `<p>Hi ${data.learnerName ?? "there"},</p>
+           <p><strong>${data.courseTitle}</strong> has a new lesson:</p>
+           <blockquote style="margin:16px 0;padding:12px 16px;background:#fafafa;border-left:3px solid #d4d4d8;color:#3f3f46">${data.lessonTitle ?? "New lesson"}</blockquote>
+           <p>Your progress is saved, so you can pick up wherever you left off.</p>`
+        ) + button(courseUrl, "Continue learning"),
+      };
+    }
+    case "weekly_learning_report": {
+      const lessons = Number(data.lessonsCompleted ?? 0);
+      const streak = Number(data.streakDays ?? 0);
+      const inProgress = Number(data.coursesInProgress ?? 0);
+      const summary =
+        lessons === 0
+          ? `<p>No lessons were completed this week. A single lesson is enough to keep a streak alive.</p>`
+          : `<p>You completed <strong>${lessons}</strong> ${lessons === 1 ? "lesson" : "lessons"} this week${
+              streak > 0 ? ` and kept a <strong>${streak}-day</strong> streak going` : ""
+            }.</p>`;
+      return {
+        subject: lessons > 0 ? `Your week on Zybble — ${lessons} ${lessons === 1 ? "lesson" : "lessons"} completed` : "Your week on Zybble",
+        html: shell(
+          "Weekly learning report",
+          `<p>Hi ${data.learnerName ?? "there"},</p>
+           ${summary}
+           <table style="margin:16px 0;font-size:14px">
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Lessons completed</td><td><strong>${lessons}</strong></td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Current streak</td><td><strong>${streak} ${streak === 1 ? "day" : "days"}</strong></td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Courses in progress</td><td><strong>${inProgress}</strong></td></tr>
+           </table>`
+        ) + button(`${origin}/my-learning`, "Open My Learning"),
+      };
+    }
+    case "study_reminder": {
+      const courseUrl = String(data.courseUrl ?? `${origin}/my-learning`);
+      const courseTitle = data.courseTitle ? String(data.courseTitle) : null;
+      return {
+        subject: courseTitle ? `Continue ${courseTitle}` : "Your Zybble lessons are waiting",
+        html: shell(
+          "A quick nudge",
+          `<p>Hi ${data.learnerName ?? "there"},</p>
+           <p>${
+             courseTitle
+               ? `You left off in <strong>${courseTitle}</strong>. One lesson today keeps your streak alive.`
+               : "You have lessons waiting in My Learning. One short session today keeps your streak alive."
+           }</p>`
+        ) + button(courseUrl, "Resume where you left off"),
+      };
+    }
+    case "catalog_digest": {
+      const items = String(data.items ?? "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 6);
+      const list =
+        items.length > 0
+          ? `<ul style="margin:16px 0;padding-left:18px;font-size:14px;color:#3f3f46">${items
+              .map((item) => `<li style="padding:3px 0">${item}</li>`)
+              .join("")}</ul>`
+          : "";
+      return {
+        subject: `${items.length} ${items.length === 1 ? "course" : "courses"} worth a look this week`,
+        html: shell(
+          "New and discounted in the catalog",
+          `<p>Hi ${data.learnerName ?? "there"},</p>
+           <p>Here is what changed on Zybble this week. Prices are in Indian Rupees and every course is taught by an independent creator.</p>
+           ${list}`
+        ) + button(`${origin}/explore`, "Browse the catalog"),
+      };
+    }
     case "security_password_reset_requested":
       return {
         subject: "Reset your Zybble password",
@@ -271,6 +366,80 @@ const render = renderEmailTemplate;
  * Never throws for a business failure — the caller records the error on the row
  * so it can be retried without touching the underlying transaction.
  */
+/* -------------------------------------------------------------------------- */
+/* Consent                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/** The `learner_preferences` column that gates an optional template. */
+export type LearnerConsentKey =
+  | "email_course_updates"
+  | "email_promos"
+  | "weekly_report"
+  | "study_reminders";
+
+/**
+ * Which optional messages each preference controls.
+ *
+ * A template that is not listed here is **transactional** and always sent:
+ * receipts, certificates, verification links, moderation decisions and payout
+ * notices are the record of something that already happened, and a learner who
+ * opts out of marketing still has to receive them. Everything listed here is
+ * optional and is skipped when the learner has turned it off.
+ */
+export const EMAIL_CONSENT: Partial<Record<EmailTemplate, LearnerConsentKey>> = {
+  course_update: "email_course_updates",
+  weekly_learning_report: "weekly_report",
+  study_reminder: "study_reminders",
+  catalog_digest: "email_promos",
+};
+
+/** Column defaults from the schema, used when a learner has no preference row. */
+const CONSENT_DEFAULTS: Record<LearnerConsentKey, boolean> = {
+  email_course_updates: true,
+  email_promos: false,
+  weekly_report: true,
+  study_reminders: true,
+};
+
+export type ConsentResult =
+  | { allowed: true }
+  | { allowed: false; reason: "opted_out" | "unknown_recipient" | "unavailable" };
+
+/**
+ * Whether an optional email may go to this address.
+ *
+ * Fails closed: if the recipient cannot be resolved, or the preferences cannot
+ * be read, the optional message is not sent. Guessing "they probably meant yes"
+ * is how an unsubscribe stops working.
+ */
+export async function hasEmailConsent(to: string, template: EmailTemplate): Promise<ConsentResult> {
+  const key = EMAIL_CONSENT[template];
+  if (!key) return { allowed: true };
+
+  const service = createServiceClient();
+  if (!service) return { allowed: false, reason: "unavailable" };
+
+  const { data: profile } = await service
+    .from("profiles")
+    .select("id")
+    .eq("email", to.trim().toLowerCase())
+    .maybeSingle();
+  if (!profile) return { allowed: false, reason: "unknown_recipient" };
+
+  const { data: prefs, error } = await service
+    .from("learner_preferences")
+    .select(`${key}`)
+    .eq("user_id", profile.id)
+    .maybeSingle();
+  if (error) return { allowed: false, reason: "unavailable" };
+
+  // No preference row yet: fall back to the column default the schema defines,
+  // so a brand-new learner gets course updates but no marketing.
+  const stored = prefs ? (prefs as Record<string, unknown>)[key] : undefined;
+  const allowed = stored === undefined || stored === null ? CONSENT_DEFAULTS[key] : Boolean(stored);
+  return allowed ? { allowed: true } : { allowed: false, reason: "opted_out" };
+}
+
 export async function dispatchEmail(row: {
   to_email: string;
   template: EmailTemplate;
@@ -295,7 +464,11 @@ export async function dispatchEmail(row: {
 }
 
 /** Convenience for non-transactional, best-effort notifications. */
-export async function sendEmail(payload: EmailPayload): Promise<{ providerId?: string; error?: string }> {
+export async function sendEmail(
+  payload: EmailPayload
+): Promise<{ providerId?: string; error?: string; skipped?: "consent" }> {
+  const consent = await hasEmailConsent(payload.to, payload.template);
+  if (!consent.allowed) return { skipped: "consent" };
   return dispatchEmail({ to_email: payload.to, template: payload.template, payload: payload.data });
 }
 
@@ -317,7 +490,12 @@ export async function enqueueEmail(input: {
   payload: Record<string, string | number>;
   /** Stable per business object, e.g. `receipt:<publicOrderId>`. */
   idempotencyKey: string;
-}): Promise<{ queued: boolean; error?: string }> {
+}): Promise<{ queued: boolean; error?: string; skipped?: "consent" }> {
+  // An optional message to somebody who turned it off is not queued at all, so
+  // the outbox never becomes a place where consent is checked later.
+  const consent = await hasEmailConsent(input.to, input.template);
+  if (!consent.allowed) return { queued: false, skipped: "consent" };
+
   const service = createServiceClient();
   if (!service) return { queued: false, error: "Email outbox is unavailable" };
 
@@ -334,6 +512,114 @@ export async function enqueueEmail(input: {
     return { queued: false, error: error.message };
   }
   return { queued: true };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batched enqueue                                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface BatchEmailInput {
+  to: string;
+  /** Preferred: consent is then resolved in one query for the whole batch. */
+  userId?: string;
+  template: EmailTemplate;
+  payload: Record<string, string | number>;
+  idempotencyKey: string;
+}
+
+/**
+ * Queues the same message for many learners.
+ *
+ * Fanning out one `enqueueEmail` call per recipient would be a round trip per
+ * learner, so this resolves consent for the whole batch in a single read of
+ * `learner_preferences` and writes the outbox rows in chunks. Duplicates are
+ * ignored by the unique idempotency key, which keeps a retried announcement from
+ * emailing anybody twice.
+ */
+export async function enqueueEmailBatch(
+  inputs: BatchEmailInput[]
+): Promise<{ queued: number; skippedConsent: number; error?: string }> {
+  if (inputs.length === 0) return { queued: 0, skippedConsent: 0 };
+
+  const service = createServiceClient();
+  if (!service) return { queued: 0, skippedConsent: inputs.length, error: "Email outbox is unavailable" };
+
+  const consentColumns: LearnerConsentKey[] = [
+    "email_course_updates",
+    "email_promos",
+    "weekly_report",
+    "study_reminders",
+  ];
+  /** `<userId>:<column>` → whether that learner allows that message. */
+  const allowedById = new Map<string, boolean>();
+
+  const gatedIds = [
+    ...new Set(
+      inputs.filter((input) => EMAIL_CONSENT[input.template] && input.userId).map((input) => input.userId as string)
+    ),
+  ];
+  for (let i = 0; i < gatedIds.length; i += 500) {
+    const { data } = await service
+      .from("learner_preferences")
+      .select("user_id, email_course_updates, email_promos, weekly_report, study_reminders")
+      .in("user_id", gatedIds.slice(i, i + 500));
+    for (const row of (data ?? []) as unknown as Array<Record<string, unknown>>) {
+      for (const column of consentColumns) {
+        const value = row[column];
+        allowedById.set(
+          `${String(row.user_id)}:${column}`,
+          value === undefined || value === null ? CONSENT_DEFAULTS[column] : Boolean(value)
+        );
+      }
+    }
+  }
+
+  const rows: Array<{
+    to_email: string;
+    template: EmailTemplate;
+    payload: Record<string, string | number>;
+    idempotency_key: string;
+    status: "queued";
+  }> = [];
+  let skippedConsent = 0;
+
+  for (const input of inputs) {
+    const column = EMAIL_CONSENT[input.template];
+    if (column) {
+      // No preference row means the schema defaults apply, exactly as they do
+      // for the single-recipient path.
+      const allowed = input.userId
+        ? allowedById.get(`${input.userId}:${column}`) ?? CONSENT_DEFAULTS[column]
+        : (await hasEmailConsent(input.to, input.template)).allowed;
+      if (!allowed) {
+        skippedConsent += 1;
+        continue;
+      }
+    }
+    rows.push({
+      to_email: input.to,
+      template: input.template,
+      payload: input.payload,
+      idempotency_key: input.idempotencyKey,
+      status: "queued",
+    });
+  }
+
+  let queued = 0;
+  for (let i = 0; i < rows.length; i += 500) {
+    // An upsert with `ignoreDuplicates` is an insert that treats a duplicate
+    // idempotency key as success, which is exactly what a re-run must do.
+    const { error, count } = await service
+      .from("email_outbox")
+      .upsert(rows.slice(i, i + 500), { onConflict: "idempotency_key", ignoreDuplicates: true, count: "exact" });
+    if (error) {
+      console.error("[email] batch enqueue failed", { reason: error.message.slice(0, 200) });
+      return { queued, skippedConsent, error: error.message };
+    }
+    queued += count ?? 0;
+  }
+
+  return { queued, skippedConsent };
 }
 
 const MAX_ATTEMPTS = 5;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CreditCard, Receipt, ShieldCheck } from "lucide-react";
+import { CreditCard, Receipt } from "lucide-react";
 import { getOrders } from "@/lib/server/learner";
 import { formatInr } from "@/lib/money";
 import { formatDate } from "@/lib/format";
@@ -93,10 +93,6 @@ export default async function LearnerOrdersPage() {
         </ul>
       )}
 
-      <p className="flex items-start gap-2 text-[12px] text-zinc-400">
-        <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
-        Access to a course is granted by a verified Razorpay payment or webhook — never by a browser redirect.
-      </p>
     </div>
   );
 }

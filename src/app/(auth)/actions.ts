@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured, siteOrigin } from "@/lib/env";
+import { sendVerificationEmail } from "@/lib/server/verification";
 
 export interface AuthFormState {
   ok: boolean;
@@ -110,12 +111,29 @@ export async function signUpAction(_prev: AuthFormState, formData: FormData): Pr
 
   revalidatePath("/", "layout");
 
+  // Supabase only sends its own confirmation email when the project's SMTP is
+  // configured, which a fresh project is not. Zybble therefore generates the
+  // confirmation link here and delivers it through Resend, so signing up always
+  // produces an email the learner can actually click.
+  if (data.user && !data.user.email_confirmed_at) {
+    const outcome = await sendVerificationEmail({
+      email: parsed.data.email,
+      name: parsed.data.name,
+      userId: data.user.id,
+    });
+    if (outcome.status === "unavailable") {
+      console.error("[signup] verification email could not be sent or queued", {
+        user: data.user.id,
+      });
+    }
+  }
+
   // When email confirmation is enabled, Supabase returns a user with no session.
   if (!data.session) {
     return {
       ok: true,
       needsEmailConfirmation: true,
-      message: "Check your inbox to confirm your email address, then sign in.",
+      message: `We emailed a confirmation link to ${parsed.data.email}. Open it to finish signing up.`,
     };
   }
 

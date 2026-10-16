@@ -7,22 +7,19 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Award,
   Bookmark,
+  Compass,
   Flame,
   GraduationCap,
   LayoutDashboard,
   LogOut,
   Receipt,
   Settings,
-  Presentation,
-  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDictionary } from "@/lib/i18n";
 import { Logo } from "@/components/layout/logo";
 import { useApp } from "@/components/providers/app-providers";
 import type { SidebarCounts } from "./learner-counts";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 
 function NavItem({
   href,
@@ -73,13 +70,16 @@ export function LearnerSidebarContent({
   const translateUi = useTranslate();
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, learnerPrefs, language } = useApp();
+  const { signOut, language } = useApp();
   const enrollmentCount = counts?.enrollmentCount ?? 0;
   const wishlistCount = counts?.wishlistCount ?? 0;
   const certificateCount = counts?.certificateCount ?? 0;
-  // Counters are read on the server and passed through the sidebar props; the
-  // browser never invents them.
-  const sidebarCounts = counts;
+  // Counters, the daily goal and the streak are read on the server and passed
+  // through as props; the browser never invents them.
+  const goalMinutesPerDay = counts?.goalMinutesPerDay ?? 0;
+  const streakDays = counts?.streakDays ?? 0;
+  const activeDays = counts?.activeDays ?? [];
+  const lessonsThisWeek = counts?.lessonsThisWeek ?? 0;
   const dict = getDictionary(language);
 
   const items = [
@@ -137,71 +137,63 @@ export function LearnerSidebarContent({
           ))}
         </nav>
 
-        {/* Streak / goal panel */}
+        {/* Streak / goal panel — every number comes from `lesson_progress`. */}
         <div className="mx-0.5 mt-6 mb-4 rounded-xl border border-violet-200/80 bg-accent p-3.5">
           <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-foreground">
-            <Flame className="size-3.5" aria-hidden /><LocalizedText text={"Daily goal:"} />{learnerPrefs.goalMinutesPerDay}<LocalizedText text={"min"} /></p>
-          <div className="mt-2.5 flex gap-1">
-            {[0, 1, 2, 3, 4, 5, 6].map((d) => (
+            <Flame className="size-3.5" aria-hidden />
+            <LocalizedText text={dict.dailyGoal(goalMinutesPerDay)} />
+          </p>
+
+          <div className="mt-2.5 flex gap-1" role="img" aria-label={translateUi(dict.lastSevenDays)}>
+            {activeDays.map((active, index) => (
               <span
-                key={d}
-                className={cn(
-                  "h-1.5 flex-1 rounded-full",
-                  d < 4 ? "bg-primary" : "bg-violet-200"
-                )}
+                key={index}
+                className={cn("h-1.5 flex-1 rounded-full", active ? "bg-primary" : "bg-violet-200")}
                 aria-hidden
               />
             ))}
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-violet-900/60"><LocalizedText text={"Simulated 4-day streak — small sessions compound."} /></p>
+
+          <p className="mt-2 text-[11px] leading-relaxed text-violet-900/60">
+            <LocalizedText
+              text={
+                streakDays > 0
+                  ? dict.streakSummary(streakDays, lessonsThisWeek)
+                  : dict.streakEmpty
+              }
+            />
+          </p>
         </div>
       </div>
 
+      {/*
+        No profile block down here. The header's user menu already carries the
+        avatar, name, settings link and sign-out; repeating the learner's
+        identity at the bottom of the navigation only duplicated it.
+      */}
       <div className="border-t border-border p-3">
-        {user ? (
-          <div className="flex flex-col gap-3">
-            <TeachingCard onNavigate={onNavigate} />
-            <div className="flex items-center gap-2.5 rounded-lg p-1.5">
-              <Avatar className="size-8.5">
-                {user.avatar && <AvatarImage src={user.avatar} alt={translateUi(user.name)} />}
-                <AvatarFallback className="bg-primary text-[11px] text-white">
-                  <LocalizedText text={user.initials} />
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold"><LocalizedText text={user.name} /></p>
-                <Link href="/settings" className="text-[11.5px] font-medium text-primary hover:underline">
-                  <LocalizedText text={dict.viewSettings} />
-                </Link>
-              </div>
-            <button
-              type="button"
-              onClick={() => {
-                signOut();
-                router.push("/");
-              }}
-              title={translateUi(dict.signOut)}
-              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
-            >
-              <LogOut className="size-4" />
-              <span className="sr-only"><LocalizedText text={dict.signOut} /></span>
-            </button>
-            </div>
-            <Link
-              href="/"
-              className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
-            >
-              <Compass className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Back to Explore"} /></Link>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 p-1">
-            <Link
-              href="/"
-              className="flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
-            >
-              <Compass className="size-4 text-zinc-400" aria-hidden /><LocalizedText text={"Back to Explore"} /></Link>
-          </div>
-        )}
+        <div className="flex flex-col gap-0.5">
+          <TeachingCard onNavigate={onNavigate} />
+          <Link
+            href="/"
+            onClick={onNavigate}
+            className="mt-2 flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9"
+          >
+            <Compass className="size-4 text-zinc-400" aria-hidden />
+            <LocalizedText text={dict.backToExplore} />
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              signOut();
+              router.push("/");
+            }}
+            className="flex h-10 cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none lg:h-9"
+          >
+            <LogOut className="size-4 text-zinc-400" aria-hidden />
+            <LocalizedText text={dict.signOut} />
+          </button>
+        </div>
       </div>
     </div>
   );

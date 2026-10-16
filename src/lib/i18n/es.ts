@@ -386,5 +386,10 @@ export const es: Dictionary = {
 
   /* ---------------------------------------------------------- learner shell */
   dailyGoal: (minutes) => `Objetivo diario: ${minutes} min`,
-  streakNote: "Racha simulada de 4 días: las sesiones cortas se acumulan.",
+  streakSummary: (days: number, lessons: number) =>
+    `Racha de ${days} ${days === 1 ? "día" : "días"} · ${lessons} ${
+      lessons === 1 ? "lección completada" : "lecciones completadas"
+    } esta semana`,
+  streakEmpty: "Completa una lección hoy para empezar una racha.",
+  lastSevenDays: "Últimos siete días",
 };

@@ -231,6 +231,82 @@ export const getLearnerPreferences = cache(async () => {
   };
 });
 
+export interface LearnerStreak {
+  /** Consecutive days with at least one completed lesson, ending today or yesterday. */
+  streakDays: number;
+  /** The last seven UTC days, oldest first. */
+  activeDays: boolean[];
+  lessonsThisWeek: number;
+}
+
+function utcDayKey(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+/**
+ * A real study streak, derived from `lesson_progress.completed_at`.
+ *
+ * Walking back starts at yesterday when today has no completion yet, so opening
+ * the dashboard in the morning does not look like a broken streak. The read is
+ * bounded to the 1,000 most recent completions: a streak longer than that is not
+ * something this panel needs to distinguish, and an unbounded scan of a learner's
+ * whole history on every dashboard render would be.
+ */
+export const getLearnerStreak = cache(async (): Promise<LearnerStreak> => {
+  const empty: LearnerStreak = {
+    streakDays: 0,
+    activeDays: [false, false, false, false, false, false, false],
+    lessonsThisWeek: 0,
+  };
+
+  const session = await getSession();
+  if (!session || !isSupabaseConfigured()) return empty;
+
+  const supabase = await createServerClient();
+  const { data } = await supabase
+    .from("lesson_progress")
+    .select("completed_at")
+    .eq("user_id", session.id)
+    .eq("completed", true)
+    .not("completed_at", "is", null)
+    .order("completed_at", { ascending: false })
+    .limit(1000);
+
+  const rows = (data ?? []) as Array<{ completed_at: string | null }>;
+  if (rows.length === 0) return empty;
+
+  const completedDays = new Set<string>();
+  for (const row of rows) {
+    if (!row.completed_at) continue;
+    const date = new Date(row.completed_at);
+    if (!Number.isNaN(date.getTime())) completedDays.add(utcDayKey(date));
+  }
+
+  const today = new Date();
+  const activeDays: boolean[] = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    activeDays.push(completedDays.has(utcDayKey(new Date(today.getTime() - i * 86_400_000))));
+  }
+
+  // Count whole lessons completed in the window, not just the days that had one.
+  const windowStart = new Date(today.getTime() - 6 * 86_400_000);
+  windowStart.setUTCHours(0, 0, 0, 0);
+  const lessonsCompletedThisWeek = rows.filter((row) => {
+    if (!row.completed_at) return false;
+    const date = new Date(row.completed_at);
+    return !Number.isNaN(date.getTime()) && date.getTime() >= windowStart.getTime();
+  }).length;
+
+  let streakDays = 0;
+  const todayActive = completedDays.has(utcDayKey(today));
+  for (let i = todayActive ? 0 : 1; i < 366; i += 1) {
+    if (!completedDays.has(utcDayKey(new Date(today.getTime() - i * 86_400_000)))) break;
+    streakDays += 1;
+  }
+
+  return { streakDays, activeDays, lessonsThisWeek: lessonsCompletedThisWeek };
+});
+
 export const getConversations = cache(async () => {
   const session = await getSession();
   if (!session || !isSupabaseConfigured()) return [];

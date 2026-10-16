@@ -62,7 +62,10 @@ export const getSession = cache(async (): Promise<SessionProfile | null> => {
     avatarKey: profile.avatar_key,
     role: profile.role as SessionProfile["role"],
     status: profile.status as SessionProfile["status"],
-    emailVerified: Boolean(profile.email_verified),
+    // Supabase's auth record is the authority on confirmation; the mirrored
+    // `profiles.email_verified` column is the fallback for a session that was
+    // verified before the mirror caught up.
+    emailVerified: Boolean(user.email_confirmed_at) || Boolean(profile.email_verified),
     countryCode: profile.country_code,
     locale: profile.locale ?? "en",
     creator: creatorRow

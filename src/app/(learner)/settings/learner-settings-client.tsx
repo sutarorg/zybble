@@ -5,11 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  BadgeCheck,
   BellRing,
+  Camera,
   Check,
   ChevronRight,
   Globe,
+  Loader2,
   LogOut,
+  MailWarning,
   Save,
   ShieldAlert,
   Target,
@@ -18,6 +22,7 @@ import {
 } from "lucide-react";
 import {
   requestAccountDeletion,
+  resendVerificationEmail,
   updateLearnerPreferences,
   updateProfile,
 } from "@/app/(learner)/actions";
@@ -45,14 +50,49 @@ import { cn } from "@/lib/utils";
 
 const GOALS = [15, 30, 45, 60, 90, 120];
 
+/**
+ * Optional email, keyed to the `learner_preferences` column it controls. Each
+ * entry names what turning it on actually causes — see `EMAIL_CONSENT` in
+ * `src/lib/server/email.ts` for the templates each key gates.
+ */
 const PREFS = [
-  { key: "emailCourseUpdates", title: "Course updates", text: "New lessons and announcements from your courses." },
-  { key: "weeklyReport", title: "Weekly learning report", text: "Your progress summary every Monday morning." },
-  { key: "studyReminders", title: "Study reminders", text: "Gentle nudges to keep your streak alive." },
-  { key: "emailPromos", title: "Promotions", text: "Price drops and launches in the catalog." },
+  {
+    key: "emailCourseUpdates",
+    title: "Course updates",
+    text: "New lessons and announcements from courses you are enrolled in.",
+    on: "Course update emails turned on",
+    off: "Course update emails turned off",
+  },
+  {
+    key: "weeklyReport",
+    title: "Weekly learning report",
+    text: "Your progress summary, sent every Monday morning.",
+    on: "Weekly learning report turned on",
+    off: "Weekly learning report turned off",
+  },
+  {
+    key: "studyReminders",
+    title: "Study reminders",
+    text: "A daily nudge on the days you have not completed a lesson.",
+    on: "Study reminders turned on",
+    off: "Study reminders turned off",
+  },
+  {
+    key: "emailPromos",
+    title: "Promotions",
+    text: "Price drops and new launches in the catalog.",
+    on: "Catalog promotion emails turned on",
+    off: "Catalog promotion emails turned off",
+  },
 ] as const;
 
-type PrefKey = (typeof PREFS)[number]["key"];
+type Preferences = {
+  goalMinutesPerDay: number;
+  emailCourseUpdates: boolean;
+  emailPromos: boolean;
+  weeklyReport: boolean;
+  studyReminders: boolean;
+};
 
 export function LearnerSettingsClient({
   accountName,
@@ -66,17 +106,11 @@ export function LearnerSettingsClient({
   accountEmail: string;
   emailVerified: boolean;
   avatarKey: string | null;
-  preferences: {
-    goalMinutesPerDay: number;
-    emailCourseUpdates: boolean;
-    emailPromos: boolean;
-    weeklyReport: boolean;
-    studyReminders: boolean;
-  };
+  preferences: Preferences;
   shortcuts: Array<{ href: string; label: string; text: string }>;
 }) {
   const router = useRouter();
-  const { language, setLanguage } = useApp();
+  const { language, setLanguage, uploadAvatar } = useApp();
 
   const [name, setName] = React.useState(accountName);
   const [savedName, setSavedName] = React.useState(accountName);
@@ -85,21 +119,54 @@ export function LearnerSettingsClient({
   const [savingPrefs, setSavingPrefs] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
+  const [resending, setResending] = React.useState(false);
+  const fileInput = React.useRef<HTMLInputElement>(null);
+
+  // The last value the server accepted. A failed save rolls back to this rather
+  // than to the original props, so one rejected toggle cannot undo an earlier
+  // change that did persist.
+  const savedPrefs = React.useRef(preferences);
+  React.useEffect(() => {
+    savedPrefs.current = preferences;
+    setPrefs(preferences);
+  }, [preferences]);
 
   const nameDirty = name.trim() !== savedName.trim();
-  const prefsDirty = JSON.stringify(prefs) !== JSON.stringify(preferences);
 
-  const persistPrefs = React.useCallback(
-    (next: typeof preferences) => {
-      setSavingPrefs(true);
-      void updateLearnerPreferences(next)
-        .then((result) => {
-          if (!result.ok) toast.error(result.error ?? "Could not save your preferences");
-          else toast.success("Preferences saved");
-        })
-        .finally(() => setSavingPrefs(false));
+  const persistPrefs = React.useCallback((next: Preferences, message: string) => {
+    setSavingPrefs(true);
+    void updateLearnerPreferences(next)
+      .then((result) => {
+        if (!result.ok) {
+          setPrefs(savedPrefs.current);
+          toast.error(result.error ?? "Could not save your preferences");
+          return;
+        }
+        savedPrefs.current = next;
+        toast.success(result.message ?? message);
+      })
+      .finally(() => setSavingPrefs(false));
+  }, []);
+
+  const handleAvatarFile = React.useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      // Clearing the field means picking the same file twice still fires change.
+      event.target.value = "";
+      if (!file) return;
+
+      setUploadingAvatar(true);
+      const result = await uploadAvatar(file);
+      setUploadingAvatar(false);
+
+      if (!result.success) {
+        toast.error(result.error ?? "Could not update your profile photo");
+        return;
+      }
+      toast.success("Profile photo updated");
     },
-    []
+    [uploadAvatar]
   );
 
   return (
@@ -116,32 +183,98 @@ export function LearnerSettingsClient({
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <UserRound className="size-4.5 text-primary" aria-hidden /> Profile
         </h2>
-        <div className="mt-4 flex items-center gap-4">
-          {avatarKey ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imagePath("avatars", avatarKey)}
-              alt=""
-              className="size-14 rounded-full object-cover ring-1 ring-border"
+
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <div className="relative">
+            {/* The photo is the control: clicking it opens the file picker. */}
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={uploadingAvatar}
+              aria-label="Change profile photo"
+              className={cn(
+                "group relative block size-16 cursor-pointer rounded-full ring-1 ring-border transition-shadow",
+                "hover:ring-2 hover:ring-primary/40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+                uploadingAvatar && "cursor-wait"
+              )}
+            >
+              {avatarKey ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imagePath("avatars", avatarKey)}
+                  alt=""
+                  className="size-16 rounded-full object-cover"
+                />
+              ) : (
+                <Avatar className="size-16">
+                  <AvatarFallback className="bg-primary text-base text-white">
+                    {initialsOf(name)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-zinc-900/55 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 data-[busy=true]:opacity-100" data-busy={uploadingAvatar}>
+                {uploadingAvatar ? (
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                ) : (
+                  <Camera className="size-5" aria-hidden />
+                )}
+              </span>
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(event) => void handleAvatarFile(event)}
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
             />
-          ) : (
-            <Avatar className="size-14 ring-1 ring-border">
-              <AvatarFallback className="bg-primary text-sm text-white">{initialsOf(name)}</AvatarFallback>
-            </Avatar>
-          )}
-          <div>
+          </div>
+
+          <div className="min-w-0">
             <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-              Signed in as <span className="font-medium text-foreground">{accountEmail}</span>
+              Signed in as <span className="font-medium text-foreground break-anywhere">{accountEmail}</span>
             </p>
-            {!emailVerified ? (
-              <p className="mt-1 inline-flex items-center gap-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
-                <ShieldAlert className="size-3" aria-hidden /> Email not verified yet
+            <p className="mt-1 text-[11.5px] text-zinc-400">
+              Click your photo to change it · JPEG, PNG or WebP up to 5 MB
+            </p>
+            {emailVerified ? (
+              <p className="mt-1.5 inline-flex items-center gap-1.5 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">
+                <BadgeCheck className="size-3" aria-hidden /> Email verified
               </p>
-            ) : null}
+            ) : (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <p className="inline-flex items-center gap-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
+                  <ShieldAlert className="size-3" aria-hidden /> Email not verified yet
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={resending}
+                  onClick={() => {
+                    setResending(true);
+                    void resendVerificationEmail()
+                      .then((result) => {
+                        if (!result.ok) {
+                          toast.error(result.error ?? "Could not send the verification email");
+                          return;
+                        }
+                        toast.success(result.message ?? "Verification email sent", {
+                          description: result.message ? undefined : `Check ${accountEmail}`,
+                        });
+                        router.refresh();
+                      })
+                      .finally(() => setResending(false));
+                  }}
+                >
+                  <MailWarning aria-hidden /> Resend verification email
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="space-y-1.5">
             <Label htmlFor="ls-name">Display name</Label>
             <Input id="ls-name" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
@@ -159,7 +292,7 @@ export function LearnerSettingsClient({
                       return;
                     }
                     setSavedName(name.trim());
-                    toast.success("Profile saved");
+                    toast.success(result.message ?? "Profile saved");
                     router.refresh();
                   })
                   .finally(() => setSavingProfile(false));
@@ -175,19 +308,25 @@ export function LearnerSettingsClient({
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <Target className="size-4.5 text-primary" aria-hidden /> Daily learning goal
         </h2>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
+          Shown in your sidebar and used to pace your study reminders.
+        </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {GOALS.map((goal) => (
             <button
               key={goal}
               type="button"
               aria-pressed={prefs.goalMinutesPerDay === goal}
+              disabled={savingPrefs}
               onClick={() => {
+                if (prefs.goalMinutesPerDay === goal) return;
                 const next = { ...prefs, goalMinutesPerDay: goal };
                 setPrefs(next);
-                persistPrefs(next);
+                persistPrefs(next, `Daily goal set to ${goal} minutes`);
               }}
               className={cn(
-                "flex h-11 cursor-pointer items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium transition-all sm:h-10",
+                "flex h-11 items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium transition-all sm:h-10",
+                savingPrefs ? "cursor-wait" : "cursor-pointer",
                 prefs.goalMinutesPerDay === goal
                   ? "border-primary bg-primary text-white shadow-sm"
                   : "border-border bg-white text-muted-foreground hover:border-zinc-300 hover:text-foreground"
@@ -230,8 +369,8 @@ export function LearnerSettingsClient({
           <BellRing className="size-4.5 text-primary" aria-hidden /> Email preferences
         </h2>
         <p className="mt-1 text-[12.5px] text-muted-foreground">
-          Transactional email such as receipts and moderation decisions is always sent. These control optional
-          messages.
+          Transactional email such as receipts, certificates and moderation decisions is always sent. These control
+          the optional messages, and each change is saved as soon as you make it.
         </p>
         <ul className="mt-3 space-y-1">
           {PREFS.map((item) => (
@@ -239,11 +378,13 @@ export function LearnerSettingsClient({
               <label className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/60">
                 <Checkbox
                   className="mt-0.5"
-                  checked={Boolean(prefs[item.key])}
+                  checked={prefs[item.key]}
+                  disabled={savingPrefs}
                   onCheckedChange={(value) => {
-                    const next = { ...prefs, [item.key]: value === true } as typeof prefs;
+                    const enabled = value === true;
+                    const next = { ...prefs, [item.key]: enabled } as Preferences;
                     setPrefs(next);
-                    persistPrefs(next);
+                    persistPrefs(next, enabled ? item.on : item.off);
                   }}
                 />
                 <span>
@@ -254,7 +395,7 @@ export function LearnerSettingsClient({
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[12px] text-zinc-400" aria-live="polite">
+        <p className="mt-3 text-[12px] text-zinc-400" role="status" aria-live="polite">
           {savingPrefs ? "Saving…" : ""}
         </p>
       </section>
@@ -349,12 +490,6 @@ export function LearnerSettingsClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {prefsDirty ? (
-        <p className="text-[11.5px] text-zinc-400" role="status">
-          Preferences save as soon as you change them.
-        </p>
-      ) : null}
     </div>
   );
 }

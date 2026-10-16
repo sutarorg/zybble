@@ -10,6 +10,7 @@ import type { User } from "@/types";
 import { toUiUser } from "@/lib/session-user";
 import { uploadAvatarFile } from "@/lib/upload";
 import { signOutAction } from "@/app/(auth)/actions";
+import { updateAvatar } from "@/app/(learner)/actions";
 import { useRouter } from "next/navigation";
 
 /**
@@ -21,22 +22,6 @@ import { useRouter } from "next/navigation";
  * that cannot grant access: the interface language, and nothing else.
  */
 
-export interface LearnerPrefs {
-  goalMinutesPerDay: number;
-  emailCourseUpdates: boolean;
-  emailPromos: boolean;
-  weeklyReport: boolean;
-  studyReminders: boolean;
-}
-
-const DEFAULT_LEARNER_PREFS: LearnerPrefs = {
-  goalMinutesPerDay: 30,
-  emailCourseUpdates: true,
-  emailPromos: false,
-  weeklyReport: true,
-  studyReminders: true,
-};
-
 const LANGUAGE_KEY = "zybble.language.v1";
 
 interface AppContextValue {
@@ -45,14 +30,11 @@ interface AppContextValue {
   session: SessionProfile | null;
   /** The same session projected onto the shape shared UI components expect. */
   user: User | null;
-  /** Uploads a new profile image to private R2 storage and updates the profile. */
+  /** Uploads a new profile image to private R2 storage and attaches it to the profile. */
   uploadAvatar: (file: File) => Promise<{ success: boolean; error?: string; avatarUrl?: string }>;
   /* interface language — a UI preference only */
   language: string;
   setLanguage: (code: string) => void;
-  /** Optimistic defaults; the authoritative preferences live in Postgres. */
-  learnerPrefs: LearnerPrefs;
-  setLearnerPrefs: (patch: Partial<LearnerPrefs>) => void;
   /** Signs out through the Supabase Auth server and clears the session cookie. */
   signOut: () => Promise<void>;
 }
@@ -81,22 +63,22 @@ export function AppProviders({
       if (!session) return { success: false, error: "Sign in to change your profile photo" };
       try {
         const result = await uploadAvatarFile(file);
-        if (!result.success) return { success: false, error: result.error };
-        // Re-render from the server so the avatar key comes from the database.
-        window.location.reload();
+        if (!result.success || !result.objectKey) return { success: false, error: result.error };
+
+        // The bytes are in R2, but nothing points at them yet: a server action
+        // re-checks the key and only then attaches it to the profile.
+        const confirmed = await updateAvatar(result.objectKey);
+        if (!confirmed.ok) return { success: false, error: confirmed.error };
+
+        // Re-render from the server so the avatar comes from the database.
+        router.refresh();
         return { success: true, avatarUrl: result.fileUrl };
       } catch {
         return { success: false, error: "Failed to upload your profile photo" };
       }
     },
-    [session]
+    [session, router]
   );
-
-  const setLearnerPrefs = useCallback(() => {
-    // Preferences are persisted server-side by the settings action; the local
-    // hook intentionally does nothing so nothing is silently stored in the
-    // browser and then lost.
-  }, []);
 
   const signOut = useCallback(async () => {
     await signOutAction();
@@ -114,11 +96,9 @@ export function AppProviders({
       uploadAvatar,
       language: language.hydrated ? language.value : "en",
       setLanguage: language.set,
-      learnerPrefs: DEFAULT_LEARNER_PREFS,
-      setLearnerPrefs,
       signOut,
     }),
-    [language.hydrated, language.value, language.set, session, uploadAvatar, setLearnerPrefs, signOut]
+    [language.hydrated, language.value, language.set, session, uploadAvatar, signOut]
   );
 
   return (
