@@ -2,19 +2,26 @@ import { LocalizedText } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+/**
+ * The brand mark, served from `public/zybble-mark.png`.
+ *
+ * Rendered with a plain `<img>` rather than `next/image`: it is a small static
+ * asset that appears in every header, sidebar and footer, so sending it
+ * through the image optimiser would add a request to the critical path for no
+ * gain. The intrinsic size is declared so the layout never shifts.
+ */
 export function ZybbleMark({ className }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        "flex size-8 items-center justify-center rounded-[10px] bg-primary shadow-sm",
-        className
-      )}
+    // eslint-disable-next-line @next/next/no-img-element -- static brand asset, see above
+    <img
+      src="/zybble-mark.png"
+      alt=""
+      width={32}
+      height={32}
+      decoding="async"
+      className={cn("size-8 shrink-0 rounded-[10px] object-contain", className)}
       aria-hidden
-    >
-      <svg viewBox="0 0 24 24" fill="none" className="size-4.5 text-white" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 5.5h12L9.5 18.5H18" />
-      </svg>
-    </span>
+    />
   );
 }
 
@@ -38,7 +45,9 @@ export function Logo({
     >
       <ZybbleMark />
       {showWordmark && (
-        <span className="font-display text-[19px] font-bold tracking-tight text-foreground"><LocalizedText text={"Zybble"} /></span>
+        <span className="font-display text-[19px] font-bold tracking-tight text-foreground">
+          <LocalizedText text={"Zybble"} />
+        </span>
       )}
     </Link>
   );

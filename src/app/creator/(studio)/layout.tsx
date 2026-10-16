@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { requireCreator } from "@/lib/server/session";
+import { getSession } from "@/lib/server/session";
 import { getCreatorCourses, getCreatorNotifications } from "@/lib/server/creator";
 import { CreatorStudioProvider, type StudioNotification } from "@/components/providers/creator-studio-context";
 import { CreatorShell } from "@/components/creator/creator-shell";
@@ -14,7 +14,15 @@ import { CreatorShell } from "@/components/creator/creator-shell";
  * learner can reach onboarding without already holding the creator role.
  */
 export default async function CreatorStudioLayout({ children }: { children: ReactNode }) {
-  const session = await requireCreator();
+  // A missing role is a *navigation* outcome, not a server exception: throwing
+  // here rendered the framework 500 page instead of letting the visitor do
+  // something about it. Send each case somewhere useful instead.
+  const session = await getSession();
+  if (!session) redirect("/login?next=/creator");
+  if (session.status !== "active") redirect("/login");
+  // Signed in but not yet a creator — onboarding is one click away.
+  if (!session.creator) redirect("/creator/signup");
+
   const [notifications, courses] = await Promise.all([getCreatorNotifications(), getCreatorCourses()]);
 
   const displayName = session.creator?.displayName ?? session.fullName;

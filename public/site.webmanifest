@@ -1,0 +1,16 @@
+{
+  "name": "Zybble — Learn AI Skills That Matter",
+  "short_name": "Zybble",
+  "description": "India's marketplace for practical AI courses. All prices in INR (₹).",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "icons": [
+    { "src": "/zybble-favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/zybble-favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/zybble-favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

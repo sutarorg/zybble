@@ -3,16 +3,14 @@
 import { LocalizedText, useTranslate } from "@/components/providers/localized-text";
 import Link from "next/link";
 import { TeachingCard } from "@/components/layout/teaching-card";
-import { usePathname, useRouter } from "next/navigation";
-import { Compass, GraduationCap, LogOut, ArrowLeft, Presentation } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Compass, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORIES } from "@/lib/config/catalog";
 import { categoryIcon } from "@/lib/icons";
 import { getDictionary } from "@/lib/i18n";
 import { useApp } from "@/components/providers/app-providers";
 import { Logo } from "@/components/layout/logo";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 function NavItem({
@@ -64,8 +62,7 @@ export function SidebarContent({
 }) {
   const translateUi = useTranslate();
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, signOut, language } = useApp();
+  const { user, language } = useApp();
   const dict = getDictionary(language);
 
   // Explore is the site root. Signed-in learners also get My Learning
@@ -131,38 +128,14 @@ export function SidebarContent({
         </nav>
       </div>
 
+      {/*
+        The public sidebar deliberately shows no account block. The marketplace
+        is browsable by guests and shared screens alike, so the signed-in
+        learner's name, avatar and sign-out live only in the header account
+        menu, where the session is unambiguous and one click away.
+      */}
       <div className="border-t border-border p-3">
-        {user ? (
-          <div className="flex flex-col gap-3">
-            <TeachingCard onNavigate={onNavigate} />
-            <div className="flex items-center gap-2.5 rounded-lg p-1.5">
-              <Avatar className="size-8.5">
-                {user.avatar && <AvatarImage src={user.avatar} alt={translateUi(user.name)} />}
-                <AvatarFallback className="bg-primary text-[11px] text-white">
-                  <LocalizedText text={user.initials} />
-                </AvatarFallback>
-              </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold"><LocalizedText text={user.name} /></p>
-              <span className="text-[11.5px] text-muted-foreground"><LocalizedText text={dict.account} /></span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                signOut();
-                router.push("/");
-              }}
-              title={translateUi(dict.signOut)}
-              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
-            >
-              <LogOut className="size-4" />
-              <span className="sr-only"><LocalizedText text={dict.signOut} /></span>
-            </button>
-            </div>
-          </div>
-        ) : (
-          <TeachingCard onNavigate={onNavigate} />
-        )}
+        <TeachingCard onNavigate={onNavigate} />
       </div>
     </div>
   );

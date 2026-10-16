@@ -149,7 +149,9 @@ export const serverEnv = {
   resendApiKey: read("RESEND_API_KEY"),
   resendFromEmail: read("RESEND_FROM_EMAIL"),
   openrouterApiKey: read("OPENROUTER_API_KEY"),
-  openrouterModel: read("OPENROUTER_MODEL") ?? "openai/gpt-4o-mini",
+  // DeepSeek is Zybble AI's model. Override with `OPENROUTER_MODEL` for any
+  // other OpenRouter slug (e.g. `deepseek/deepseek-chat-v3.1`).
+  openrouterModel: read("OPENROUTER_MODEL") ?? "deepseek/deepseek-chat",
   openrouterSiteUrl: read("OPENROUTER_SITE_URL") ?? publicEnv.siteUrl,
   openrouterAppName: read("OPENROUTER_APP_NAME") ?? "Zybble",
 };

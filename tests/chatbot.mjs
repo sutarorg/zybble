@@ -23,6 +23,10 @@ before(async () => {
   );
 });
 
+// `serverEnv` is built once at module load, so the key must exist before the
+// import below. It is a stand-in: no test here reaches OpenRouter.
+process.env.OPENROUTER_API_KEY ||= "test-key-not-a-credential";
+
 const { isChatbotPage, MAX_MESSAGE_CHARS, MAX_CONVERSATION_ENTRIES } = await import("../src/lib/chatbot.ts");
 const ai = await import("../src/lib/server/ai.ts");
 
@@ -157,5 +161,168 @@ test("fallback answers disclose the failure rather than faking an answer", () =>
     // Never invents a course, and always offers a real, allow-listed way out.
     assert.deepEqual(answer.recommendedSlugs ?? [], []);
     assert.equal(answer.link?.href, "/help");
+  }
+});
+/* -------------------------------------------------------------------------- */
+/* Streaming and the plain-text wire format                                    */
+/* -------------------------------------------------------------------------- */
+
+test("a plain-text reply keeps its prose and strips the SLUGS trailer", () => {
+  const answer = ai.parsePlainAnswer(
+    "The n8n course is the best fit for automation work.\nSLUGS: n8n-workflows, chatgpt-basics"
+  );
+  assert.equal(answer.text, "The n8n course is the best fit for automation work.");
+  assert.deepEqual(answer.recommendedSlugs, ["n8n-workflows", "chatgpt-basics"]);
+});
+
+test("a trailer is never shown to the visitor, even without a newline", () => {
+  const answer = ai.parsePlainAnswer("Nothing published yet.\nSLUGS: ");
+  assert.equal(answer.text, "Nothing published yet.");
+  assert.deepEqual(answer.recommendedSlugs, []);
+});
+
+test("an allow-listed LINK line becomes a link, an unknown one is dropped", () => {
+  const ok = ai.parsePlainAnswer("Ask support about that.\nLINK: /help | Help Center");
+  assert.deepEqual(ok.link, { href: "/help", label: "Help Center" });
+
+  const blocked = ai.parsePlainAnswer("Ask support about that.\nLINK: /admin/users | Users");
+  assert.equal(blocked.link, undefined);
+  assert.equal(blocked.text, "Ask support about that.");
+});
+
+test("parseAssistantContent accepts both wire formats", () => {
+  const json = ai.parseAssistantContent(
+    JSON.stringify({ text: "Here you go", recommended_slugs: ["n8n-workflows"] })
+  );
+  assert.equal(json.text, "Here you go");
+  assert.deepEqual(json.recommendedSlugs, ["n8n-workflows"]);
+
+  const plain = ai.parseAssistantContent("Here you go\nSLUGS: n8n-workflows");
+  assert.equal(plain.text, "Here you go");
+  assert.deepEqual(plain.recommendedSlugs, ["n8n-workflows"]);
+});
+
+test("a content-free plain reply fails closed rather than rendering nothing", () => {
+  assert.throws(() => ai.parseAssistantContent("   "), /Zybble AI is unavailable/);
+  assert.throws(() => ai.parsePlainAnswer("SLUGS: n8n-workflows"), /Zybble AI is unavailable/);
+});
+
+test("the streaming filter withholds a trailer that has not finished arriving", () => {
+  assert.equal(ai.visiblePrefix("Try n8n"), "Try n8n");
+  // The blank line before a trailer is withheld with it, so nothing is left behind.
+  assert.equal(ai.visiblePrefix("Try n8n\nSLUGS"), "Try n8n");
+  assert.equal(ai.visiblePrefix("Try n8n\nSLUGS: n8n"), "Try n8n");
+  // Once the line turns out to be prose it is released in full.
+  assert.equal(ai.visiblePrefix("Try n8n\nSLUGS are fun"), "Try n8n\nSLUGS are fun");
+  assert.equal(ai.visiblePrefix(""), "");
+});
+
+test("an SSE stream is read as deltas, then closed with a validated answer", async () => {
+  const frames = [
+    'data: {"choices":[{"delta":{"content":"Try "}}]}',
+    'data: {"choices":[{"delta":{"content":"the n8n course."}}]}',
+    'data: {"choices":[{"delta":{"content":"\\nSLUGS: n8n-workflows"}}]}',
+    "data: [DONE]",
+  ];
+  const body = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      // Deliberately split a frame across chunks: the reader must reassemble it.
+      controller.enqueue(encoder.encode(frames[0] + "\n\n" + frames[1].slice(0, 10)));
+      controller.enqueue(encoder.encode(frames[1].slice(10) + "\n\n" + frames[2] + "\n\n" + frames[3] + "\n\n"));
+      controller.close();
+    },
+  });
+
+  const events = [];
+  for await (const event of ai.streamZybbleAi({
+    messages: [{ role: "user", content: "automation?" }],
+    catalog,
+    fetchImpl: async () => ({ ok: true, status: 200, body }),
+  })) {
+    events.push(event);
+  }
+
+  const text = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
+  assert.equal(text, "Try the n8n course.");
+  assert.equal(events.at(-1).type, "done");
+  assert.deepEqual(events.at(-1).answer.recommendedSlugs, ["n8n-workflows"]);
+  // The trailer never reaches the visitor as text.
+  assert.doesNotMatch(text, /SLUGS/);
+});
+
+test("a hallucinated slug in a streamed reply is still dropped before rendering", async () => {
+  const body = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      controller.enqueue(
+        encoder.encode(
+          'data: {"choices":[{"delta":{"content":"Sure.\\nSLUGS: totally-made-up-course"}}]}\n\ndata: [DONE]\n\n'
+        )
+      );
+      controller.close();
+    },
+  });
+
+  const events = [];
+  for await (const event of ai.streamZybbleAi({
+    messages: [{ role: "user", content: "anything?" }],
+    catalog,
+    fetchImpl: async () => ({ ok: true, status: 200, body }),
+  })) {
+    events.push(event);
+  }
+
+  assert.equal(events.at(-1).type, "done");
+  assert.deepEqual(events.at(-1).answer.recommendedSlugs, ["totally-made-up-course"]);
+  assert.deepEqual(
+    ai.resolveRecommendations(events.at(-1).answer.recommendedSlugs, catalog),
+    []
+  );
+});
+
+test("a streamed reply is grounded in the prompt catalog, in INR", async () => {
+  let sentBody = "";
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"Hi"}}]}\n\ndata: [DONE]\n\n'));
+      controller.close();
+    },
+  });
+
+  for await (const _event of ai.streamZybbleAi({
+    messages: [{ role: "user", content: "hi" }],
+    catalog,
+    fetchImpl: async (_url, init) => {
+      sentBody = String(init.body);
+      return { ok: true, status: 200, body };
+    },
+  })) {
+    void _event;
+  }
+
+  const payload = JSON.parse(sentBody);
+  assert.equal(payload.stream, true);
+  assert.equal(payload.model, "deepseek/deepseek-chat");
+  // The model sees the catalog and nothing else — no KYC, no money internals.
+  assert.match(payload.messages[0].content, /n8n-workflows/);
+  assert.match(payload.messages[0].content, /price: 4000 INR/);
+});
+
+test("a rate-limited or failing upstream surfaces as the honest reason", async () => {
+  for (const [status, reason] of [[429, "rate_limited"], [500, "unavailable"], [402, "rate_limited"]]) {
+    await assert.rejects(
+      (async () => {
+        for await (const _event of ai.streamZybbleAi({
+          messages: [{ role: "user", content: "hi" }],
+          catalog,
+          fetchImpl: async () => ({ ok: false, status, body: null }),
+        })) {
+          void _event;
+        }
+      })(),
+      (error) => error.name === "AiUnavailableError" && error.reason === reason,
+      `status ${status}`
+    );
   }
 });
