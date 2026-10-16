@@ -181,15 +181,15 @@ create index if not exists payout_audit_events_request_idx
 -- Updated-at triggers
 -- ----------------------------------------------------------------------------
 
-drop trigger if exists set_updated_at on public.creator_payout_destinations;
-create trigger set_updated_at
+drop trigger if exists creator_payout_destinations_touch on public.creator_payout_destinations;
+create trigger creator_payout_destinations_touch
   before update on public.creator_payout_destinations
-  for each row execute function public.tg_set_updated_at();
+  for each row execute function public.touch_updated_at();
 
-drop trigger if exists set_updated_at on public.payout_requests;
-create trigger set_updated_at
+drop trigger if exists payout_requests_touch on public.payout_requests;
+create trigger payout_requests_touch
   before update on public.payout_requests
-  for each row execute function public.tg_set_updated_at();
+  for each row execute function public.touch_updated_at();
 
 -- ----------------------------------------------------------------------------
 -- State transition & immutability guard on payout_requests
