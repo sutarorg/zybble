@@ -84,7 +84,7 @@ export default async function PublishCoursePage({ params }: { params: Promise<{ 
       ) : null}
 
       {/* ---------------------------------------------------------- summary */}
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
         <h2 className="font-display text-[15px] font-semibold tracking-tight">Course summary</h2>
         <dl className="mt-4 grid gap-x-6 gap-y-3 text-[13px] sm:grid-cols-2">
           <SummaryItem label="Title">{course.title}</SummaryItem>
@@ -145,7 +145,7 @@ export default async function PublishCoursePage({ params }: { params: Promise<{ 
       </section>
 
       {/* --------------------------------------------------------- checklist */}
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
         <h2 className="font-display text-[15px] font-semibold tracking-tight">Readiness checklist</h2>
         <p className="mt-1 text-[12.5px] text-muted-foreground">
           The submit button unlocks when every required item below is done. These are the same rules the
@@ -176,7 +176,7 @@ export default async function PublishCoursePage({ params }: { params: Promise<{ 
       </section>
 
       {/* ----------------------------------------------------- review history */}
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
         <h2 className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-tight">
           <Send className="size-4 text-primary" aria-hidden /> Review history
         </h2>

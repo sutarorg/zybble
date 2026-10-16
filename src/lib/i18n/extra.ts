@@ -1245,19 +1245,19 @@ export const EXTRA_TEXT: Record<string, Record<string, string>> = {
     "de": "Füge einen Slogan hinzu und wähle mindestens ein Thema.",
     "ja": "キャッチフレーズと少なくとも一つのトピックを選んでください。"
   },
-  "Details & pricing": {
-    "es": "Detalles y precios",
-    "pt": "Detalhes e preços",
-    "fr": "Détails et tarifs",
-    "de": "Details & Preise",
-    "ja": "詳細と価格設定"
+  "Details & thumbnail": {
+    "es": "Detalles y miniatura",
+    "pt": "Detalhes e miniatura",
+    "fr": "Détails et vignette",
+    "de": "Details & Vorschaubild",
+    "ja": "詳細とサムネイル"
   },
-  "Thumbnail & resources": {
-    "es": "Miniatura y recursos",
-    "pt": "Miniatura e recursos",
-    "fr": "Vignette et ressources",
-    "de": "Vorschaubild & Ressourcen",
-    "ja": "サムネイルとリソース"
+  "Pricing": {
+    "es": "Precios",
+    "pt": "Preços",
+    "fr": "Tarifs",
+    "de": "Preise",
+    "ja": "価格設定"
   },
   "Review & submit": {
     "es": "Revisar y enviar",

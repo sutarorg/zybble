@@ -53,7 +53,7 @@ export default function PrivacyPage() {
 
         <LegalSection index={4} title="Sharing">
           <p>
-            <LocalizedText text={"Zybble shares data only with the processors needed to run the service — hosting and database (Supabase on Vercel), video hosting and processing (Bunny Stream), private file storage (Cloudflare R2), payments and payouts (Razorpay), transactional email (Resend) and course-discovery AI inference (OpenRouter) — and when required by law. We do not sell personal data. Creators see aggregated course statistics, not identifiable learner data, except when you post a review or message them."} />
+            <LocalizedText text={"Zybble shares data only with the processors needed to run the service — hosting, database, video hosting and processing, private file storage, payments and payouts, transactional email and course-discovery AI inference providers — and when required by law. We do not sell personal data. Creators see aggregated course statistics, not identifiable learner data, except when you post a review or message them."} />
           </p>
         </LegalSection>
 

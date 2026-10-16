@@ -21,7 +21,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Details &amp; pricing</h1>
+          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Details &amp; thumbnail</h1>
           <p className="mt-1.5 text-[14px] text-muted-foreground">{course.title}</p>
         </div>
         <StatusBadge status={course.status} />
@@ -63,6 +63,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
           language: course.language,
           priceRupees: paiseToRupees(course.pricePaise),
           compareAtRupees: course.compareAtPaise > 0 ? paiseToRupees(course.compareAtPaise) : "",
+          thumbnailKey: course.thumbnailKey,
           whatYouLearn: course.whatYouLearn.length > 0 ? course.whatYouLearn : [""],
           requirements: course.requirements.length > 0 ? course.requirements : [""],
           audience: course.audience.length > 0 ? course.audience : [""],

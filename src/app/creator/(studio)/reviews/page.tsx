@@ -37,7 +37,7 @@ export default async function CreatorReviewsPage() {
   const average = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [animation:fadeSlide_.35s_ease_both]">
       <header>
         <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Learner reviews</h1>
         <p className="mt-1.5 text-[14px] text-muted-foreground">
@@ -56,7 +56,7 @@ export default async function CreatorReviewsPage() {
       ) : (
         <ul className="grid gap-3 lg:grid-cols-2">
           {reviews.map((review) => (
-            <li key={review.id} className="rounded-xl border border-border bg-white p-4 shadow-card">
+            <li key={review.id} className="rounded-2xl border border-border bg-white p-4 shadow-card">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[13px] font-medium text-muted-foreground">{review.courseTitle}</p>

@@ -35,7 +35,7 @@ export function CourseWizardFrame({ steps, children }: { steps: CourseWizardStep
   const backHref = activeIndex === 0 ? "/creator/courses" : previousHref;
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-5xl space-y-6 [animation:fadeSlide_.35s_ease_both]">
       <WizardStepper steps={steps} />
 
       {children}

@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import { saveCourse } from "@/app/creator/actions";
 import { CATEGORIES, TEACHING_LANGUAGES } from "@/lib/config/catalog";
 import { rupeesToPaise } from "@/lib/money";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
+const ThumbnailUpload = dynamic(() => import("@/components/creator/thumbnail-upload").then((m) => m.ThumbnailUpload), { ssr: false, loading: () => <div className="h-24 w-44 animate-pulse rounded-xl bg-muted" /> });
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export interface CourseDetailsInitial {
   id?: string;
+  thumbnailKey?: string | null;
   title: string;
   subtitle: string;
   description: string;
@@ -69,6 +72,7 @@ export function CourseDetailsForm({
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+  const thumbnailFile = React.useRef<File | null>(null);
 
   const isCreate = !initial?.id;
 
@@ -119,6 +123,10 @@ export function CourseDetailsForm({
     }
 
     if (isCreate) {
+      if (thumbnailFile.current && result.id) {
+        const { uploadThumbnail } = await import("@/components/creator/thumbnail-upload");
+        await uploadThumbnail(result.id, thumbnailFile.current).catch(() => null);
+      }
       // First save creates the record; the wizard unlocks and continues.
       router.push(`/creator/courses/${result.id}/curriculum`);
       router.refresh();
@@ -129,7 +137,7 @@ export function CourseDetailsForm({
   }
 
   return (
-    <form onSubmit={onSubmit} aria-busy={busy} className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
+    <form onSubmit={onSubmit} aria-busy={busy} className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
       <FormError message={error} />
 
       {/* ---------------------------------------------------------------- */}
@@ -139,9 +147,6 @@ export function CourseDetailsForm({
         <h2 id="cd-basics-heading" className="font-display text-[15px] font-semibold tracking-tight">
           About this course
         </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          The title and description appear everywhere your course is listed.
-        </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
@@ -219,9 +224,6 @@ export function CourseDetailsForm({
         <h2 id="cd-class-heading" className="font-display text-[15px] font-semibold tracking-tight">
           Category, level and language
         </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          These decide where your course appears and who it is suggested to.
-        </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
@@ -286,9 +288,6 @@ export function CourseDetailsForm({
         <h2 id="cd-outcomes-heading" className="font-display text-[15px] font-semibold tracking-tight">
           Outcomes and audience
         </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          Concrete bullets sell a course far better than adjectives. Up to {MAX_LIST_ITEMS} items each.
-        </p>
 
         <ListEditor
           title="What learners will be able to do"
@@ -313,64 +312,11 @@ export function CourseDetailsForm({
         />
       </section>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Pricing                                                           */}
-      {/* ---------------------------------------------------------------- */}
-      <section aria-labelledby="cd-pricing-heading" className="mt-7 border-t border-border pt-6">
-        <h2 id="cd-pricing-heading" className="font-display text-[15px] font-semibold tracking-tight">
-          Pricing
-        </h2>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          Zybble is INR-only. Prices are stored as exact integer paise; set 0 to keep the course free.
-        </p>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="cd-price" required>
-              Price (₹)
-            </FieldLabel>
-            <Input
-              id="cd-price"
-              inputMode="decimal"
-              required
-              disabled={locked}
-              placeholder="0"
-              value={form.priceRupees}
-              onChange={(e) => update("priceRupees", e.target.value)}
-              aria-invalid={Boolean(fieldErrors.priceRupees)}
-              aria-describedby={fieldErrors.priceRupees ? "cd-price-error" : "cd-price-help"}
-            />
-            <FieldHint
-              id="cd-price-help"
-              errorId="cd-price-error"
-              error={fieldErrors.priceRupees}
-              hint={`Stored as ${previewPaise(form.priceRupees)} paise. 0 makes the course free.`}
-            />
-          </div>
-
-          <div>
-            <FieldLabel htmlFor="cd-compare">Compare-at price (₹)</FieldLabel>
-            <Input
-              id="cd-compare"
-              inputMode="decimal"
-              disabled={locked}
-              placeholder="Optional"
-              value={form.compareAtRupees}
-              onChange={(e) => update("compareAtRupees", e.target.value)}
-              aria-invalid={Boolean(fieldErrors.compareAtRupees)}
-              aria-describedby={fieldErrors.compareAtRupees ? "cd-compare-error" : "cd-compare-help"}
-            />
-            <FieldHint
-              id="cd-compare-help"
-              errorId="cd-compare-error"
-              error={fieldErrors.compareAtRupees}
-              hint="Shown struck through next to the price — use it only for a genuine earlier price."
-            />
-          </div>
-        </div>
+      <section aria-labelledby="cd-thumb-heading" className="mt-7 border-t border-border pt-6">
+        <h2 id="cd-thumb-heading" className="font-display text-[15px] font-semibold tracking-tight">Thumbnail</h2>
+        <div className="mt-4"><ThumbnailUpload courseId={initial?.id} thumbnailKey={initial?.thumbnailKey ?? null} disabled={locked} onFile={isCreate ? (f) => { thumbnailFile.current = f; } : undefined} /></div>
       </section>
 
-      {/* ---------------------------------------------------------------- */}
       {/* Actions                                                           */}
       {/* ---------------------------------------------------------------- */}
       <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-border pt-5">

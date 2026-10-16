@@ -95,7 +95,7 @@ export default async function CreatorAnalyticsPage({
     }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [animation:fadeSlide_.35s_ease_both]">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Analytics</h1>
@@ -151,7 +151,7 @@ export default async function CreatorAnalyticsPage({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-xl border border-border bg-white p-5 shadow-card lg:col-span-2">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-card lg:col-span-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-display text-[15px] font-semibold tracking-tight">Views over time</h2>
             <p className="text-[12px] text-muted-foreground">
@@ -170,7 +170,7 @@ export default async function CreatorAnalyticsPage({
           )}
         </section>
 
-        <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
           <h2 className="font-display text-[15px] font-semibold tracking-tight">Discovery funnel</h2>
           <p className="mt-1 text-[12px] text-muted-foreground">Where attention turns into sales.</p>
           <div className="mt-4 space-y-2">
@@ -204,7 +204,7 @@ export default async function CreatorAnalyticsPage({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-xl border border-border bg-white p-5 shadow-card lg:col-span-2">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-card lg:col-span-2">
           <h2 className="font-display text-[15px] font-semibold tracking-tight">Watch time by course</h2>
           <p className="mt-1 text-[12px] text-muted-foreground">
             Total minutes of lesson playback, longest first.
@@ -229,7 +229,7 @@ export default async function CreatorAnalyticsPage({
           )}
         </section>
 
-        <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
           <h2 className="font-display text-[15px] font-semibold tracking-tight">Most viewed</h2>
           <p className="mt-1 text-[12px] text-muted-foreground">Course pages opened in this window.</p>
           {topByViews.length === 0 ? (
@@ -240,7 +240,7 @@ export default async function CreatorAnalyticsPage({
         </section>
       </div>
 
-      <section className="rounded-xl border border-border bg-white shadow-card">
+      <section className="rounded-2xl border border-border bg-white shadow-card">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-5 py-4">
           <h2 className="font-display text-[15px] font-semibold tracking-tight">Course breakdown</h2>
           <p className="text-[12px] text-muted-foreground">

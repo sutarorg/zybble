@@ -61,7 +61,7 @@ export default async function CreatorDashboardPage({
     }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [animation:fadeSlide_.35s_ease_both]">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">
@@ -77,17 +77,6 @@ export default async function CreatorDashboardPage({
           </Link>
         </Button>
       </header>
-
-      {!finance.earningsAvailable ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] text-amber-900">
-          <p className="font-semibold">Earnings could not be read</p>
-          <p className="mt-1 text-amber-800">
-            The revenue trend and money figures below are zeros because the captured-sales totals
-            did not come back — not because you have earned nothing. Course and payout data is
-            unaffected.
-          </p>
-        </div>
-      ) : null}
 
       {!route.hasAccount && finance.netEarnedPaise > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] text-amber-900">
@@ -125,7 +114,7 @@ export default async function CreatorDashboardPage({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-xl border border-border bg-white p-5 shadow-card lg:col-span-2">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-card lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-display text-[15px] font-semibold tracking-tight">Revenue trend</h2>
@@ -149,7 +138,7 @@ export default async function CreatorDashboardPage({
           </div>
         </section>
 
-        <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
           <h2 className="font-display text-[15px] font-semibold tracking-tight">Top courses by learners</h2>
           {topCourses.length === 0 ? (
             <p className="mt-4 text-[13px] text-muted-foreground">
@@ -162,7 +151,7 @@ export default async function CreatorDashboardPage({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display text-[15px] font-semibold tracking-tight">Your courses</h2>
             <Button asChild variant="ghost" size="sm">
@@ -202,7 +191,7 @@ export default async function CreatorDashboardPage({
           )}
         </section>
 
-        <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
           <h2 className="font-display text-[15px] font-semibold tracking-tight">Money movement</h2>
           <dl className="mt-4 space-y-3">
             {[
@@ -225,7 +214,7 @@ export default async function CreatorDashboardPage({
         </section>
       </div>
 
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-card">
         <h2 className="flex items-center gap-2 font-display text-[15px] font-semibold tracking-tight">
           <Sparkles className="size-4 text-primary" aria-hidden /> Creator checklist
         </h2>

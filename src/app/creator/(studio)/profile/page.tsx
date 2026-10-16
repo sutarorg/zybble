@@ -37,7 +37,7 @@ export default async function CreatorProfilePage() {
   const username = profile?.username;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [animation:fadeSlide_.35s_ease_both]">
       <header>
         <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Creator profile</h1>
         <p className="mt-1.5 text-[14px] text-muted-foreground">
@@ -45,7 +45,7 @@ export default async function CreatorProfilePage() {
         </p>
       </header>
 
-      <section className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-5 shadow-card">
+      <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-white p-5 shadow-card">
         {/* The photo is the upload control: click it to change it. */}
         <AvatarUpload avatarKey={profile?.avatar_key ?? null} name={displayName} />
         <div className="min-w-0 flex-1">

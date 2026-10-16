@@ -162,7 +162,7 @@ export function CreatorSettingsForm({ preferences }: { preferences: CreatorStudi
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <BellRing className="size-4.5 text-primary" aria-hidden /> Studio alerts
         </h2>
@@ -220,7 +220,7 @@ export function CreatorSettingsForm({ preferences }: { preferences: CreatorStudi
         </p>
       </section>
 
-      <section className="rounded-xl border border-border bg-white p-5 shadow-card sm:p-6">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
           <BookOpenCheck className="size-4.5 text-primary" aria-hidden /> Defaults for new courses
         </h2>

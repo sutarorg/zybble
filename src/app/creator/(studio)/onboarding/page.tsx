@@ -45,7 +45,7 @@ export default async function CreatorOnboardingPage() {
         {steps.map((step, index) => {
           const meta = CREATOR_STEPS[index];
           return (
-            <li key={step.id} className="rounded-xl border border-border bg-white p-4 shadow-card">
+            <li key={step.id} className="rounded-2xl border border-border bg-white p-4 shadow-card">
               <div className="flex flex-wrap items-start gap-3">
                 <span
                   className={`flex size-8 shrink-0 items-center justify-center rounded-full ${

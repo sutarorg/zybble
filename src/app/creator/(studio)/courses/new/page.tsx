@@ -26,10 +26,7 @@ export default async function NewCoursePage() {
     <CourseWizardFrame steps={steps}>
       <header>
         <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Create a course</h1>
-        <p className="mt-1.5 text-[14px] text-muted-foreground">
-          Start with the details. You can add curriculum, video and downloadable resources next. The course stays
-          a private draft until you submit it for review.
-        </p>
+        <p className="mt-1.5 text-[14px] text-muted-foreground">Add the basics and a thumbnail — you can build the rest next.</p>
       </header>
 
       <RouteBlockedNotice route={route} />

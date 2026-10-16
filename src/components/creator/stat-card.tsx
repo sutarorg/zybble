@@ -18,7 +18,7 @@ export function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-white p-4.5 shadow-card sm:p-5">
+    <div className="rounded-2xl border border-border bg-white p-4.5 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover sm:p-5">
       <div className="flex items-center justify-between">
         <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-primary">
           <Icon className="size-4.5" aria-hidden />
