@@ -1,6 +1,5 @@
 import { Clock, Users, Wallet, BookOpen } from "lucide-react";
 import { getCreatorAnalytics, getCreatorCourses } from "@/lib/server/creator";
-import { money } from "@/lib/creator";
 import { formatInrCompact } from "@/lib/money";
 import { StatCard } from "@/components/creator/stat-card";
 import { AreaChart, BarList } from "@/components/creator/charts";
@@ -69,7 +68,7 @@ export default async function CreatorAnalyticsPage({
             description="Nothing has been sold in the selected period, so there is nothing to chart."
           />
         ) : (
-          <AreaChart className="mt-4" data={chartData} formatValue={(value) => money(value)} />
+          <AreaChart className="mt-4" data={chartData} valueFormat="money" />
         )}
       </section>
 
