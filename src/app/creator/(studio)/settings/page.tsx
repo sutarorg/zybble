@@ -83,7 +83,6 @@ export default async function CreatorSettingsPage() {
           </li>
           <li>• Payout destinations and requests are managed on the Payouts page, where they are encrypted at rest.</li>
           <li>• Account status, role and email address are managed from your learner settings and by administrators.</li>
-          <li>• Zybble publishes no refund policy, so there is nothing here to configure.</li>
         </ul>
       </section>
     </div>
