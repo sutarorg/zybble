@@ -122,6 +122,18 @@ async function handleUpload(request: Request, body: unknown, session: Awaited<Re
       content_type: contentType,
       size_bytes: sizeBytes,
     });
+    // Keep the denormalised counter on the course truthful — the catalog and
+    // the review checklist read it, and `refreshCourseAggregates` only runs on
+    // curriculum changes.
+    const { count } = await service
+      .from("course_resources")
+      .select("id", { count: "exact", head: true })
+      .eq("course_id", courseId);
+    await service
+      .from("courses")
+      .update({ downloadable_resources: count ?? 0 })
+      .eq("id", courseId)
+      .eq("creator_id", session.id);
   }
 
   return Response.json({ key, url, expiresInSeconds: 15 * 60 }, { status: 201, headers: rateLimitHeaders(limit) });

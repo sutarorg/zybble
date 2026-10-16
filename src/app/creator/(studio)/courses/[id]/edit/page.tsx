@@ -13,29 +13,44 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
   const [course, route] = await Promise.all([getCreatorCourse(id), getRouteOnboardingState()]);
   if (!course) notFound();
 
+  const locked = course.status === "published";
+  // A course that has never been submitted keeps the wizard's "Save draft" action.
+  const isFirstDraft = course.status === "draft" && !course.submittedAt;
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header className="flex flex-wrap items-center gap-3">
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Edit course</h1>
+          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Details &amp; pricing</h1>
           <p className="mt-1.5 text-[14px] text-muted-foreground">{course.title}</p>
         </div>
         <StatusBadge status={course.status} />
       </header>
 
-      {course.status === "published" ? (
+      {locked ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3.5 text-[13px] text-sky-900">
           This course is published, so its details are locked for buyers. Ask an administrator to unpublish it
           before you make changes — otherwise learners would see a course that silently changed under them.
         </div>
       ) : null}
 
+      {course.status === "changes_requested" || course.status === "rejected" ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5 text-[13px] text-amber-900">
+          <p className="font-medium">
+            {course.status === "changes_requested" ? "The reviewers asked for changes." : "This submission was rejected."}
+          </p>
+          {course.rejectionReason ? <p className="mt-1">{course.rejectionReason}</p> : null}
+          <p className="mt-1">
+            Update the course, then resubmit it from the Review &amp; submit step.
+          </p>
+        </div>
+      ) : null}
+
       <RouteBlockedNotice route={route} />
 
       <CourseDetailsForm
-        routeActive={route.settlementVerified}
-        lockPrice={course.status === "published"}
-        submitLabel="Save changes"
+        locked={locked}
+        submitLabel={isFirstDraft ? "Save draft" : "Save changes"}
         initial={{
           id: course.id,
           title: course.title,
