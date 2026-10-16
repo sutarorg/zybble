@@ -7,6 +7,7 @@ import { createServerClient, createServiceClient } from "@/lib/supabase/server";
 import { requireSession, AuthorizationError } from "@/lib/server/session";
 import { issueCertificateIfComplete } from "@/lib/server/learner";
 import { confirmAvatarUpload } from "@/lib/server/account";
+import { alertCreator } from "@/lib/server/creator-alerts";
 import { sendVerificationEmail } from "@/lib/server/verification";
 import { rateLimit } from "@/lib/rate-limit";
 import { signOutAction } from "@/app/(auth)/actions";
@@ -404,6 +405,16 @@ export async function submitReview(input: unknown): Promise<ActionResult> {
     if (!parsed.success) return { ok: false, error: "Invalid review" };
 
     const supabase = await createServerClient();
+
+    // An edited review is not a new one, and only a new review is worth
+    // interrupting a creator for.
+    const { data: previous } = await supabase
+      .from("reviews")
+      .select("id")
+      .eq("course_id", parsed.data.courseId)
+      .eq("user_id", session.id)
+      .maybeSingle();
+
     // The `reviews_insert_entitled` RLS policy is the authority: a learner can
     // only review a course they hold an entitlement to.
     const { error } = await supabase.from("reviews").upsert(
@@ -425,7 +436,38 @@ export async function submitReview(input: unknown): Promise<ActionResult> {
     }
 
     revalidatePath(`/courses`);
-    return { ok: true };
+
+    if (!previous) {
+      const { data: course } = await supabase
+        .from("courses")
+        .select("id, title, creator_id")
+        .eq("id", parsed.data.courseId)
+        .maybeSingle();
+      const creatorId = (course?.creator_id as string | null) ?? null;
+      if (creatorId) {
+        const courseTitle = String(course?.title ?? "your course");
+        // Best-effort and gated by the creator's studio settings; a review that
+        // saved must never fail because its announcement did not.
+        await alertCreator({
+          creatorId,
+          kind: "new_review",
+          notification: {
+            title: `New review on ${courseTitle}`,
+            body: `${parsed.data.rating} out of 5 from a learner.`,
+            href: "/creator/reviews",
+          },
+          payload: {
+            courseTitle,
+            rating: parsed.data.rating,
+            reviewTitle: parsed.data.title ?? "",
+            reviewBody: parsed.data.body ?? "",
+          },
+          idempotencyKey: `creator-review:${parsed.data.courseId}:${session.id}`,
+        });
+      }
+    }
+
+    return { ok: true, message: "Review published" };
   } catch (error) {
     return fail(error, "Could not save your review");
   }

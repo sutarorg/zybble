@@ -202,3 +202,48 @@ export function validateDraftStep(step: CreatorStepId, draft: CourseDraft): Draf
   }
   return errors;
 }
+/* -------------------------------------------------------------------------- */
+/* Public username                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Usernames nobody may claim.
+ *
+ * These are not routes — a creator lives at `/instructors/<username>` — they are
+ * impersonation risks: a learner reading "zybble" or "support" as the instructor
+ * name would reasonably believe the platform itself is teaching the course.
+ */
+export const RESERVED_USERNAMES: readonly string[] = [
+  "zybble",
+  "admin",
+  "administrator",
+  "moderator",
+  "support",
+  "help",
+  "helpdesk",
+  "official",
+  "system",
+  "api",
+  "www",
+  "mail",
+  "email",
+  "instructors",
+  "instructor",
+  "creator",
+  "creators",
+  "team",
+  "staff",
+  "root",
+  "null",
+  "undefined",
+];
+
+/** Lowercases and trims the way the server schema does, so a check and a save agree. */
+export function normalizeUsername(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function isReservedUsername(value: string): boolean {
+  const normalized = normalizeUsername(value);
+  return RESERVED_USERNAMES.includes(normalized) || normalized.startsWith("zybble-");
+}

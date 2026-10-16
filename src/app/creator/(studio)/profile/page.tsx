@@ -1,10 +1,8 @@
-import { UserRound } from "lucide-react";
 import { createServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { requireCreator } from "@/lib/server/session";
-import { imagePath } from "@/lib/image-path";
+import { AvatarUpload } from "@/components/creator/avatar-upload";
 import { CreatorProfileForm } from "./creator-profile-form";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export const metadata = { title: "Creator profile" };
 export const dynamic = "force-dynamic";
@@ -48,11 +46,8 @@ export default async function CreatorProfilePage() {
       </header>
 
       <section className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-5 shadow-card">
-        <Avatar className="size-16 ring-1 ring-border">
-          <AvatarFallback className="bg-zinc-800 text-white">
-            <UserRound className="size-7" aria-hidden />
-          </AvatarFallback>
-        </Avatar>
+        {/* The photo is the upload control: click it to change it. */}
+        <AvatarUpload avatarKey={profile?.avatar_key ?? null} name={displayName} />
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-[17px] font-semibold tracking-tight">{displayName}</h2>
           {profile?.headline ? (
@@ -72,6 +67,9 @@ export default async function CreatorProfilePage() {
               "Choose a username to publish your instructor page."
             )}
           </p>
+          <p className="mt-1 text-[11.5px] text-zinc-400">
+            Click your photo to change it · JPEG, PNG or WebP up to 5 MB
+          </p>
         </div>
       </section>
 
@@ -88,14 +86,6 @@ export default async function CreatorProfilePage() {
           website: profile?.website ?? "",
         }}
       />
-
-      {profile?.avatar_key ? (
-        <p className="text-[12px] text-zinc-400">
-          Avatar is served from private storage at{" "}
-          <code className="font-mono">{imagePath("avatars", profile.avatar_key)}</code> behind an authenticated
-          image route — it is never a public bucket URL.
-        </p>
-      ) : null}
     </div>
   );
 }

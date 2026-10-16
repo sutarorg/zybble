@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createServiceClient, createServerClient } from "@/lib/supabase/server";
-import { requireCreator, AuthorizationError } from "@/lib/server/session";
+import { requireCreator, requireSession, AuthorizationError } from "@/lib/server/session";
 import { inrPriceInputSchema, formatInr } from "@/lib/money";
-import { dispatchEmail } from "@/lib/server/email";
+import { sendEmail } from "@/lib/server/email";
 import {
   encryptPayoutDestination,
   PayoutCryptoError,
@@ -19,6 +19,9 @@ import {
 } from "@/lib/server/payouts";
 import { getCreatorFinance } from "@/lib/server/creator";
 import { announceNewLesson } from "@/lib/server/course-updates";
+import { isReservedUsername } from "@/lib/creator";
+import { TEACHING_LANGUAGES } from "@/lib/config/catalog";
+import { rateLimit } from "@/lib/rate-limit";
 
 export interface CreatorActionResult {
   ok: boolean;
@@ -44,10 +47,9 @@ const UUID = z.string().uuid();
 /** Turns a learner account into a creator account without losing learner state. */
 export async function becomeCreator(): Promise<CreatorActionResult> {
   try {
-    const session = await requireCreator().catch(async () => {
-      const { requireSession } = await import("@/lib/server/session");
-      return requireSession();
-    });
+    // Becoming a creator is the one studio action that must work *before* a
+    // creator profile exists, so the guard is the session, not the studio role.
+    const session = await requireSession();
     const service = createServiceClient();
     if (!service) return { ok: false, error: "Service is unavailable" };
 
@@ -71,14 +73,17 @@ export async function becomeCreator(): Promise<CreatorActionResult> {
   }
 }
 
+const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, "Pick a username with at least 3 characters")
+  .max(30)
+  .regex(/^[a-z0-9][a-z0-9-]*$/, "Use lowercase letters, numbers and hyphens only")
+  .refine((value) => !isReservedUsername(value), "That username is reserved");
+
 const creatorProfileSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(3, "Pick a username with at least 3 characters")
-    .max(30)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, "Use lowercase letters, numbers and hyphens only"),
+  username: usernameSchema,
   displayName: z.string().trim().min(2, "Enter your display name").max(80),
   headline: z.string().trim().max(140).optional(),
   bio: z.string().trim().max(2000).optional(),
@@ -86,6 +91,88 @@ const creatorProfileSchema = z.object({
   topics: z.array(z.string().max(40)).max(10).default([]),
   website: z.string().trim().url("Enter a valid URL").max(200).optional().or(z.literal("")),
 });
+
+export interface UsernameAvailability {
+  available: boolean;
+  /**
+   * Why it is not available, in words the form can render. `own` means the
+   * caller already holds it, which counts as available.
+   */
+  reason?: "invalid" | "reserved" | "taken" | "own" | "unavailable" | "rate_limited";
+  /** The server's own wording, so the form shows the rule that was applied. */
+  message?: string;
+  /**
+   * The normalised value that was actually checked. The caller must compare it
+   * against the field before painting a result, or a slow response for
+   * "adas" would tick a box that now says "adash".
+   */
+  checked: string;
+}
+
+/**
+ * Live username availability for the profile and signup forms.
+ *
+ * Reads through the service role because one creator cannot see another's
+ * `creator_profiles` row under RLS, and an availability check that could only
+ * ever see its own row would report every username as free. The answer is not a
+ * secret: `/instructors/<username>` is a public page, so this discloses nothing
+ * that browsing the catalog does not. It is rate limited anyway, because a
+ * per-keystroke endpoint is otherwise a free enumeration service.
+ *
+ * The verdict is advisory — `saveCreatorProfile` re-checks and is the only thing
+ * that can actually claim the name.
+ */
+export async function checkUsernameAvailability(username: unknown): Promise<UsernameAvailability> {
+  const checked = typeof username === "string" ? username.trim().toLowerCase() : "";
+
+  try {
+    const session = await requireSession();
+
+    const limit = rateLimit(`username:${session.id}`, 40, 60_000);
+    if (!limit.allowed) {
+      return { available: false, reason: "rate_limited", message: "Too many checks — pause a moment", checked };
+    }
+
+    const parsed = usernameSchema.safeParse(username);
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message ?? "That username is not allowed";
+      return {
+        available: false,
+        reason: /reserved/i.test(message) ? "reserved" : "invalid",
+        message,
+        checked,
+      };
+    }
+
+    const service = createServiceClient();
+    if (!service) {
+      return { available: false, reason: "unavailable", message: "Availability cannot be checked right now", checked };
+    }
+
+    const { data, error } = await service
+      .from("creator_profiles")
+      .select("user_id")
+      .eq("username", parsed.data)
+      .maybeSingle();
+    if (error) {
+      return { available: false, reason: "unavailable", message: "Availability cannot be checked right now", checked };
+    }
+
+    if (!data) return { available: true, message: "Available", checked };
+    if (String(data.user_id) === session.id) {
+      return { available: true, reason: "own", message: "This is your current username", checked };
+    }
+    return { available: false, reason: "taken", message: "That username is already taken", checked };
+  } catch (error) {
+    if (error instanceof AuthorizationError) {
+      return { available: false, reason: "unavailable", message: error.message, checked };
+    }
+    console.error("[creator-action] username check failed", {
+      reason: error instanceof Error ? error.message.slice(0, 200) : "unknown",
+    });
+    return { available: false, reason: "unavailable", message: "Availability cannot be checked right now", checked };
+  }
+}
 
 export async function saveCreatorProfile(input: unknown): Promise<CreatorActionResult> {
   try {
@@ -357,15 +444,20 @@ export async function requestCreatorPayout(input: unknown): Promise<CreatorActio
       .eq("id", session.id)
       .maybeSingle();
     if (profile?.email) {
-      await dispatchEmail({
-        to_email: String(profile.email),
+      // Sent through `sendEmail`, not `dispatchEmail`: this is a payout update,
+      // and the creator's studio settings decide whether payout updates reach
+      // their inbox. The request itself is already committed either way.
+      await sendEmail({
+        to: String(profile.email),
+        userId: session.id,
         template: "payout_requested",
-        payload: {
+        data: {
           creatorName: String(profile.full_name ?? "Creator"),
           publicId,
           amount: formatInr(requestedPaise),
           destinationMasked: `${String(dest.method).toUpperCase()} (${String(dest.masked_destination)})`,
         },
+        idempotencyKey: `payout_requested:${publicId}`,
       });
     }
 
@@ -684,11 +776,14 @@ export async function submitCourseForReview(courseId: string): Promise<CreatorAc
     });
 
     const { data: profile } = await service.from("profiles").select("email, full_name").eq("id", session.id).maybeSingle();
-    if (profile) {
-      await dispatchEmail({
-        to_email: profile.email,
+    if (profile?.email) {
+      // A moderation notice: gated by the studio's moderation switch.
+      await sendEmail({
+        to: String(profile.email),
+        userId: session.id,
         template: "course_submitted",
-        payload: { creatorName: profile.full_name ?? "Creator", courseTitle: course.title },
+        data: { creatorName: String(profile.full_name ?? "Creator"), courseTitle: course.title },
+        idempotencyKey: `course_submitted:${courseId}:${Date.now()}`,
       });
     }
 
@@ -949,32 +1044,68 @@ export async function deleteResource(resourceId: string, courseId: string): Prom
   }
 }
 
-const prefsSchema = z.object({
-  goalMinutesPerDay: z.number().int().min(5).max(480),
-  emailCourseUpdates: z.boolean(),
-  emailPromos: z.boolean(),
-  weeklyReport: z.boolean(),
-  studyReminders: z.boolean(),
+const studioPrefsSchema = z.object({
+  emailNewEnrollment: z.boolean(),
+  emailNewReview: z.boolean(),
+  emailModeration: z.boolean(),
+  emailPayoutUpdates: z.boolean(),
+  notifyInApp: z.boolean(),
+  defaultCourseLanguage: z.string().trim().min(1, "Choose a teaching language").max(40),
+  defaultCourseLevel: z.enum(["beginner", "intermediate", "advanced"]),
+  /** Typed in rupees like every other price field; stored as integer paise. */
+  defaultPriceRupees: inrPriceInputSchema,
 });
 
 /**
- * Creator preferences.
+ * Studio settings.
  *
- * There is no payout threshold, payout method or currency control here:
- * settlement runs through Razorpay Route into an Indian bank account and is
- * configured in the Razorpay Dashboard, not in Zybble.
+ * These write to `creator_studio_preferences` and nowhere else. This action used
+ * to save the learner's daily goal and study reminders from the studio, with
+ * camelCase keys against a snake_case table — so it configured the wrong table
+ * and the write was rejected besides.
+ *
+ * What is deliberately not here: payout destinations and requests live on the
+ * Payouts page, the commission rate is a marketplace setting, and learner
+ * preferences belong to `/settings`.
  */
 export async function saveCreatorPreferences(input: unknown): Promise<CreatorActionResult> {
   try {
     const session = await requireCreator();
-    const parsed = prefsSchema.safeParse(input);
-    if (!parsed.success) return { ok: false, error: "Invalid preferences" };
+    const parsed = studioPrefsSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Check your studio settings" };
+    }
+
+    if (!(TEACHING_LANGUAGES as readonly string[]).includes(parsed.data.defaultCourseLanguage)) {
+      return { ok: false, error: "Choose a teaching language Zybble supports" };
+    }
+
     const supabase = await createServerClient();
-    await supabase.from("learner_preferences").upsert({ user_id: session.id, ...parsed.data }, { onConflict: "user_id" });
+    const { error } = await supabase.from("creator_studio_preferences").upsert(
+      {
+        user_id: session.id,
+        email_new_enrollment: parsed.data.emailNewEnrollment,
+        email_new_review: parsed.data.emailNewReview,
+        email_moderation: parsed.data.emailModeration,
+        email_payout_updates: parsed.data.emailPayoutUpdates,
+        notify_in_app: parsed.data.notifyInApp,
+        default_course_language: parsed.data.defaultCourseLanguage,
+        default_course_level: parsed.data.defaultCourseLevel,
+        default_price_paise: parsed.data.defaultPriceRupees,
+      },
+      { onConflict: "user_id" }
+    );
+    if (error) {
+      console.error("[creator-action] could not save studio settings", { reason: error.message.slice(0, 200) });
+      return { ok: false, error: "Could not save your studio settings" };
+    }
+
+    // The new-course form reads these defaults, so it must re-read them too.
     revalidatePath("/creator/settings");
-    return { ok: true, message: `Saved. Your next earnings summary will show amounts in INR.` };
+    revalidatePath("/creator/courses/new");
+    return { ok: true, message: "Studio settings saved" };
   } catch (error) {
-    return fail(error, "Could not save your preferences");
+    return fail(error, "Could not save your studio settings");
   }
 }
 

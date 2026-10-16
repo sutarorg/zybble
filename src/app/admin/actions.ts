@@ -100,6 +100,8 @@ export async function approveCourse(input: unknown): Promise<AdminActionResult> 
     if (creatorProfile) {
       await enqueueEmail({
         to: creatorProfile.email,
+        // The creator id lets consent be read without resolving the address.
+        userId: String(course.creator_id),
         template: "course_approved",
         payload: {
           creatorName: creatorProfile.full_name ?? "Creator",
@@ -157,6 +159,8 @@ export async function requestCourseChanges(input: unknown): Promise<AdminActionR
     if (creatorProfile) {
       await enqueueEmail({
         to: creatorProfile.email,
+        // The creator id lets consent be read without resolving the address.
+        userId: String(course.creator_id),
         template: "course_changes_requested",
         payload: {
           creatorName: creatorProfile.full_name ?? "Creator",
@@ -213,6 +217,8 @@ export async function rejectCourse(input: unknown): Promise<AdminActionResult> {
     if (creatorProfile) {
       await enqueueEmail({
         to: creatorProfile.email,
+        // The creator id lets consent be read without resolving the address.
+        userId: String(course.creator_id),
         template: "course_rejected",
         payload: {
           creatorName: creatorProfile.full_name ?? "Creator",
@@ -647,6 +653,8 @@ export async function approvePayoutRequestAction(input: unknown): Promise<AdminA
     if (creatorProfile?.email) {
       await enqueueEmail({
         to: String(creatorProfile.email),
+        // The creator id lets consent be read without resolving the address.
+        userId: String(row.creator_id),
         template: "payout_approved",
         payload: {
           creatorName: String(creatorProfile.full_name ?? "Creator"),
@@ -748,6 +756,8 @@ export async function rejectPayoutRequestAction(input: unknown): Promise<AdminAc
     if (creatorProfile?.email) {
       await enqueueEmail({
         to: String(creatorProfile.email),
+        // The creator id lets consent be read without resolving the address.
+        userId: String(row.creator_id),
         template: "payout_rejected",
         payload: {
           creatorName: String(creatorProfile.full_name ?? "Creator"),
@@ -844,6 +854,8 @@ export async function markPayoutRequestFailedAction(input: unknown): Promise<Adm
     if (creatorProfile?.email) {
       await enqueueEmail({
         to: String(creatorProfile.email),
+        // The creator id lets consent be read without resolving the address.
+        userId: String(row.creator_id),
         template: "payout_failed",
         payload: {
           creatorName: String(creatorProfile.full_name ?? "Creator"),
@@ -992,6 +1004,8 @@ export async function confirmManualPayoutPaidAction(input: unknown): Promise<Adm
     if (creatorProfile?.email) {
       await enqueueEmail({
         to: String(creatorProfile.email),
+        // The creator id lets consent be read without resolving the address.
+        userId: String(row.creator_id),
         template: "payout_paid",
         payload: {
           creatorName: String(creatorProfile.full_name ?? "Creator"),

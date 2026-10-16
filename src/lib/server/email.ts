@@ -21,6 +21,8 @@ export type EmailTemplate =
   | "course_changes_requested"
   | "course_rejected"
   | "verify_email"
+  | "creator_new_enrollment"
+  | "creator_new_review"
   | "course_update"
   | "weekly_learning_report"
   | "study_reminder"
@@ -42,6 +44,8 @@ export const EMAIL_TEMPLATES = [
   "course_changes_requested",
   "course_rejected",
   "verify_email",
+  "creator_new_enrollment",
+  "creator_new_review",
   "course_update",
   "weekly_learning_report",
   "study_reminder",
@@ -81,6 +85,8 @@ export interface EmailPayload {
   data: Record<string, string | number>;
   /** Unique per business event; a retry reuses the same key and cannot duplicate. */
   idempotencyKey: string;
+  /** Recipient's user id, so consent is read without looking the address up. */
+  userId?: string | null;
 }
 
 const shell = (title: string, body: string) => `<!doctype html>
@@ -169,6 +175,49 @@ export function renderEmailTemplate(
            <p style="color:#71717a;font-size:13px">If you did not create a Zybble account, you can ignore this email.</p>`
         ) + button(`${data.actionUrl ?? `${origin}/login`}`, "Confirm email address"),
       };
+    case "creator_new_enrollment": {
+      const enrollments = Number(data.enrollments ?? 1);
+      return {
+        subject: `New enrollment in ${data.courseTitle}`,
+        html: shell(
+          "Somebody enrolled in your course",
+          `<p>Hi ${data.creatorName ?? "there"},</p>
+           <p><strong>${data.courseTitle}</strong> gained ${enrollments} new ${
+             enrollments === 1 ? "enrollment" : "enrollments"
+           }. The learner's payment was captured and verified, and the amount is already reflected in your available balance.</p>
+           <table style="margin:16px 0;font-size:14px">
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Your share</td><td><strong>${formatInr(
+               Number(data.creatorSharePaise ?? 0)
+             )}</strong></td></tr>
+             <tr><td style="padding:4px 16px 4px 0;color:#71717a">Total students</td><td><strong>${Number(
+               data.students ?? 0
+             )}</strong></td></tr>
+           </table>`
+        ) + button(`${origin}/creator/earnings`, "Open earnings"),
+      };
+    }
+    case "creator_new_review": {
+      const rating = Number(data.rating ?? 0);
+      const stars = rating > 0 ? `${rating} out of 5` : "a rating";
+      return {
+        subject: `New review on ${data.courseTitle}`,
+        html: shell(
+          "A learner reviewed your course",
+          `<p>Hi ${data.creatorName ?? "there"},</p>
+           <p><strong>${data.courseTitle}</strong> received ${stars}.</p>
+           ${
+             data.reviewTitle
+               ? `<p style="margin:12px 0 0"><strong>${data.reviewTitle}</strong></p>`
+               : ""
+           }
+           ${
+             data.reviewBody
+               ? `<blockquote style="margin:12px 0;padding:12px 16px;background:#fafafa;border-left:3px solid #d4d4d8;color:#3f3f46">${data.reviewBody}</blockquote>`
+               : ""
+           }`
+        ) + button(`${origin}/creator/reviews`, "Read your reviews"),
+      };
+    }
     case "course_update": {
       const courseUrl = String(data.courseUrl ?? `${origin}/my-learning`);
       return {
@@ -401,6 +450,44 @@ const CONSENT_DEFAULTS: Record<LearnerConsentKey, boolean> = {
   study_reminders: true,
 };
 
+/** The `creator_studio_preferences` column that gates a studio message. */
+export type CreatorConsentKey =
+  | "email_new_enrollment"
+  | "email_new_review"
+  | "email_moderation"
+  | "email_payout_updates";
+
+/**
+ * Studio messages, gated by the creator's own settings page.
+ *
+ * Moderation and payout notices are included because `/creator/settings` offers
+ * those switches — a toggle that does nothing is a lie. The underlying records
+ * stay visible in the studio either way: turning payout email off does not hide
+ * a payout, it only stops the announcement.
+ */
+export const CREATOR_EMAIL_CONSENT: Partial<Record<EmailTemplate, CreatorConsentKey>> = {
+  course_submitted: "email_moderation",
+  course_approved: "email_moderation",
+  course_changes_requested: "email_moderation",
+  course_rejected: "email_moderation",
+  payout_requested: "email_payout_updates",
+  payout_approved: "email_payout_updates",
+  payout_paid: "email_payout_updates",
+  payout_rejected: "email_payout_updates",
+  payout_failed: "email_payout_updates",
+  transfer_status: "email_payout_updates",
+  creator_new_enrollment: "email_new_enrollment",
+  creator_new_review: "email_new_review",
+};
+
+/** Column defaults from `creator_studio_preferences`. */
+const CREATOR_CONSENT_DEFAULTS: Record<CreatorConsentKey, boolean> = {
+  email_new_enrollment: true,
+  email_new_review: true,
+  email_moderation: true,
+  email_payout_updates: true,
+};
+
 export type ConsentResult =
   | { allowed: true }
   | { allowed: false; reason: "opted_out" | "unknown_recipient" | "unavailable" };
@@ -412,7 +499,14 @@ export type ConsentResult =
  * be read, the optional message is not sent. Guessing "they probably meant yes"
  * is how an unsubscribe stops working.
  */
-export async function hasEmailConsent(to: string, template: EmailTemplate): Promise<ConsentResult> {
+export async function hasEmailConsent(
+  to: string,
+  template: EmailTemplate,
+  userId?: string | null
+): Promise<ConsentResult> {
+  const creatorKey = CREATOR_EMAIL_CONSENT[template];
+  if (creatorKey) return hasCreatorConsent(to, creatorKey, userId);
+
   const key = EMAIL_CONSENT[template];
   if (!key) return { allowed: true };
 
@@ -437,6 +531,44 @@ export async function hasEmailConsent(to: string, template: EmailTemplate): Prom
   // so a brand-new learner gets course updates but no marketing.
   const stored = prefs ? (prefs as Record<string, unknown>)[key] : undefined;
   const allowed = stored === undefined || stored === null ? CONSENT_DEFAULTS[key] : Boolean(stored);
+  return allowed ? { allowed: true } : { allowed: false, reason: "opted_out" };
+}
+
+/**
+ * Studio consent for a creator, resolved from `creator_studio_preferences`.
+ *
+ * A creator with no row yet gets the schema defaults (everything on), which is
+ * also what the settings page shows them — so the first enrollment email is not
+ * suppressed by a preference nobody has ever set.
+ */
+async function hasCreatorConsent(
+  to: string,
+  key: CreatorConsentKey,
+  userId?: string | null
+): Promise<ConsentResult> {
+  const service = createServiceClient();
+  if (!service) return { allowed: false, reason: "unavailable" };
+
+  let id = userId ?? null;
+  if (!id) {
+    const { data: profile } = await service
+      .from("profiles")
+      .select("id")
+      .eq("email", to.trim().toLowerCase())
+      .maybeSingle();
+    if (!profile) return { allowed: false, reason: "unknown_recipient" };
+    id = String(profile.id);
+  }
+
+  const { data, error } = await service
+    .from("creator_studio_preferences")
+    .select("email_new_enrollment, email_new_review, email_moderation, email_payout_updates")
+    .eq("user_id", id)
+    .maybeSingle();
+  if (error) return { allowed: false, reason: "unavailable" };
+
+  const stored = data ? (data as unknown as Record<string, unknown>)[key] : undefined;
+  const allowed = stored === undefined || stored === null ? CREATOR_CONSENT_DEFAULTS[key] : Boolean(stored);
   return allowed ? { allowed: true } : { allowed: false, reason: "opted_out" };
 }
 
@@ -467,7 +599,7 @@ export async function dispatchEmail(row: {
 export async function sendEmail(
   payload: EmailPayload
 ): Promise<{ providerId?: string; error?: string; skipped?: "consent" }> {
-  const consent = await hasEmailConsent(payload.to, payload.template);
+  const consent = await hasEmailConsent(payload.to, payload.template, payload.userId);
   if (!consent.allowed) return { skipped: "consent" };
   return dispatchEmail({ to_email: payload.to, template: payload.template, payload: payload.data });
 }
@@ -490,10 +622,12 @@ export async function enqueueEmail(input: {
   payload: Record<string, string | number>;
   /** Stable per business object, e.g. `receipt:<publicOrderId>`. */
   idempotencyKey: string;
+  /** Recipient's user id, so consent is read without looking the address up. */
+  userId?: string | null;
 }): Promise<{ queued: boolean; error?: string; skipped?: "consent" }> {
   // An optional message to somebody who turned it off is not queued at all, so
   // the outbox never becomes a place where consent is checked later.
-  const consent = await hasEmailConsent(input.to, input.template);
+  const consent = await hasEmailConsent(input.to, input.template, input.userId);
   if (!consent.allowed) return { queued: false, skipped: "consent" };
 
   const service = createServiceClient();
@@ -544,35 +678,52 @@ export async function enqueueEmailBatch(
   const service = createServiceClient();
   if (!service) return { queued: 0, skippedConsent: inputs.length, error: "Email outbox is unavailable" };
 
-  const consentColumns: LearnerConsentKey[] = [
-    "email_course_updates",
-    "email_promos",
-    "weekly_report",
-    "study_reminders",
-  ];
-  /** `<userId>:<column>` → whether that learner allows that message. */
+  /** `<userId>:<column>` → whether that person allows that message. */
   const allowedById = new Map<string, boolean>();
 
-  const gatedIds = [
-    ...new Set(
-      inputs.filter((input) => EMAIL_CONSENT[input.template] && input.userId).map((input) => input.userId as string)
-    ),
-  ];
-  for (let i = 0; i < gatedIds.length; i += 500) {
-    const { data } = await service
-      .from("learner_preferences")
-      .select("user_id, email_course_updates, email_promos, weekly_report, study_reminders")
-      .in("user_id", gatedIds.slice(i, i + 500));
-    for (const row of (data ?? []) as unknown as Array<Record<string, unknown>>) {
-      for (const column of consentColumns) {
-        const value = row[column];
-        allowedById.set(
-          `${String(row.user_id)}:${column}`,
-          value === undefined || value === null ? CONSENT_DEFAULTS[column] : Boolean(value)
-        );
+  const collect = async <T extends string>(
+    table: "learner_preferences" | "creator_studio_preferences",
+    columns: readonly T[],
+    defaults: Record<T, boolean>,
+    gated: (input: BatchEmailInput) => T | undefined
+  ) => {
+    const ids = [
+      ...new Set(inputs.filter((input) => gated(input) && input.userId).map((input) => input.userId as string)),
+    ];
+    for (let i = 0; i < ids.length; i += 500) {
+      const { data } = await service
+        .from(table)
+        .select(`user_id, ${columns.join(", ")}`)
+        .in("user_id", ids.slice(i, i + 500));
+      for (const row of (data ?? []) as unknown as Array<Record<string, unknown>>) {
+        for (const column of columns) {
+          const value = row[column];
+          allowedById.set(
+            `${String(row.user_id)}:${column}`,
+            value === undefined || value === null ? defaults[column] : Boolean(value)
+          );
+        }
       }
     }
-  }
+  };
+
+  await collect(
+    "learner_preferences",
+    ["email_course_updates", "email_promos", "weekly_report", "study_reminders"] as const,
+    CONSENT_DEFAULTS,
+    (input) => EMAIL_CONSENT[input.template]
+  );
+  await collect(
+    "creator_studio_preferences",
+    [
+      "email_new_enrollment",
+      "email_new_review",
+      "email_moderation",
+      "email_payout_updates",
+    ] as const,
+    CREATOR_CONSENT_DEFAULTS,
+    (input) => CREATOR_EMAIL_CONSENT[input.template]
+  );
 
   const rows: Array<{
     to_email: string;
@@ -584,12 +735,15 @@ export async function enqueueEmailBatch(
   let skippedConsent = 0;
 
   for (const input of inputs) {
-    const column = EMAIL_CONSENT[input.template];
+    const column = EMAIL_CONSENT[input.template] ?? CREATOR_EMAIL_CONSENT[input.template];
     if (column) {
       // No preference row means the schema defaults apply, exactly as they do
       // for the single-recipient path.
+      const defaults = EMAIL_CONSENT[input.template]
+        ? CONSENT_DEFAULTS[column as LearnerConsentKey]
+        : CREATOR_CONSENT_DEFAULTS[column as CreatorConsentKey];
       const allowed = input.userId
-        ? allowedById.get(`${input.userId}:${column}`) ?? CONSENT_DEFAULTS[column]
+        ? allowedById.get(`${input.userId}:${column}`) ?? defaults
         : (await hasEmailConsent(input.to, input.template)).allowed;
       if (!allowed) {
         skippedConsent += 1;

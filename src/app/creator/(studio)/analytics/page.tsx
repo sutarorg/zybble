@@ -295,7 +295,7 @@ export default async function CreatorAnalyticsPage({
       </section>
 
       <p className="text-[12px] leading-relaxed text-zinc-400">
-        An impression is counted when a course card enters a learner's viewport, once per course per
+        An impression is counted when a course card enters a learner&apos;s viewport, once per course per
         page view. A view is a course page open. Watch time is whole seconds of lesson playback from a
         signed-in learner, so previews watched while signed out are not included. Course events older
         than the platform retention window are pruned, and nothing here is sampled or modelled.

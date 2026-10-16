@@ -518,6 +518,75 @@ function buildSeries(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Studio preferences                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface CreatorStudioPreferences {
+  emailNewEnrollment: boolean;
+  emailNewReview: boolean;
+  emailModeration: boolean;
+  emailPayoutUpdates: boolean;
+  notifyInApp: boolean;
+  defaultCourseLanguage: string;
+  defaultCourseLevel: "beginner" | "intermediate" | "advanced";
+  defaultPricePaise: number;
+  updatedAt: string | null;
+}
+
+/** The schema's column defaults, used until a creator saves their own. */
+export const STUDIO_PREFERENCE_DEFAULTS: CreatorStudioPreferences = {
+  emailNewEnrollment: true,
+  emailNewReview: true,
+  emailModeration: true,
+  emailPayoutUpdates: true,
+  notifyInApp: true,
+  defaultCourseLanguage: "English",
+  defaultCourseLevel: "beginner",
+  defaultPricePaise: 0,
+  updatedAt: null,
+};
+
+const LEVELS = ["beginner", "intermediate", "advanced"] as const;
+
+/**
+ * Studio settings for the signed-in creator.
+ *
+ * Readable under RLS because the row belongs to the caller; a creator with no
+ * row yet gets the schema defaults rather than an empty form, so the settings
+ * page shows the behaviour the platform actually applies.
+ */
+export const getCreatorStudioPreferences = cache(async (): Promise<CreatorStudioPreferences> => {
+  const session = await requireCreator();
+  if (!isSupabaseConfigured()) return STUDIO_PREFERENCE_DEFAULTS;
+
+  const supabase = await createServerClient();
+  const { data } = await supabase
+    .from("creator_studio_preferences")
+    .select("*")
+    .eq("user_id", session.id)
+    .maybeSingle();
+  if (!data) return STUDIO_PREFERENCE_DEFAULTS;
+
+  const row = data as Record<string, unknown>;
+  const level = String(row.default_course_level ?? "beginner");
+  const price = Number(row.default_price_paise ?? 0);
+
+  return {
+    emailNewEnrollment: Boolean(row.email_new_enrollment ?? true),
+    emailNewReview: Boolean(row.email_new_review ?? true),
+    emailModeration: Boolean(row.email_moderation ?? true),
+    emailPayoutUpdates: Boolean(row.email_payout_updates ?? true),
+    notifyInApp: Boolean(row.notify_in_app ?? true),
+    defaultCourseLanguage: String(row.default_course_language ?? "English"),
+    defaultCourseLevel: (LEVELS as readonly string[]).includes(level)
+      ? (level as CreatorStudioPreferences["defaultCourseLevel"])
+      : "beginner",
+    defaultPricePaise: Number.isFinite(price) && price >= 0 ? Math.round(price) : 0,
+    updatedAt: (row.updated_at as string) ?? null,
+  };
+});
+
+/* -------------------------------------------------------------------------- */
 /* Catalog engagement (creator analytics)                                      */
 /* -------------------------------------------------------------------------- */
 

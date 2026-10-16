@@ -7,11 +7,9 @@ import { toast } from "sonner";
 import {
   BadgeCheck,
   BellRing,
-  Camera,
   Check,
   ChevronRight,
   Globe,
-  Loader2,
   LogOut,
   MailWarning,
   Save,
@@ -30,9 +28,7 @@ import { signOutAction } from "@/app/(auth)/actions";
 import { useApp } from "@/components/providers/app-providers";
 import { LANGUAGES } from "@/lib/config/catalog";
 import { getDictionary } from "@/lib/i18n";
-import { initialsOf } from "@/lib/format";
-import { imagePath } from "@/lib/image-path";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AvatarUpload } from "@/components/creator/avatar-upload";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -110,7 +106,7 @@ export function LearnerSettingsClient({
   shortcuts: Array<{ href: string; label: string; text: string }>;
 }) {
   const router = useRouter();
-  const { language, setLanguage, uploadAvatar } = useApp();
+  const { language, setLanguage } = useApp();
 
   const [name, setName] = React.useState(accountName);
   const [savedName, setSavedName] = React.useState(accountName);
@@ -119,54 +115,31 @@ export function LearnerSettingsClient({
   const [savingPrefs, setSavingPrefs] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
   const [resending, setResending] = React.useState(false);
-  const fileInput = React.useRef<HTMLInputElement>(null);
 
   // The last value the server accepted. A failed save rolls back to this rather
   // than to the original props, so one rejected toggle cannot undo an earlier
-  // change that did persist.
-  const savedPrefs = React.useRef(preferences);
-  React.useEffect(() => {
-    savedPrefs.current = preferences;
-    setPrefs(preferences);
-  }, [preferences]);
+  // change that did persist. State, not a ref: the rollback has to render.
+  const [savedPrefs, setSavedPrefs] = React.useState(preferences);
 
   const nameDirty = name.trim() !== savedName.trim();
 
-  const persistPrefs = React.useCallback((next: Preferences, message: string) => {
-    setSavingPrefs(true);
-    void updateLearnerPreferences(next)
-      .then((result) => {
-        if (!result.ok) {
-          setPrefs(savedPrefs.current);
-          toast.error(result.error ?? "Could not save your preferences");
-          return;
-        }
-        savedPrefs.current = next;
-        toast.success(result.message ?? message);
-      })
-      .finally(() => setSavingPrefs(false));
-  }, []);
-
-  const handleAvatarFile = React.useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      // Clearing the field means picking the same file twice still fires change.
-      event.target.value = "";
-      if (!file) return;
-
-      setUploadingAvatar(true);
-      const result = await uploadAvatar(file);
-      setUploadingAvatar(false);
-
-      if (!result.success) {
-        toast.error(result.error ?? "Could not update your profile photo");
-        return;
-      }
-      toast.success("Profile photo updated");
+  const persistPrefs = React.useCallback(
+    (next: Preferences, message: string) => {
+      setSavingPrefs(true);
+      void updateLearnerPreferences(next)
+        .then((result) => {
+          if (!result.ok) {
+            setPrefs(savedPrefs);
+            toast.error(result.error ?? "Could not save your preferences");
+            return;
+          }
+          setSavedPrefs(next);
+          toast.success(result.message ?? message);
+        })
+        .finally(() => setSavingPrefs(false));
     },
-    [uploadAvatar]
+    [savedPrefs]
   );
 
   return (
@@ -185,51 +158,7 @@ export function LearnerSettingsClient({
         </h2>
 
         <div className="mt-4 flex flex-wrap items-center gap-4">
-          <div className="relative">
-            {/* The photo is the control: clicking it opens the file picker. */}
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              disabled={uploadingAvatar}
-              aria-label="Change profile photo"
-              className={cn(
-                "group relative block size-16 cursor-pointer rounded-full ring-1 ring-border transition-shadow",
-                "hover:ring-2 hover:ring-primary/40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
-                uploadingAvatar && "cursor-wait"
-              )}
-            >
-              {avatarKey ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={imagePath("avatars", avatarKey)}
-                  alt=""
-                  className="size-16 rounded-full object-cover"
-                />
-              ) : (
-                <Avatar className="size-16">
-                  <AvatarFallback className="bg-primary text-base text-white">
-                    {initialsOf(name)}
-                  </AvatarFallback>
-                </Avatar>
-              )}
-              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-zinc-900/55 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 data-[busy=true]:opacity-100" data-busy={uploadingAvatar}>
-                {uploadingAvatar ? (
-                  <Loader2 className="size-5 animate-spin" aria-hidden />
-                ) : (
-                  <Camera className="size-5" aria-hidden />
-                )}
-              </span>
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(event) => void handleAvatarFile(event)}
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden
-            />
-          </div>
+          <AvatarUpload avatarKey={avatarKey} name={name} onUploaded={() => router.refresh()} />
 
           <div className="min-w-0">
             <p className="text-[12.5px] leading-relaxed text-muted-foreground">

@@ -28,6 +28,7 @@ import { randomUUID } from "node:crypto";
 import { requireServiceClient, type SessionProfile } from "@/lib/server/session";
 import {
   CURRENCY,
+  formatInr,
   splitCommission,
   assertInr,
   type CommissionBps,
@@ -40,6 +41,7 @@ import {
   type RazorpayWebhookPayload,
 } from "@/lib/server/razorpay";
 import { enqueueEmail } from "@/lib/server/email";
+import { alertCreator } from "@/lib/server/creator-alerts";
 
 export class CheckoutError extends Error {
   readonly code: string;
@@ -499,12 +501,14 @@ export async function applyCapturedPayment(
 
   // Keep the denormalised catalog counters honest — derived from real
   // entitlements, never set by a client.
+  const studentsByCourse = new Map<string, number>();
   for (const item of items ?? []) {
     const { count } = await service
       .from("entitlements")
       .select("id", { count: "exact", head: true })
       .eq("course_id", item.course_id)
       .is("revoked_at", null);
+    studentsByCourse.set(String(item.course_id), count ?? 0);
     await service.from("courses").update({ students_count: count ?? 0 }).eq("id", item.course_id);
   }
 
@@ -519,6 +523,34 @@ export async function applyCapturedPayment(
     amountPaise: input.amountPaise,
     item: items?.[0] ?? null,
   });
+
+  // Each creator whose course was in this order hears about the sale, through
+  // whichever channels their studio settings allow.
+  for (const item of items ?? []) {
+    const creatorId = String(item.creator_id ?? "");
+    const courseId = String(item.course_id ?? "");
+    if (!creatorId || !courseId) continue;
+    const courseTitle = String(item.course_title ?? "your course");
+    await alertCreator(
+      {
+        creatorId,
+        kind: "new_enrollment",
+        notification: {
+          title: `New enrollment in ${courseTitle}`,
+          body: `${formatInr(Number(item.creator_share_paise ?? 0))} added to your available balance.`,
+          href: "/creator/earnings",
+        },
+        payload: {
+          courseTitle,
+          creatorSharePaise: Number(item.creator_share_paise ?? 0),
+          enrollments: 1,
+          students: studentsByCourse.get(courseId) ?? 0,
+        },
+        idempotencyKey: `creator-enrollment:${order.id}:${item.id}`,
+      },
+      service
+    );
+  }
 }
 
 /**

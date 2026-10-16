@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, CheckCheck, GraduationCap, Layers3, Rocket, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/components/providers/app-providers";
-import { becomeCreator, saveCreatorProfile } from "@/app/creator/actions";
+import { becomeCreator, checkUsernameAvailability, saveCreatorProfile } from "@/app/creator/actions";
+import { UsernameField } from "@/components/creator/username-field";
 import { CATEGORIES } from "@/lib/config/catalog";
 import { categoryIcon } from "@/lib/icons";
 import { Logo } from "@/components/layout/logo";
@@ -64,6 +65,18 @@ export function CreatorSignupClient({
         setError("Add a headline and choose at least one teaching topic.");
         return;
       }
+
+      // The field checks as you type; this is the same question asked again at
+      // the moment it matters, so the next step is never reached with a name
+      // somebody else already holds.
+      setLoading(true);
+      const availability = await checkUsernameAvailability(username.trim());
+      setLoading(false);
+      if (!availability.available) {
+        setError(availability.message ?? "That username is not available.");
+        return;
+      }
+
       setError("");
       setStep(1);
       return;
@@ -200,21 +213,13 @@ export function CreatorSignupClient({
 
                 {step === 0 ? (
                   <>
-                    <div className="space-y-2">
-                      <Label htmlFor="username">Public username</Label>
-                      <Input
-                        id="username"
-                        value={username}
-                        onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                        placeholder="your-name"
-                        maxLength={30}
-                        required
-                        minLength={3}
-                      />
-                      <p className="text-[11.5px] text-muted-foreground">
-                        Your profile will live at /instructors/{username || "your-name"}.
-                      </p>
-                    </div>
+                    <UsernameField
+                      id="username"
+                      label="Public username"
+                      value={username}
+                      onChange={setUsername}
+                      hint="Your profile will live at /instructors/your-name."
+                    />
                     <div className="space-y-2">
                       <Label htmlFor="headline">Headline</Label>
                       <Input
