@@ -157,7 +157,7 @@ export function EnrollCard({
 
       <p className="mt-4 flex items-start gap-1.5 text-[11.5px] text-zinc-400">
         <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
-        Access is granted only after Razorpay confirms your payment. Zybble publishes no refund policy.
+        Access is granted only after Razorpay confirms your payment was captured.
       </p>
     </div>
   );

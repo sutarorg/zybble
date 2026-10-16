@@ -39,8 +39,8 @@ export default async function AdminSettingsPage() {
               deduct or display them today.
             </li>
             <li>
-              Zybble publishes <strong>no refund policy</strong>. Refunds can only be issued by an administrator
-              through Razorpay, and reversals are recorded from provider events.
+              Money leaves the platform only through a reviewed creator payout. There is no customer-facing money
+              reversal flow in this portal.
             </li>
           </ul>
         </div>

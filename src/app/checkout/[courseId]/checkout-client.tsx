@@ -230,9 +230,9 @@ export function CheckoutClient({
                 <div className="flex items-start gap-2.5 rounded-lg border border-border bg-white p-3">
                   <Info className="mt-0.5 size-4 shrink-0 text-zinc-400" aria-hidden />
                   <p className="text-[12px] leading-relaxed text-muted-foreground">
-                    Access is granted only after Razorpay confirms the payment was captured — never because you reached
-                    the success page. Zybble publishes no refund policy; if a payment is reversed by your bank or by
-                    Razorpay, the ledger is corrected automatically and access ends.
+                    Access is granted only after Razorpay confirms the payment was captured — never because you
+                    reached the success page. If your access has not appeared within a minute, refresh My Learning or
+                    contact support from the Help Center.
                   </p>
                 </div>
               </div>
@@ -271,8 +271,8 @@ export function CheckoutClient({
                   </dl>
 
                   <p className="mt-3 text-[11.5px] text-zinc-400">
-                    Amounts are in Indian Rupees. Zybble publishes no refund policy and does not invent tax treatment —
-                    your receipt is the Razorpay payment record.
+                    Amounts are in Indian Rupees and no tax line is added to your order — your receipt is the
+                    Razorpay payment record.
                   </p>
                 </div>
               </div>

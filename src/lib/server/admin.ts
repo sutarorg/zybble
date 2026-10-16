@@ -33,7 +33,6 @@ export interface AdminOverview {
   grossPaise: number;
   commissionPaise: number;
   creatorPayablePaise: number;
-  refundedPaise: number;
   openReports: number;
   routeTransfers: number;
   failedTransfers: number;
@@ -49,7 +48,7 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
   await requireAdmin();
   const empty: AdminOverview = {
     courses: 0, publishedCourses: 0, pendingCourses: 0, learners: 0, creators: 0, orders: 0,
-    grossPaise: 0, commissionPaise: 0, creatorPayablePaise: 0, refundedPaise: 0,
+    grossPaise: 0, commissionPaise: 0, creatorPayablePaise: 0,
     openReports: 0, routeTransfers: 0, failedTransfers: 0, settledPaise: 0,
     payoutRequestsCount: 0, pendingPayoutRequests: 0, pendingPayoutPaise: 0,
     paidOutPaise: 0, outstandingCreatorPayablePaise: 0,
@@ -60,7 +59,7 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
 
   const [
     courses, published, pending, learners, creators, orders,
-    commissionLedger, creatorLedger, refunds, reports, transfers, failedTransfers, settlements,
+    commissionLedger, creatorLedger, reports, transfers, failedTransfers, settlements,
     payoutRequestsRes, creatorAdjustmentsRes,
   ] = await Promise.all([
     service.from("courses").select("id", { count: "exact", head: true }),
@@ -71,7 +70,6 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
     service.from("orders").select("id", { count: "exact", head: true }),
     service.from("ledger_entries").select("amount_paise").eq("kind", "commission"),
     service.from("ledger_entries").select("amount_paise").eq("kind", "sale").eq("account", "platform").eq("direction", "debit"),
-    service.from("refunds").select("amount_paise").eq("status", "processed"),
     service.from("reports").select("id", { count: "exact", head: true }).eq("status", "open"),
     service.from("route_transfers").select("id", { count: "exact", head: true }),
     service.from("route_transfers").select("id", { count: "exact", head: true }).eq("status", "failed"),
@@ -120,7 +118,6 @@ export const getAdminOverview = cache(async (): Promise<AdminOverview> => {
     grossPaise: sum(creatorLedger.data as { amount_paise: number }[]) + sum(commissionLedger.data as { amount_paise: number }[]),
     commissionPaise: sum(commissionLedger.data as { amount_paise: number }[]),
     creatorPayablePaise: netCreatorPayablePaise,
-    refundedPaise: sum(refunds.data as { amount_paise: number }[]),
     openReports: reports.count ?? 0,
     routeTransfers: payoutRows.length + (transfers.count ?? 0),
     failedTransfers: failedPayoutRequests + (failedTransfers.count ?? 0),
@@ -599,7 +596,6 @@ export const getAdminPayouts = cache(async (): Promise<AdminPayoutsOverview> => 
     { data: destRows },
     { data: creatorRows },
     { data: itemRows },
-    { data: refundRows },
     { data: settlementRows },
     { data: auditRows },
     legacyTransfers,
@@ -626,10 +622,6 @@ export const getAdminPayouts = cache(async (): Promise<AdminPayoutsOverview> => 
     service
       .from("order_items")
       .select("order_id, creator_id, unit_price_paise, commission_paise, creator_share_paise, orders ( status )"),
-    service
-      .from("refunds")
-      .select("order_id, amount_paise, status")
-      .eq("status", "processed"),
     service
       .from("route_settlements")
       .select("creator_id, amount_paise, status")
@@ -680,20 +672,10 @@ export const getAdminPayouts = cache(async (): Promise<AdminPayoutsOverview> => 
     string,
     Array<{ orderId: string; unitPricePaise: number; commissionPaise: number; creatorSharePaise: number }>
   >();
-  const itemByOrderId = new Map<
-    string,
-    { creatorId: string; unitPricePaise: number; creatorSharePaise: number }
-  >();
-
   for (const row of (itemRows ?? []) as Array<Record<string, unknown>>) {
     const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
     const orderObj = Array.isArray(orderRel) ? orderRel[0] : orderRel;
-    if (
-      orderObj?.status &&
-      orderObj.status !== "paid" &&
-      orderObj.status !== "partially_refunded" &&
-      orderObj.status !== "refunded"
-    ) {
+    if (orderObj?.status && orderObj.status !== "paid") {
       continue;
     }
     const creatorId = String(row.creator_id);
@@ -707,29 +689,6 @@ export const getAdminPayouts = cache(async (): Promise<AdminPayoutsOverview> => 
     const list = capturedItemsByCreator.get(creatorId) ?? [];
     list.push(entry);
     capturedItemsByCreator.set(creatorId, list);
-    if (orderId) {
-      itemByOrderId.set(orderId, {
-        creatorId,
-        unitPricePaise: entry.unitPricePaise,
-        creatorSharePaise: entry.creatorSharePaise,
-      });
-    }
-  }
-
-  const refundsByCreator = new Map<
-    string,
-    Array<{ unitPricePaise: number; creatorSharePaise: number; refundAmountPaise: number }>
-  >();
-  for (const row of (refundRows ?? []) as Array<Record<string, unknown>>) {
-    const item = itemByOrderId.get(String(row.order_id ?? ""));
-    if (!item) continue;
-    const list = refundsByCreator.get(item.creatorId) ?? [];
-    list.push({
-      unitPricePaise: item.unitPricePaise,
-      creatorSharePaise: item.creatorSharePaise,
-      refundAmountPaise: Number(row.amount_paise ?? 0),
-    });
-    refundsByCreator.set(item.creatorId, list);
   }
 
   const legacySettledByCreator = new Map<string, number>();
@@ -765,7 +724,6 @@ export const getAdminPayouts = cache(async (): Promise<AdminPayoutsOverview> => 
       creatorId,
       computeCreatorPayoutBalance({
         capturedOrderItems: capturedItemsByCreator.get(creatorId) ?? [],
-        processedRefunds: refundsByCreator.get(creatorId) ?? [],
         payoutRequests: requestsByCreator.get(creatorId) ?? [],
         legacySettledPaise: legacySettledByCreator.get(creatorId) ?? 0,
       })
@@ -776,8 +734,6 @@ export const getAdminPayouts = cache(async (): Promise<AdminPayoutsOverview> => 
     grossPaise: 0,
     commissionPaise: 0,
     grossEarnedPaise: 0,
-    refundPaise: 0,
-    refundedCreatorSharePaise: 0,
     netEarnedPaise: 0,
     reservedPendingPaise: 0,
     paidOutPaise: 0,

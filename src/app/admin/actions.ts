@@ -5,7 +5,6 @@ import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireAdmin, AuthorizationError } from "@/lib/server/session";
 import { MIN_COMMISSION_BPS, MAX_COMMISSION_BPS, formatCommissionPercent, formatInr } from "@/lib/money";
-import { refundOrder } from "@/lib/server/checkout";
 import { enqueueEmail } from "@/lib/server/email";
 import {
   decryptPayoutDestination,
@@ -483,53 +482,6 @@ export async function resolveReport(reportId: string, status: "open" | "under_re
     return { ok: true };
   } catch (error) {
     return fail(error, "Could not update this report");
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Refunds                                                                     */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Corrects a genuine payment error.
- *
- * Zybble publishes no customer-facing refund policy; this administrative
- * correction always records the real Razorpay refund id and reverses the Route
- * transfer proportionally. There is no way to mark an order refunded locally.
- */
-export async function refundOrderAction(input: unknown): Promise<AdminActionResult> {
-  try {
-    const admin = await requireAdmin();
-    const parsed = z
-      .object({
-        publicOrderId: z.string().min(6).max(40),
-        amountPaise: z.number().int().positive().optional(),
-        reason: z.string().trim().min(5, "Record why this refund is needed").max(500),
-        revokeEntitlement: z.boolean().default(true),
-      })
-      .safeParse(input);
-    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the refund" };
-
-    const result = await refundOrder({
-      publicOrderId: parsed.data.publicOrderId,
-      amountPaise: parsed.data.amountPaise,
-      reason: parsed.data.reason,
-      adminId: admin.id,
-      revokeEntitlement: parsed.data.revokeEntitlement,
-    });
-
-    revalidatePath("/admin/orders");
-    revalidatePath("/admin/payouts");
-    return {
-      ok: true,
-      message: `Refund ${result.refundId} was created with Razorpay. Settlement to the learner's bank account follows Razorpay's normal refund timeline.`,
-    };
-  } catch (error) {
-    if (error instanceof Error && "code" in error) {
-      const typed = error as { message: string; status?: number };
-      return { ok: false, error: typed.message };
-    }
-    return fail(error, "Could not process this refund");
   }
 }
 

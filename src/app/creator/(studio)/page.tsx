@@ -203,7 +203,6 @@ export default async function CreatorDashboardPage({
               { label: "Available to request", value: finance.availablePaise },
               { label: "Reserved in pending requests", value: finance.reservedPendingPaise },
               { label: "Paid out to you", value: finance.paidOutPaise },
-              { label: "Refund adjustments", value: finance.refundedCreatorSharePaise },
             ].map((row) => (
               <div key={row.label} className="flex items-baseline justify-between gap-4 text-[13px]">
                 <dt className="text-muted-foreground">{row.label}</dt>
@@ -212,7 +211,7 @@ export default async function CreatorDashboardPage({
             ))}
           </dl>
           <p className="mt-4 text-[12px] text-zinc-400">
-            Figures reconcile captured orders, processed refunds, and confirmed manual payouts in INR paise.
+            Figures reconcile captured orders and confirmed manual payouts in integer INR paise.
           </p>
         </section>
       </div>

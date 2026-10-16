@@ -118,7 +118,7 @@ export interface Order {
   totalPaise: number;
   currency: "INR";
   createdAt: string; // ISO
-  status: "paid" | "failed" | "pending" | "refunded";
+  status: "paid" | "failed" | "pending" | "cancelled";
   /** Masked instrument label from Razorpay, e.g. "UPI · a•••@okhdfc". Never a card number. */
   method: string;
 }
@@ -292,7 +292,7 @@ export interface EarningTransaction {
   courseId: string;
   courseTitle: string;
   orderRef: string;
-  status: "paid" | "pending" | "refunded";
+  status: "paid" | "pending";
   grossPaise: number;
   commissionPaise: number;
   netPaise: number;
@@ -383,7 +383,7 @@ export interface AdminOrder {
   commissionPaise: number;
   creatorSharePaise: number;
   date: string; // ISO
-  status: "paid" | "pending" | "refunded" | "failed";
+  status: "paid" | "pending" | "failed" | "cancelled";
   method: string; // masked descriptor from Razorpay
 }
 

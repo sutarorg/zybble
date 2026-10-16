@@ -12,10 +12,9 @@ export const dynamic = "force-dynamic";
 const STATUS_TONE: Record<string, string> = {
   paid: "bg-emerald-100 text-emerald-700",
   created: "bg-zinc-100 text-zinc-600",
+  pending: "bg-zinc-100 text-zinc-600",
   failed: "bg-red-100 text-red-700",
   cancelled: "bg-zinc-100 text-zinc-600",
-  refunded: "bg-orange-100 text-orange-700",
-  partially_refunded: "bg-orange-100 text-orange-700",
 };
 
 export default async function LearnerOrdersPage() {

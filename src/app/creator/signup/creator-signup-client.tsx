@@ -311,7 +311,7 @@ export function CreatorSignupClient({
                           privacy policy
                         </Link>
                         . The planned marketplace commission is {commissionPercentLabel}%, applied per order and shown in
-                        every payout statement. Zybble publishes no refund policy.
+                        every payout statement.
                       </Label>
                     </div>
                   </>

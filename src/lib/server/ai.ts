@@ -1,9 +1,16 @@
 /**
- * Zybble AI — OpenRouter-backed public course-discovery assistant.
+ * Zybble 2.0 — the OpenRouter-backed public assistant.
+ *
+ * Every answer is produced with `OPENROUTER_API_KEY` (read server-side only,
+ * see `serverEnv.openrouterApiKey`). The assistant knows two things:
+ *
+ *  - **The platform**, from {@link PLATFORM_KNOWLEDGE}: what Zybble is, how
+ *    enrollment, payments, certificates, settings and Creator Studio work.
+ *  - **The catalog**, from a live read of published courses only.
  *
  * Grounding rules (the reason a recommendation can never be invented):
  *  1. The model only ever sees a compact list of **published** courses.
- *  2. It must answer with a JSON object matching a strict schema.
+ *  2. It must answer in the plain-text wire format below.
  *  3. Every recommended `slug` is resolved against the database before it is
  *     rendered; a slug the model invented is discarded, not displayed.
  *  4. The API key is server-only.
@@ -12,9 +19,11 @@
 import "server-only";
 import { serverEnv, isOpenRouterConfigured } from "@/lib/env";
 import { formatInrOrFree } from "@/lib/money";
+import { ASSISTANT_NAME, PLATFORM_KNOWLEDGE } from "@/lib/chatbot";
 
 export const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
-export const REQUEST_TIMEOUT_MS = 12_000;
+/** Larger system brief than a bare persona needs, so the budget is generous. */
+export const REQUEST_TIMEOUT_MS = 20_000;
 export const MAX_USER_MESSAGE_CHARS = 500;
 export const MAX_HISTORY_MESSAGES = 12;
 export const MAX_CATALOG_ITEMS = 60;
@@ -45,13 +54,27 @@ export interface AssistantAnswer {
 export class AiUnavailableError extends Error {
   readonly reason: AssistantAnswer["error"];
   constructor(reason: AssistantAnswer["error"] = "unavailable") {
-    super("Zybble AI is unavailable");
+    super(`${ASSISTANT_NAME} is unavailable`);
     this.name = "AiUnavailableError";
     this.reason = reason;
   }
 }
 
-const ALLOWED_LINK_PATHS = new Set(["/help", "/login", "/signup", "/my-learning", "/dashboard"]);
+/**
+ * Same-origin paths the assistant may offer as a link. Anything else — an
+ * external URL, an admin route, a deep link into somebody's account — is
+ * dropped by {@link sanitiseLink} rather than rendered.
+ */
+const ALLOWED_LINK_PATHS = new Set([
+  "/help",
+  "/login",
+  "/signup",
+  "/dashboard",
+  "/my-learning",
+  "/orders",
+  "/certificates",
+  "/creator",
+]);
 
 export function sanitiseLink(link: unknown): { href: string; label: string } | undefined {
   if (!link || typeof link !== "object") return undefined;
@@ -120,24 +143,46 @@ export interface ChatMessageInput {
  * Reasons: it streams cleanly (the visitor sees words, not `{"text":"…`),
  * and DeepSeek reliably honours it. The trailer is the only part that is
  * machine-read, and it is validated before anything is rendered.
+ *
+ * The prompt is built in two halves: a stable identity and rules block, and
+ * {@link PLATFORM_KNOWLEDGE}, the factual brief about Zybble that both this
+ * prompt and the chat panel share. Exported so tests can assert the assistant
+ * really is grounded in the platform brief instead of a vague persona.
  */
-const SYSTEM_PROMPT = `You are Zybble AI, the course-discovery assistant for Zybble, an AI-course marketplace in India.
+export const ASSISTANT_IDENTITY = `You are ${ASSISTANT_NAME}, the AI assistant built into Zybble, an India-only marketplace for practical AI courses taught by independent creators.
+
+Identity:
+- Your name is ${ASSISTANT_NAME}. When a visitor asks who or what you are, say you are ${ASSISTANT_NAME}, Zybble's AI assistant — never "an AI model", never a third-party product, and never a human.
+- You are helpful, concrete and warm, and you write like a knowledgeable guide to the marketplace rather than a sales page.
+
+What you know:
+- The PLATFORM BRIEF below. Treat every line of it as fact you may state plainly.
+- The CATALOG below: the only courses that exist as far as recommendations go.
 
 Rules you must follow:
-- Answer only from the CATALOG below. Every course you mention MUST appear there.
-- Recommend at most 3 courses. Copy their "slug" values exactly.
-- All prices are Indian Rupees (INR, INR symbol ₹). Never mention dollars, euros or any other currency.
+- Recommend only courses that appear in the CATALOG. Every course you mention MUST be there. Copy their "slug" values exactly.
+- Recommend at most 3 courses.
+- Answer platform questions (enrollment, payments, certificates, learning experience, account settings, email preferences, Creator Studio, earnings, payouts, support) from the PLATFORM BRIEF. If the brief does not cover it, say you are not sure and point to the Help Center — do not invent a policy, a price, a deadline or a feature.
+- Never ask for or repeat personal data: no passwords, no email addresses, no order numbers, no payment details, no bank or UPI details.
+- You cannot see accounts, orders, payments, progress or certificates, you cannot take payment, and you cannot change prices or grant access.
+- Zybble does not offer refunds. If a visitor asks, say so plainly and offer the Help Center for support — never invent a refund window, an exception or a policy.
+- All prices are Indian Rupees (INR, ₹). Never mention dollars, euros or any other currency.
 - If the catalog has no good match, say so and offer to broaden the search.
-- You cannot see learner accounts, take payments, issue refunds or contact support.
-- For enrollment, billing, refunds, certificates or account questions, point to the Help Center.
-- Reply in the same language the visitor used, keeping it under 90 words.
-- Write plain prose. No markdown, no headings, no code fences.
+- Reply in the same language the visitor used, keeping it under 100 words.
+- Write plain prose. No markdown, no headings, no bullet lists, no code fences.
 
 Output format — exactly two parts, nothing else:
 1. Your reply to the visitor.
 2. An optional final line, only if you are naming courses:
    SLUGS: slug-one, slug-two
 Use only slugs copied from the CATALOG. Omit the line entirely if you recommend nothing.`;
+
+/** The full system message minus the live catalog. Exported for testing. */
+export function buildSystemMessage(catalog: GroundedCourse[]): string {
+  return `${ASSISTANT_IDENTITY}\n\nPLATFORM BRIEF:\n${PLATFORM_KNOWLEDGE}\n\nCATALOG:\n${
+    renderCatalogForPrompt(catalog) || "(the catalog is currently empty)"
+  }`;
+}
 
 export interface OpenRouterOptions {
   messages: ChatMessageInput[];
@@ -156,7 +201,7 @@ function buildRequestBody(options: OpenRouterOptions, stream: boolean): string {
   const messages = [
     {
       role: "system",
-      content: `${SYSTEM_PROMPT}\n\nCATALOG:\n${renderCatalogForPrompt(options.catalog) || "(the catalog is currently empty)"}`,
+      content: buildSystemMessage(options.catalog),
     },
     ...history,
   ];
@@ -457,7 +502,7 @@ export function parseAssistantContent(content: string): AssistantAnswer {
 export function fallbackAnswer(reason: AssistantAnswer["error"], catalogCount: number): AssistantAnswer {
   if (reason === "rate_limited") {
     return {
-      text: "Zybble AI is busy right now. Please try again in a moment, or browse the catalog directly.",
+      text: `${ASSISTANT_NAME} is busy right now. Please try again in a moment, or browse the catalog directly.`,
       recommendedSlugs: [],
       link: { href: "/help", label: "Help Center" },
       error: "rate_limited",
@@ -472,7 +517,7 @@ export function fallbackAnswer(reason: AssistantAnswer["error"], catalogCount: n
     };
   }
   return {
-    text: "Zybble AI is temporarily unavailable. You can still browse the full catalog and filter it by level, duration and price.",
+    text: `${ASSISTANT_NAME} is temporarily unavailable. You can still browse the full catalog and filter it by level, duration and price.`,
     recommendedSlugs: [],
     link: { href: "/help", label: "Help Center" },
     error: "unavailable",

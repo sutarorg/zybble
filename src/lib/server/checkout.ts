@@ -17,8 +17,10 @@
  *    access twice or double-credit a creator.
  *  * The commission rate is snapshotted onto each order item, so changing the
  *    marketplace rate later never rewrites a past sale.
- *  * Refunds and reversals record explicit creator-share adjustments without
- *    assuming funds were automatically clawed back from a creator's bank account.
+ *  * Zybble has no refund flow. There is no refund path in this module, no
+ *    `refunds` table, and provider refund events are recorded and ignored rather
+ *    than acted on. Money leaves the platform only through a reviewed creator
+ *    payout.
  */
 
 import "server-only";
@@ -35,10 +37,8 @@ import {
   fetchPayment,
   verifyCheckoutSignature,
   fetchTransfer,
-  reverseTransfer,
   type RazorpayWebhookPayload,
 } from "@/lib/server/razorpay";
-import { computeCreatorRefundAdjustmentPaise } from "@/lib/server/payouts";
 import { enqueueEmail } from "@/lib/server/email";
 
 export class CheckoutError extends Error {
@@ -577,7 +577,7 @@ export async function appendLedger(
   service: ReturnType<typeof requireServiceClient>,
   entry: {
     idempotencyKey: string;
-    kind: "sale" | "commission" | "transfer" | "settlement" | "payout" | "refund" | "reversal" | "adjustment";
+    kind: "sale" | "commission" | "transfer" | "settlement" | "payout" | "reversal" | "adjustment";
     account: string;
     userId?: string | null;
     orderId?: string | null;
@@ -671,7 +671,7 @@ export async function handleRazorpayWebhook(
     provider: "razorpay",
     provider_event_id: eventId ?? `no-id:${hashBody(rawBody)}`,
     event_type: payload.event,
-    entity_id: payload.payload?.payment?.id ?? payload.payload?.transfer?.id ?? payload.payload?.refund?.id ?? null,
+    entity_id: payload.payload?.payment?.id ?? payload.payload?.transfer?.id ?? null,
     payload,
     status: "received",
   });
@@ -813,33 +813,19 @@ export async function applyWebhookEvent(
       return { status: "processed" };
     }
     case "refund.processed":
-    case "refund.failed": {
-      const refund = payload.payload?.refund;
-      if (!refund) return { status: "ignored", detail: "no refund payload" };
-      const status = payload.event === "refund.processed" ? "processed" : "failed";
-
-      const { data: existing } = await service
-        .from("refunds")
-        .select("id, order_id")
-        .eq("refund_id", refund.id)
-        .maybeSingle();
-
-      if (existing) {
-        // A refund Zybble requested through the admin portal: only the status
-        // changes. `refundOrder()` already wrote the ledger entries.
-        await service
-          .from("refunds")
-          .update({ status, amount_paise: refund.amount, updated_at: new Date().toISOString() })
-          .eq("refund_id", refund.id);
-        return { status: "processed" };
-      }
-
-      // A reversal Zybble did not initiate: a chargeback, a dispute, or a
-      // reversal raised at the bank. The payment no longer stands, so the
-      // accounting record has to be corrected here or the books lie.
-      if (status !== "processed") return { status: "ignored", detail: "unrequested refund failed" };
-      await reconcileProviderReversal(service, refund);
-      return { status: "processed" };
+    case "refund.failed":
+    case "refund.created":
+    case "payment.refunded": {
+      // Zybble has no refund flow, so there is nothing here to reconcile and no
+      // `refunds` table to write to. The event is still durably recorded in
+      // `webhook_events` by the caller — a refund that appears at the provider
+      // (a chargeback, a dispute, an action taken in the Razorpay dashboard) is
+      // an accounting question for an administrator, not something this service
+      // silently mutates learner access or creator balances for.
+      console.warn("[razorpay-webhook] refund event received on a platform with no refund flow", {
+        event: payload.event,
+      });
+      return { status: "ignored", detail: "Zybble has no refund flow; event recorded for review" };
     }
     default:
       return { status: "ignored", detail: payload.event };
@@ -932,338 +918,4 @@ export async function applyTransferState(
   }
 
   return { status: "processed" };
-}
-
-/**
- * Admin-initiated refund. Zybble has no customer-facing refund policy; this
- * exists so an administrator can correct a genuine payment error, and it always
- * records real provider identifiers.
- */
-export async function refundOrder(input: {
-  publicOrderId: string;
-  amountPaise?: number;
-  reason: string;
-  adminId: string;
-  revokeEntitlement: boolean;
-}): Promise<{ refundId: string; amountPaise: number }> {
-  const service = requireServiceClient();
-  const { createRefund } = await import("@/lib/server/razorpay");
-
-  const { data: order } = await service
-    .from("orders")
-    .select("id, public_id, status, total_paise, currency")
-    .eq("public_id", input.publicOrderId)
-    .maybeSingle();
-  if (!order) throw new CheckoutError("order_not_found", "Order not found", 404);
-  if (String(order.currency) !== CURRENCY) throw new CheckoutError("currency_mismatch", "Unsupported currency", 409);
-  if (order.status !== "paid" && order.status !== "partially_refunded") {
-    throw new CheckoutError("order_not_paid", "Only a paid order can be refunded", 409);
-  }
-
-  const { data: payment } = await service
-    .from("payments")
-    .select("id, razorpay_payment_id")
-    .eq("order_id", order.id)
-    .eq("status", "captured")
-    .maybeSingle();
-  if (!payment?.razorpay_payment_id) throw new CheckoutError("payment_not_found", "No captured payment on this order", 409);
-
-  const { data: already } = await service
-    .from("refunds")
-    .select("amount_paise")
-    .eq("order_id", order.id)
-    .eq("status", "processed");
-  const refunded = (already ?? []).reduce((sum, row) => sum + Number(row.amount_paise ?? 0), 0);
-  const amountPaise = Math.min(input.amountPaise ?? Number(order.total_paise) - refunded, Number(order.total_paise) - refunded);
-  if (amountPaise <= 0) throw new CheckoutError("nothing_to_refund", "This order has already been fully refunded", 409);
-
-  const localId = newPublicId("Ref");
-  await service.from("refunds").insert({
-    refund_id: localId,
-    order_id: order.id,
-    payment_id: payment.id,
-    amount_paise: amountPaise,
-    currency: CURRENCY,
-    reason: input.reason.slice(0, 500),
-    status: "pending",
-    requested_by: input.adminId,
-  });
-
-  const providerRefund = await createRefund({
-    paymentId: payment.razorpay_payment_id,
-    amountPaise,
-    notes: { zybble_order: order.public_id, reason: input.reason.slice(0, 200) },
-  });
-
-  await service
-    .from("refunds")
-    .update({
-      refund_id: providerRefund.id,
-      status: providerRefund.status === "processed" ? "processed" : "pending",
-    })
-    .eq("refund_id", localId);
-
-  // If this order was a historical Route order, attempt to reverse any unsettled
-  // Route transfer; for standard manual-payout orders `transfers` is empty.
-  const { data: transfers } = await service
-    .from("route_transfers")
-    .select("transfer_id, creator_id, order_id, order_item_id, amount_paise, reversed_paise, status")
-    .eq("order_id", order.id);
-  for (const transfer of transfers ?? []) {
-    const outstanding = transfer.amount_paise - transfer.reversed_paise;
-    if (outstanding <= 0) continue;
-    const portion = Math.min(outstanding, Math.round((amountPaise / Number(order.total_paise)) * transfer.amount_paise));
-    if (portion <= 0) continue;
-    try {
-      await reverseTransfer(transfer.transfer_id, portion);
-    } catch {
-      // Historical settled Route transfer cannot be reversed via API.
-    }
-  }
-
-  const { data: items } = await service.from("order_items").select("*").eq("order_id", order.id);
-  for (const item of items ?? []) {
-    const split = computeCreatorRefundAdjustmentPaise({
-      unitPricePaise: Number(item.unit_price_paise ?? 0),
-      creatorSharePaise: Number(item.creator_share_paise ?? 0),
-      refundAmountPaise: amountPaise,
-    });
-    await appendLedger(service, {
-      idempotencyKey: `refund:${providerRefund.id}:${item.id}`,
-      kind: "refund",
-      account: "platform",
-      orderId: order.id,
-      orderItemId: item.id,
-      amountPaise: split.refundAmountPaise,
-      direction: "debit",
-      description: `Refund ${providerRefund.id} on order ${order.public_id}`,
-      metadata: {
-        refundId: providerRefund.id,
-        commissionReversalPaise: split.commissionReversalPaise,
-        creatorRefundDebitPaise: split.creatorRefundDebitPaise,
-      },
-    });
-    if (split.creatorRefundDebitPaise > 0) {
-      await appendLedger(service, {
-        idempotencyKey: `refund-creator-adjustment:${providerRefund.id}:${item.id}`,
-        kind: "adjustment",
-        account: `creator:${item.creator_id}`,
-        userId: String(item.creator_id),
-        orderId: order.id,
-        orderItemId: item.id,
-        amountPaise: split.creatorRefundDebitPaise,
-        direction: "debit",
-        description: `Creator share adjustment for refunded order ${order.public_id} (reduces payable balance or records post-payout receivable)`,
-        metadata: {
-          refundId: providerRefund.id,
-          orderPublicId: order.public_id,
-          creatorRefundDebitPaise: split.creatorRefundDebitPaise,
-          commissionReversalPaise: split.commissionReversalPaise,
-        },
-      });
-    }
-  }
-
-  const fullyRefunded = refunded + amountPaise >= Number(order.total_paise);
-  await service
-    .from("orders")
-    .update({ status: fullyRefunded ? "refunded" : "partially_refunded" })
-    .eq("id", order.id);
-
-  if (input.revokeEntitlement && fullyRefunded) {
-    const { data: owner } = await service.from("orders").select("user_id").eq("id", order.id).maybeSingle();
-    for (const item of items ?? []) {
-      await service
-        .from("entitlements")
-        .update({ revoked_at: new Date().toISOString() })
-        .eq("user_id", owner?.user_id ?? "")
-        .eq("course_id", item.course_id)
-        .is("revoked_at", null);
-    }
-  }
-
-  await service.from("admin_audit_log").insert({
-    actor_id: input.adminId,
-    action: "order.refund",
-    target_type: "order",
-    target_id: order.public_id,
-    detail: { refundId: providerRefund.id, amountPaise, reason: input.reason },
-  });
-
-  return { refundId: providerRefund.id, amountPaise };
-}
-
-/* -------------------------------------------------------------------------- */
-/* Provider-initiated reversals                                               */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Corrects the books for a reversal Zybble never asked for.
- *
- * Razorpay can emit `refund.processed` for a chargeback, a dispute, or a
- * reversal raised at the learner's bank. There is no `refunds` row for it, so
- * this creates one and then applies the same accounting the admin path would:
- * revoke access, reverse the ledger, recompute the course counters, reverse the
- * Route transfer if Razorpay will still accept it, and tell the learner.
- *
- * This is an accounting correction — the marketplace publishes **no refund
- * policy** and issues no refund promise. The email says so in as many words.
- */
-async function reconcileProviderReversal(
-  service: ReturnType<typeof requireServiceClient>,
-  refund: { id: string; payment_id?: string | null; amount?: number | null; notes?: Record<string, unknown> | null }
-): Promise<void> {
-  const paymentId = String(refund.payment_id ?? "");
-  if (!paymentId) return;
-
-  const { data: payment } = await service
-    .from("payments")
-    .select("id, order_id, razorpay_payment_id, status, amount_paise")
-    .eq("razorpay_payment_id", paymentId)
-    .maybeSingle();
-  if (!payment?.order_id) return;
-
-  const orderId = payment.order_id;
-  const amountPaise = Number(refund.amount ?? payment.amount_paise ?? 0);
-
-  // Record it. The unique refund_id makes a replayed event a no-op.
-  const { error: insertError } = await service.from("refunds").insert({
-    refund_id: refund.id,
-    order_id: orderId,
-    payment_id: payment.id,
-    amount_paise: amountPaise,
-    currency: CURRENCY,
-    reason: "Provider-initiated reversal (Zybble did not request this)",
-    status: "processed",
-  });
-  if (insertError && !/duplicate key|already exists|23505/i.test(insertError.message)) {
-    throw new CheckoutError("reversal_unrecorded", "Could not record the reversal", 500);
-  }
-
-  await service
-    .from("payments")
-    .update({ status: "refunded" })
-    .eq("razorpay_payment_id", paymentId);
-
-  const { data: order } = await service
-    .from("orders")
-    .select("id, public_id, user_id, total_paise, currency")
-    .eq("id", orderId)
-    .maybeSingle();
-  if (!order || String(order.currency) !== CURRENCY) return;
-
-  const { data: items } = await service.from("order_items").select("*").eq("order_id", orderId);
-
-  // Cumulative refunds decide whether access ends.
-  const { data: refunds } = await service
-    .from("refunds")
-    .select("amount_paise, status")
-    .eq("order_id", orderId)
-    .eq("status", "processed");
-  const refundedPaise = (refunds ?? []).reduce((sum, row) => sum + Number(row.amount_paise ?? 0), 0);
-  const totalPaise = Number(order.total_paise ?? 0);
-  const fullyReversed = totalPaise > 0 && refundedPaise >= totalPaise;
-
-  for (const item of items ?? []) {
-    const split = computeCreatorRefundAdjustmentPaise({
-      unitPricePaise: Number(item.unit_price_paise ?? 0),
-      creatorSharePaise: Number(item.creator_share_paise ?? 0),
-      refundAmountPaise: amountPaise,
-    });
-    await appendLedger(service, {
-      idempotencyKey: `reversal:${refund.id}:${item.id}`,
-      kind: "reversal",
-      account: "platform",
-      userId: String(order.user_id),
-      orderId: orderId,
-      orderItemId: item.id,
-      amountPaise: split.refundAmountPaise,
-      direction: "debit",
-      description: "Provider-initiated reversal",
-      metadata: {
-        refundId: refund.id,
-        commissionReversalPaise: split.commissionReversalPaise,
-        creatorRefundDebitPaise: split.creatorRefundDebitPaise,
-      },
-    });
-    if (split.creatorRefundDebitPaise > 0) {
-      await appendLedger(service, {
-        idempotencyKey: `reversal-creator-adjustment:${refund.id}:${item.id}`,
-        kind: "adjustment",
-        account: `creator:${item.creator_id}`,
-        userId: String(item.creator_id),
-        orderId: orderId,
-        orderItemId: item.id,
-        amountPaise: split.creatorRefundDebitPaise,
-        direction: "debit",
-        description: `Creator share adjustment for provider reversal on order ${order.public_id} (reduces payable balance or records post-payout receivable)`,
-        metadata: {
-          refundId: refund.id,
-          orderPublicId: order.public_id,
-          creatorRefundDebitPaise: split.creatorRefundDebitPaise,
-          commissionReversalPaise: split.commissionReversalPaise,
-        },
-      });
-    }
-
-    if (fullyReversed) {
-      await service
-        .from("entitlements")
-        .update({ revoked_at: new Date().toISOString() })
-        .eq("user_id", order.user_id)
-        .eq("course_id", item.course_id)
-        .is("revoked_at", null);
-
-      // Keep the public catalogue honest: the learner no longer counts.
-      const { count } = await service
-        .from("entitlements")
-        .select("id", { count: "exact", head: true })
-        .eq("course_id", item.course_id)
-        .is("revoked_at", null);
-      await service.from("courses").update({ students_count: count ?? 0 }).eq("id", item.course_id);
-    }
-  }
-
-  await service
-    .from("orders")
-    .update({ status: fullyReversed ? "refunded" : "partially_refunded" })
-    .eq("id", orderId);
-
-  // Ask Razorpay to claw the transfer back if it has not settled yet. A settled
-  // transfer cannot be reversed; that is the provider's call, not ours, and the
-  // admin sees the real state either way.
-  const { data: transfers } = await service
-    .from("route_transfers")
-    .select("transfer_id, amount_paise, reversed_paise, status")
-    .eq("order_id", orderId);
-  for (const transfer of transfers ?? []) {
-    const outstanding = Number(transfer.amount_paise) - Number(transfer.reversed_paise);
-    if (outstanding <= 0 || transfer.status === "reversed") continue;
-    try {
-      await reverseTransfer(transfer.transfer_id, Math.min(outstanding, amountPaise));
-    } catch {
-      // Already settled, or Razorpay declined. `transfer.reversed` /
-      // `transfer.processed` webhooks keep the record honest either way.
-    }
-  }
-
-  const { data: profile } = await service
-    .from("profiles")
-    .select("email, full_name")
-    .eq("id", order.user_id)
-    .maybeSingle();
-  if (profile) {
-    await enqueueEmail({
-      to: profile.email,
-      template: "payment_reversed",
-      payload: {
-        learnerName: profile.full_name ?? "there",
-        orderRef: String(order.public_id),
-        amountPaise,
-        courseTitle: String((items?.[0]?.course_title as string) ?? ""),
-      },
-      // One notice per reversal, no matter how many times it is redelivered.
-      idempotencyKey: `payment_reversed:${refund.id}`,
-    });
-  }
 }

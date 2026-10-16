@@ -22,7 +22,6 @@ export type EmailTemplate =
   | "course_rejected"
   | "security_password_reset_requested"
   | "security_email_changed"
-  | "payment_reversed"
   | "transfer_status"
   | "payout_requested"
   | "payout_approved"
@@ -39,7 +38,6 @@ export const EMAIL_TEMPLATES = [
   "course_rejected",
   "security_password_reset_requested",
   "security_email_changed",
-  "payment_reversed",
   "transfer_status",
   "payout_requested",
   "payout_approved",
@@ -167,20 +165,6 @@ export function renderEmailTemplate(
           "Account security alert",
           `<p>Hi ${data.name ?? "there"},</p><p>The email address on your Zybble account was changed. If this wasn't you, contact support immediately.</p>`
         ),
-      };
-    case "payment_reversed":
-      // A reversal is an accounting correction applied by the payment provider.
-      // Zybble publishes no refund policy and must not imply one.
-      return {
-        subject: `Payment reversed — ${data.orderRef}`,
-        html: shell(
-          "Payment reversed",
-          `<p>Hi ${data.learnerName ?? "there"},</p>
-           <p>Razorpay reported that <strong>${formatInr(Number(data.amountPaise ?? 0))}</strong> on order <strong>${data.orderRef}</strong>
-           ${data.courseTitle ? ` for <strong>${data.courseTitle}</strong>` : ""} was reversed at your bank or card issuer.</p>
-           <p>This is a correction to Zybble's accounting record, not a refund Zybble issued: the marketplace has no refund policy.
-           Access to the course has ended because the payment no longer stands. Your bank may take several business days to show the credit.</p>`
-        ) + button(`${origin}/orders`, "View your orders"),
       };
     case "payout_requested": {
       const ref = String(data.payoutRef ?? data.publicId ?? "");

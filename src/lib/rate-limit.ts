@@ -67,6 +67,8 @@ export const LIMITS = {
   resourceUpload: { limit: 60, windowMs: 60 * 60_000 },
   download: { limit: 120, windowMs: 10 * 60_000 },
   mutation: { limit: 120, windowMs: 60_000 },
+  /** Catalog engagement beacons: batched, so one window covers a lot of scrolling. */
+  analytics: { limit: 60, windowMs: 60_000 },
 } as const;
 
 /** Best-effort client identity for a request (no trusted forwarding headers). */

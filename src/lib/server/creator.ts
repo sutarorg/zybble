@@ -2,14 +2,14 @@
  * Creator studio data.
  *
  * Creator-facing financial figures are derived from captured orders, processed
- * refunds, the immutable ledger, and manual creator payout requests (`payout_requests`).
+ * the immutable ledger, and manual creator payout requests (`payout_requests`).
  * Nothing here is generated, sampled or seeded: an empty ledger produces an
  * empty dashboard.
  */
 
 import "server-only";
 import { cache } from "react";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerClient, createServiceClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { requireCreator, requireSession, AuthorizationError } from "@/lib/server/session";
 import { formatCommissionPercent } from "@/lib/money";
@@ -225,8 +225,6 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
     grossPaise: 0,
     commissionPaise: 0,
     grossEarnedPaise: 0,
-    refundPaise: 0,
-    refundedCreatorSharePaise: 0,
     netEarnedPaise: 0,
     reservedPendingPaise: 0,
     paidOutPaise: 0,
@@ -293,35 +291,12 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
     const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
     const orderObj = Array.isArray(orderRel) ? orderRel[0] : orderRel;
     if (!orderObj || !orderObj.status) return true;
-    return (
-      orderObj.status === "paid" ||
-      orderObj.status === "partially_refunded" ||
-      orderObj.status === "refunded"
-    );
+    return orderObj.status === "paid";
   });
 
-  const capturedOrderIds = Array.from(
-    new Set(
-      capturedItems
-        .map((row) => (row.order_id ? String(row.order_id) : null))
-        .filter((id): id is string => Boolean(id))
-    )
-  );
-
-  const { data: refundRows } =
-    capturedOrderIds.length > 0
-      ? await supabase
-          .from("refunds")
-          .select("order_id, amount_paise, status")
-          .in("order_id", capturedOrderIds)
-          .eq("status", "processed")
-      : { data: [] as Array<Record<string, unknown>> };
-
-  const itemByOrderId = new Map<string, Record<string, unknown>>();
   const breakdownMap = new Map<string, CreatorCourseRevenueRow>();
 
   for (const item of capturedItems) {
-    if (item.order_id) itemByOrderId.set(String(item.order_id), item);
     const courseId = String(item.course_id ?? item.course_title ?? "course");
     const courseTitle = String(item.course_title ?? "Course");
     const current = breakdownMap.get(courseId) ?? {
@@ -338,18 +313,6 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
     current.creatorSharePaise += Number(item.creator_share_paise ?? 0);
     breakdownMap.set(courseId, current);
   }
-
-  const processedRefundInputs = ((refundRows ?? []) as Array<Record<string, unknown>>)
-    .map((r) => {
-      const item = itemByOrderId.get(String(r.order_id ?? ""));
-      if (!item) return null;
-      return {
-        unitPricePaise: Number(item.unit_price_paise ?? 0),
-        creatorSharePaise: Number(item.creator_share_paise ?? 0),
-        refundAmountPaise: Number(r.amount_paise ?? 0),
-      };
-    })
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
   const transferRows = (transfers ?? []) as Array<Record<string, unknown>>;
   const settlementByTransfer = new Map(
@@ -372,7 +335,7 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
     } else if (status === "created" || status === "pending" || status === "processed") {
       legacyPendingPaise += Math.max(0, amount - reversed);
     }
-    if ((status === "reversed" || status === "partially_reversed") && processedRefundInputs.length === 0) {
+    if (status === "reversed" || status === "partially_reversed") {
       legacyReversedPaise += reversed || amount;
     }
   }
@@ -410,7 +373,6 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
       commissionPaise: Number(row.commission_paise ?? 0),
       creatorSharePaise: Number(row.creator_share_paise ?? 0),
     })),
-    processedRefunds: processedRefundInputs,
     payoutRequests: payoutRequests.map((req) => ({
       amountPaise: req.amountPaise,
       status: req.status,
@@ -436,7 +398,7 @@ export const getCreatorFinance = cache(async (): Promise<CreatorFinance> => {
     transferredPaise: balance.paidOutPaise,
     settledPaise: balance.paidOutPaise,
     pendingPaise: balance.reservedPendingPaise,
-    reversedPaise: balance.refundedCreatorSharePaise,
+    reversedPaise: legacyReversedPaise,
     commissionBps,
     commissionPercentLabel: formatCommissionPercent(commissionBps),
     destination,
@@ -501,11 +463,7 @@ export const getCreatorAnalytics = cache(async (range: "7d" | "30d" | "90d" | "1
     const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
     const orderObj = Array.isArray(orderRel) ? orderRel[0] : orderRel;
     if (!orderObj || !orderObj.status) return true;
-    return (
-      orderObj.status === "paid" ||
-      orderObj.status === "partially_refunded" ||
-      orderObj.status === "refunded"
-    );
+    return orderObj.status === "paid";
   });
 
   const points = buildSeries(
@@ -558,6 +516,384 @@ function buildSeries(
   }
   return buckets;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Catalog engagement (creator analytics)                                      */
+/* -------------------------------------------------------------------------- */
+
+export type AnalyticsRange = "7d" | "30d" | "90d" | "1y";
+
+const RANGE_DAYS: Record<AnalyticsRange, number> = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 };
+
+/** Anything unrecognised falls back to 30 days — never to a wider window. */
+export function parseAnalyticsRange(value: unknown): AnalyticsRange {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw === "7d" || raw === "90d" || raw === "1y" ? raw : "30d";
+}
+
+export interface CreatorEngagementPoint {
+  /** `2026-10-12` (UTC day, so server and client markup agree). */
+  label: string;
+  impressions: number;
+  views: number;
+  watchSeconds: number;
+  enrollments: number;
+}
+
+export interface CreatorCourseEngagement {
+  courseId: string;
+  title: string;
+  slug: string;
+  status: string;
+  impressions: number;
+  views: number;
+  /** Distinct signed-in learners who opened the course page. */
+  viewers: number;
+  watchSeconds: number;
+  watchSessions: number;
+  avgWatchSeconds: number;
+  enrollments: number;
+  /** All-time enrolled learners, from the denormalised course counter. */
+  students: number;
+}
+
+export interface CreatorEngagementTotals {
+  impressions: number;
+  views: number;
+  viewers: number;
+  watchSeconds: number;
+  watchSessions: number;
+  /** Whole minutes watched, for display. */
+  watchMinutes: number;
+  /** watchSeconds ÷ watchSessions — how long one sitting lasts. */
+  avgWatchSeconds: number;
+  enrollments: number;
+  courses: number;
+  students: number;
+}
+
+export interface CreatorEngagement {
+  range: AnalyticsRange;
+  days: number;
+  /** False when the platform service key is missing, so the page says so instead of showing zeros. */
+  available: boolean;
+  totals: CreatorEngagementTotals;
+  /** Same totals for the immediately preceding window, for the delta chips. */
+  previous: CreatorEngagementTotals;
+  points: CreatorEngagementPoint[];
+  byCourse: CreatorCourseEngagement[];
+}
+
+function emptyEngagementTotals(courses = 0, students = 0): CreatorEngagementTotals {
+  return {
+    impressions: 0,
+    views: 0,
+    viewers: 0,
+    watchSeconds: 0,
+    watchSessions: 0,
+    watchMinutes: 0,
+    avgWatchSeconds: 0,
+    enrollments: 0,
+    courses,
+    students,
+  };
+}
+
+function dayKey(iso: string | Date): string {
+  return (typeof iso === "string" ? iso : iso.toISOString()).slice(0, 10);
+}
+
+/** `2026-10-12` → `12 Oct`, rendered in UTC because the key carries no zone. */
+function dayLabel(key: string): string {
+  const date = new Date(`${key}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime())
+    ? key
+    : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "UTC" });
+}
+
+interface DailyRow {
+  day: string;
+  impressions: number;
+  views: number;
+  watch_seconds: number;
+  enrollments: number;
+}
+
+interface CourseRow {
+  course_id: string;
+  impressions: number;
+  views: number;
+  viewers: number;
+  watch_seconds: number;
+  watch_sessions: number;
+  enrollments: number;
+}
+
+/**
+ * Reach and watch time for the signed-in creator's catalog.
+ *
+ * The course ids come from an RLS-scoped read, so the creator can only ever
+ * aggregate their own courses; the aggregation itself runs through two
+ * `service_role`-only SQL functions because `course_events` is deliberately
+ * granted to no browser role and `entitlements` are readable only by their
+ * owner. No actor id ever leaves the database.
+ *
+ * A window with no events still returns a point per day with zeros: a flat line
+ * is the truth, and an empty array would make "no reach" indistinguishable from
+ * "no data".
+ */
+export const getCreatorEngagement = cache(async (
+  range: AnalyticsRange = "30d"
+): Promise<CreatorEngagement> => {
+  const session = await requireCreator();
+  const days = RANGE_DAYS[range];
+  const unavailable: CreatorEngagement = {
+    range,
+    days,
+    available: false,
+    totals: emptyEngagementTotals(),
+    previous: emptyEngagementTotals(),
+    points: [],
+    byCourse: [],
+  };
+
+  if (!isSupabaseConfigured()) return unavailable;
+
+  const supabase = await createServerClient();
+  const { data: courseRows } = await supabase
+    .from("courses")
+    .select("id, title, slug, status, students_count")
+    .eq("creator_id", session.id);
+
+  const courses = (courseRows ?? []) as Array<{
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+    students_count: number;
+  }>;
+  const students = courses.reduce((total, course) => total + Number(course.students_count ?? 0), 0);
+
+  if (courses.length === 0) {
+    return { ...unavailable, available: true, totals: emptyEngagementTotals(0, 0) };
+  }
+
+  const service = createServiceClient();
+  if (!service) return { ...unavailable, totals: emptyEngagementTotals(courses.length, students) };
+
+  const courseIds = courses.map((course) => course.id);
+  const until = new Date();
+  const since = new Date(until.getTime() - days * 86_400_000);
+  const previousSince = new Date(since.getTime() - days * 86_400_000);
+
+  const [{ data: daily }, { data: perCourse }, { data: previousDaily }] = await Promise.all([
+    service.rpc("creator_engagement_daily", {
+      p_course_ids: courseIds,
+      p_since: since.toISOString(),
+      p_until: until.toISOString(),
+    }),
+    service.rpc("creator_engagement_by_course", {
+      p_course_ids: courseIds,
+      p_since: since.toISOString(),
+      p_until: until.toISOString(),
+    }),
+    service.rpc("creator_engagement_daily", {
+      p_course_ids: courseIds,
+      p_since: previousSince.toISOString(),
+      p_until: since.toISOString(),
+    }),
+  ]);
+
+  const dailyRows = ((daily ?? []) as DailyRow[]).map((row) => ({
+    day: dayKey(String(row.day)),
+    impressions: Number(row.impressions ?? 0),
+    views: Number(row.views ?? 0),
+    watchSeconds: Number(row.watch_seconds ?? 0),
+    enrollments: Number(row.enrollments ?? 0),
+  }));
+  const byDay = new Map(dailyRows.map((row) => [row.day, row]));
+
+  const points: CreatorEngagementPoint[] = [];
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const key = dayKey(new Date(until.getTime() - i * 86_400_000));
+    const row = byDay.get(key);
+    points.push({
+      label: dayLabel(key),
+      impressions: row?.impressions ?? 0,
+      views: row?.views ?? 0,
+      watchSeconds: row?.watchSeconds ?? 0,
+      enrollments: row?.enrollments ?? 0,
+    });
+  }
+
+  const totalsFrom = (rows: Array<{ impressions: number; views: number; watchSeconds: number; enrollments: number }>) => {
+    const summed = rows.reduce(
+      (acc, row) => ({
+        impressions: acc.impressions + row.impressions,
+        views: acc.views + row.views,
+        watchSeconds: acc.watchSeconds + row.watchSeconds,
+        enrollments: acc.enrollments + row.enrollments,
+      }),
+      { impressions: 0, views: 0, watchSeconds: 0, enrollments: 0 }
+    );
+    return summed;
+  };
+
+  const courseRowsTyped = ((perCourse ?? []) as CourseRow[]).map((row) => ({
+    courseId: String(row.course_id),
+    impressions: Number(row.impressions ?? 0),
+    views: Number(row.views ?? 0),
+    viewers: Number(row.viewers ?? 0),
+    watchSeconds: Number(row.watch_seconds ?? 0),
+    watchSessions: Number(row.watch_sessions ?? 0),
+    enrollments: Number(row.enrollments ?? 0),
+  }));
+
+  const windowTotals = totalsFrom(dailyRows.map((row) => ({
+    impressions: row.impressions,
+    views: row.views,
+    watchSeconds: row.watchSeconds,
+    enrollments: row.enrollments,
+  })));
+  const previousTotals = totalsFrom(((previousDaily ?? []) as DailyRow[]).map((row) => ({
+    impressions: Number(row.impressions ?? 0),
+    views: Number(row.views ?? 0),
+    watchSeconds: Number(row.watch_seconds ?? 0),
+    enrollments: Number(row.enrollments ?? 0),
+  })));
+
+  const watchSessions = courseRowsTyped.reduce((total, row) => total + row.watchSessions, 0);
+  const viewers = courseRowsTyped.reduce((total, row) => total + row.viewers, 0);
+
+  const toTotals = (
+    summed: { impressions: number; views: number; watchSeconds: number; enrollments: number },
+    sessions: number,
+    distinctViewers: number
+  ): CreatorEngagementTotals => ({
+    impressions: summed.impressions,
+    views: summed.views,
+    viewers: distinctViewers,
+    watchSeconds: summed.watchSeconds,
+    watchSessions: sessions,
+    watchMinutes: Math.round(summed.watchSeconds / 60),
+    avgWatchSeconds: sessions > 0 ? Math.round(summed.watchSeconds / sessions) : 0,
+    enrollments: summed.enrollments,
+    courses: courses.length,
+    students,
+  });
+
+  const byCourse: CreatorCourseEngagement[] = courses
+    .map((course) => {
+      const stats = courseRowsTyped.find((row) => row.courseId === course.id);
+      const sessions = stats?.watchSessions ?? 0;
+      const watchSeconds = stats?.watchSeconds ?? 0;
+      return {
+        courseId: course.id,
+        title: course.title,
+        slug: course.slug,
+        status: course.status,
+        impressions: stats?.impressions ?? 0,
+        views: stats?.views ?? 0,
+        viewers: stats?.viewers ?? 0,
+        watchSeconds,
+        watchSessions: sessions,
+        avgWatchSeconds: sessions > 0 ? Math.round(watchSeconds / sessions) : 0,
+        enrollments: stats?.enrollments ?? 0,
+        students: Number(course.students_count ?? 0),
+      };
+    })
+    .sort((a, b) => b.views - a.views || b.impressions - a.impressions);
+
+  return {
+    range,
+    days,
+    available: true,
+    totals: toTotals(windowTotals, watchSessions, viewers),
+    previous: toTotals(previousTotals, 0, 0),
+    points,
+    byCourse,
+  };
+});
+
+/* -------------------------------------------------------------------------- */
+/* Earnings history                                                            */
+/* -------------------------------------------------------------------------- */
+
+export interface CreatorEarningsPoint {
+  /** `2026-10` — the month this bucket covers. */
+  key: string;
+  label: string;
+  grossPaise: number;
+  commissionPaise: number;
+  creatorSharePaise: number;
+  sales: number;
+}
+
+/** `2026-10` → `Oct 2026`. */
+function monthLabel(key: string): string {
+  const [year, month] = key.split("-").map(Number);
+  if (!year || !month) return key;
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-IN", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/**
+ * Month-by-month creator earnings for the last `months` calendar months
+ * (including the current, still-open one).
+ *
+ * Built from the same captured `order_items` the finance figures come from, so
+ * the chart and the totals can never disagree. Commission is the per-order
+ * snapshot, not today's rate.
+ */
+export const getCreatorEarningsSeries = cache(async (months = 6): Promise<CreatorEarningsPoint[]> => {
+  const session = await requireCreator();
+  const buckets: CreatorEarningsPoint[] = [];
+  const now = new Date();
+
+  for (let i = months - 1; i >= 0; i -= 1) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = date.toISOString().slice(0, 7);
+    buckets.push({
+      key,
+      label: monthLabel(key),
+      grossPaise: 0,
+      commissionPaise: 0,
+      creatorSharePaise: 0,
+      sales: 0,
+    });
+  }
+
+  if (!isSupabaseConfigured()) return buckets;
+
+  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+  const supabase = await createServerClient();
+  const { data } = await supabase
+    .from("order_items")
+    .select("created_at, unit_price_paise, quantity, commission_paise, creator_share_paise, orders ( status )")
+    .eq("creator_id", session.id)
+    .gte("created_at", since.toISOString());
+
+  const index = new Map(buckets.map((bucket, i) => [bucket.key, i]));
+  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+    const orderRel = row.orders as { status?: string } | Array<{ status?: string }> | null | undefined;
+    const order = Array.isArray(orderRel) ? orderRel[0] : orderRel;
+    if (order?.status && order.status !== "paid") continue;
+
+    const i = index.get(String(row.created_at).slice(0, 7));
+    if (i === undefined) continue;
+
+    const quantity = Math.max(1, Number(row.quantity ?? 1));
+    buckets[i].grossPaise += Number(row.unit_price_paise ?? 0) * quantity;
+    buckets[i].commissionPaise += Number(row.commission_paise ?? 0);
+    buckets[i].creatorSharePaise += Number(row.creator_share_paise ?? 0);
+    buckets[i].sales += quantity;
+  }
+
+  return buckets;
+});
 
 /* -------------------------------------------------------------------------- */
 /* Reviews and notifications                                                   */

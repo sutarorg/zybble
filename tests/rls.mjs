@@ -25,13 +25,24 @@ const MIGRATIONS = path.join(ROOT, "supabase", "migrations");
 const readMigration = (name) => fs.readFileSync(path.join(MIGRATIONS, name), "utf8");
 
 const manualPayoutsSql = readMigration("20260101000600_manual_payouts.sql");
-const schemaSql = readMigration("20260101000200_schema.sql") + "\n" + manualPayoutsSql;
-const rlsSql =
-  readMigration("20260101000300_rls.sql") +
-  "\n" +
-  readMigration("20260101000500_learner_rls_policies.sql") +
-  "\n" +
-  manualPayoutsSql;
+const refundRemovalSql = readMigration("20260101000700_remove_refunds.sql");
+const analyticsSql = readMigration("20260101000800_course_analytics_events.sql");
+const studioPrefsSql = readMigration("20260101000900_creator_studio_preferences.sql");
+
+const schemaSql = [
+  readMigration("20260101000200_schema.sql"),
+  manualPayoutsSql,
+  analyticsSql,
+  studioPrefsSql,
+].join("\n");
+const rlsSql = [
+  readMigration("20260101000300_rls.sql"),
+  readMigration("20260101000500_learner_rls_policies.sql"),
+  manualPayoutsSql,
+  refundRemovalSql,
+  analyticsSql,
+  studioPrefsSql,
+].join("\n");
 
 /** Tables a browser role (anon / authenticated) is allowed to touch at all. */
 const grantedTables = () => new Set(rlsSql.match(/grant\s+[^;]*?\bon public\.([a-z_]+)\s+to/gi)?.map((m) => m.match(/public\.([a-z_]+)/i)[1]) ?? []);
@@ -624,14 +635,11 @@ test("every privileged action writes an audit record", () => {
    * audit row from the service role. Those are legitimate, but the delegation
    * must be explicit so it is a decision rather than an accident.
    */
-  const AUDITED_ELSEWHERE = {
-    refundOrderAction: {
-      delegate: /await refundOrder\(/,
-      // The audit must name the acting admin and the order, not be anonymous.
-      evidence: /from\("admin_audit_log"\)\.insert\(/,
-      evidenceFile: path.join(ROOT, "src/lib/server/checkout.ts"),
-    },
-  };
+  // Refunds were removed from the product entirely, so the one action that used
+  // to be audited through `refundOrder()` is gone with it. The map stays as the
+  // documented escape hatch for an action whose audit row is written by the
+  // library it delegates to.
+  const AUDITED_ELSEWHERE = {};
 
   const actions = [...source.matchAll(/^export (?:async )?function (\w+)\s*\(/gm)]
     .map((m) => m[1])
@@ -657,6 +665,69 @@ test("every privileged action writes an audit record", () => {
 
     assert.match(body, /await audit\(/, `admin action ${name} performs a mutation with no audit record`);
   }
+});
+
+// ===========================================================================
+// Refunds are removed, not merely unused
+// ===========================================================================
+
+test("the refunds table is dropped and no later migration brings it back", () => {
+  assert.match(refundRemovalSql, /drop table if exists public\.refunds cascade/i);
+  // Migrations are history: 000200 still declares the table it once created.
+  // What must be true is that nothing *after* the removal re-declares it.
+  for (const later of [analyticsSql, studioPrefsSql]) {
+    assert.doesNotMatch(later, /create table if not exists public\.refunds/i);
+  }
+  // The RPC that used to debit creator shares from processed refunds is gone
+  // with it, and the replacement never mentions the table.
+  assert.match(refundRemovalSql, /drop function if exists public\.create_creator_payout_request/i);
+  const rpc = refundRemovalSql.slice(refundRemovalSql.indexOf("create or replace function public.create_creator_payout_request"));
+  assert.doesNotMatch(rpc, /public\.refunds/i);
+  assert.doesNotMatch(rpc, /v_refund_debit/i);
+  assert.match(rpc, /and o\.status = 'paid'/);
+});
+
+test("order and payment statuses no longer carry a refund state", () => {
+  assert.match(refundRemovalSql, /create type public\.order_status_v2 as enum \(\s*'created', 'pending', 'paid', 'failed', 'cancelled'\s*\)/i);
+  assert.match(refundRemovalSql, /create type public\.payment_status_v2 as enum \(\s*'created', 'authorized', 'captured', 'failed'\s*\)/i);
+  // Legacy rows are converted, never deleted: the accounting record survives.
+  assert.match(refundRemovalSql, /when 'refunded' then 'cancelled'/i);
+  assert.match(refundRemovalSql, /when 'refunded' then 'captured'/i);
+  assert.doesNotMatch(refundRemovalSql, /delete from public\.orders/i);
+});
+
+test("the ledger stays append-only, so historical refund entries are not rewritten", () => {
+  // `ledger_entry_kind` keeps its historical 'refund' value on purpose. The
+  // immutability trigger is what makes the ledger trustworthy, and no code path
+  // can write that value any more.
+  assert.doesNotMatch(refundRemovalSql, /alter type public\.ledger_entry_kind/i);
+  assert.doesNotMatch(refundRemovalSql, /update public\.ledger_entries/i);
+  assert.doesNotMatch(refundRemovalSql, /drop trigger if exists ledger_entries_no_update/i);
+});
+
+// ===========================================================================
+// Creator analytics events
+// ===========================================================================
+
+test("course_events is a service-role-only telemetry table", () => {
+  assert.match(analyticsSql, /alter table public\.course_events enable row level security/i);
+  assert.match(analyticsSql, /revoke all on public\.course_events from anon, authenticated/i);
+  // A browser that could insert an impression could inflate a creator's numbers.
+  assert.doesNotMatch(analyticsSql, /grant[^;]*\bon public\.course_events\s+to\s+[^;]*(anon|authenticated)/i);
+  assert.doesNotMatch(analyticsSql, /create policy[^;]*on public\.course_events/i);
+  // And a forged beacon cannot claim a year of viewing in one row.
+  assert.match(analyticsSql, /check \(seconds >= 0 and seconds <= 900\)/i);
+});
+
+test("studio preferences are scoped to the creator who owns them", () => {
+  assert.match(studioPrefsSql, /alter table public\.creator_studio_preferences enable row level security/i);
+  const own = policyBlocks().get("creator_studio_preferences") ?? [];
+  assert.ok(own.length > 0, "creator_studio_preferences has no policy");
+  for (const policy of own) {
+    assert.match(policy.body, /auth\.uid\(\)|public\.is_admin\(\)/, `${policy.name} is not scoped to a caller`);
+  }
+  // The studio table must not become a second home for learner preferences.
+  assert.doesNotMatch(studioPrefsSql, /study_reminders|goal_minutes_per_day|email_promos/i);
 });
 
 // ===========================================================================

@@ -4,6 +4,7 @@ import * as React from "react";
 import { Loader2, Lock, RefreshCcw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { WATCH_HEARTBEAT_SECONDS, flushCourseEvents, trackCourseEvent } from "@/lib/analytics-events";
 
 /**
  * Lesson video.
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
  */
 export function VideoPlayer({
   lessonId,
+  courseId,
   title,
   hasVideo,
   videoReady,
@@ -22,6 +24,8 @@ export function VideoPlayer({
   onProgress,
 }: {
   lessonId: string;
+  /** Set on the learning page so watch time can be credited to a course. */
+  courseId?: string;
   title: string;
   /** Server-decided: entitled learners see video, others only previews. */
   hasVideo: boolean;
@@ -65,6 +69,57 @@ export function VideoPlayer({
       setState({ kind: "error", message: "Could not reach the video service.", retryable: true });
     }
   }, [lessonId, hasVideo, videoReady]);
+
+  /* ------------------------- Watch-time heartbeats ------------------------ */
+  //
+  // Whole seconds of actual playback, accumulated from `timeupdate` deltas. A
+  // jump of more than two seconds is a seek, not watching, so it is ignored;
+  // that is also what keeps a scrubbed-to-the-end learner from being credited a
+  // full lesson. Every event is re-verified server-side against the learner's
+  // entitlement to this lesson.
+
+  const watchedSeconds = React.useRef(0);
+  const lastTime = React.useRef<number | null>(null);
+
+  const creditWatch = React.useCallback(
+    (deltaSeconds: number) => {
+      if (!courseId) return;
+      watchedSeconds.current += deltaSeconds;
+      if (watchedSeconds.current < WATCH_HEARTBEAT_SECONDS) return;
+      const whole = Math.floor(watchedSeconds.current);
+      watchedSeconds.current -= whole;
+      trackCourseEvent({ courseId, kind: "watch", lessonId, seconds: whole, source: "player" });
+    },
+    [courseId, lessonId]
+  );
+
+  const handleTimeUpdate = React.useCallback(
+    (currentTime: number) => {
+      const previous = lastTime.current;
+      lastTime.current = currentTime;
+      if (previous === null) return;
+      const delta = currentTime - previous;
+      // Ignore rewinds, seeks and paused-frame repeats.
+      if (delta > 0 && delta <= 2) creditWatch(delta);
+      onProgress?.(currentTime);
+    },
+    [creditWatch, onProgress]
+  );
+
+  React.useEffect(() => {
+    // Reset when the learner moves to another lesson.
+    watchedSeconds.current = 0;
+    lastTime.current = null;
+    return () => {
+      const whole = Math.floor(watchedSeconds.current);
+      watchedSeconds.current = 0;
+      lastTime.current = null;
+      if (whole > 0 && courseId) {
+        trackCourseEvent({ courseId, kind: "watch", lessonId, seconds: whole, source: "player" });
+        void flushCourseEvents({ beacon: true });
+      }
+    };
+  }, [courseId, lessonId]);
 
   React.useEffect(() => {
     // Authorisation is an external system (the server), so this subscribes to
@@ -121,7 +176,7 @@ export function VideoPlayer({
         preload="metadata"
         className={cn("size-full bg-black")}
         onEnded={onEnded}
-        onTimeUpdate={(event) => onProgress?.(event.currentTarget.currentTime)}
+        onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget.currentTime)}
         aria-label={title}
       />
     </div>

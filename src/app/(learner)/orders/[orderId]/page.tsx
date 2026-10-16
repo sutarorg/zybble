@@ -99,7 +99,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ or
             ))}
           </ul>
           <p className="mt-4 text-[11.5px] text-zinc-400">
-            Zybble publishes no refund policy. If you need a correction, contact support.
+            Every amount is in Indian Rupees. If a figure here looks wrong, open the Help Center and support will
+            check it against the payment record.
           </p>
         </aside>
       </div>

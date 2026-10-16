@@ -33,11 +33,7 @@ export default async function CreatorPayoutsPage() {
         <Metric
           label="Net creator share"
           value={formatInr(finance.netEarnedPaise)}
-          sub={
-            finance.refundedCreatorSharePaise > 0
-              ? `After ${formatInr(finance.refundedCreatorSharePaise)} refund adjustments`
-              : "Captured sales less commission"
-          }
+          sub="Captured sales less commission"
         />
         <Metric
           label="Available to request"
