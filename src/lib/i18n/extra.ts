@@ -618,8 +618,8 @@ export const EXTRA_TEXT: Record<string, Record<string, string>> = {
   "Pricing": {
     "es": "Precios",
     "pt": "Preços",
-    "fr": "Tarification",
-    "de": "Preisgestaltung",
+    "fr": "Tarifs",
+    "de": "Preise",
     "ja": "価格設定"
   },
   "Content": {
@@ -1251,13 +1251,6 @@ export const EXTRA_TEXT: Record<string, Record<string, string>> = {
     "fr": "Détails et vignette",
     "de": "Details & Vorschaubild",
     "ja": "詳細とサムネイル"
-  },
-  "Pricing": {
-    "es": "Precios",
-    "pt": "Preços",
-    "fr": "Tarifs",
-    "de": "Preise",
-    "ja": "価格設定"
   },
   "Review & submit": {
     "es": "Revisar y enviar",
