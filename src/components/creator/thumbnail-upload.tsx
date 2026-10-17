@@ -282,7 +282,7 @@ export function ThumbnailUpload({
           {saved && !error ? (
             <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11.5px] font-medium text-emerald-800">
               <Check className="size-3" aria-hidden="true" />
-              {courseId ? "Thumbnail saved" : "Ready to upload when saved"}
+              {courseId ? "Thumbnail saved" : "Ready"}
             </span>
           ) : null}
         </div>
@@ -295,19 +295,9 @@ export function ThumbnailUpload({
           </p>
         ) : null}
 
-        <div className="space-y-1 text-[12px] leading-relaxed text-muted-foreground">
-          <p>
-            Supported formats:{" "}
-            <strong className="font-medium text-foreground">JPEG, PNG, or WebP</strong> ·
-            Max size{" "}
-            <strong className="font-medium text-foreground">{MAX_IMAGE_MB} MB</strong> ·
-            Recommended{" "}
-            <strong className="font-medium text-foreground">1280 × 720 px (16:9)</strong>.
-          </p>
-          <p className="text-[11.5px] text-zinc-400">
-            Displayed on the public catalog card and at the top of your course preview page. Required before submitting for review.
-          </p>
-        </div>
+        <p className="text-[12px] text-muted-foreground">
+          JPEG, PNG or WebP · Up to {MAX_IMAGE_MB} MB · 1280 × 720 px
+        </p>
 
         {error ? (
           <div

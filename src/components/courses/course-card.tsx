@@ -26,13 +26,20 @@ const STATUS_BADGE: Record<string, { label: string; variant: "amber" | "violet" 
   new: { label: "New", variant: "emerald" },
 };
 
+function PreviewCardLink({ children, className, "aria-label": label }: React.ComponentProps<typeof Link>) {
+  return <div className={className} aria-label={label}>{children}</div>;
+}
+
 export function CourseCard({
   course: authoredCourse,
   wishlisted = false,
   priority = false,
   className,
+  preview = false,
 }: {
   course: Course;
+  /** Non-interactive studio preview, without analytics or wishlist writes. */
+  preview?: boolean;
   /** Server-read wishlist membership so the icon matches the database. */
   wishlisted?: boolean;
   /** Set on the first cards in view: they are the LCP element on a catalog page. */
@@ -57,7 +64,7 @@ export function CourseCard({
   // once per course per page load — scrolling a grid up and down is not reach.
   React.useEffect(() => {
     const node = cardRef.current;
-    if (!node || typeof IntersectionObserver === "undefined") return;
+    if (preview || !node || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
@@ -72,12 +79,14 @@ export function CourseCard({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [authoredCourse.id, pathname]);
+  }, [authoredCourse.id, pathname, preview]);
 
   const instructor = getCourseInstructor(course)!;
   const category = courseCategory(course);
   const CategoryIcon = categoryIcon(category.icon);
   const status = course.badge ? STATUS_BADGE[course.badge] : undefined;
+
+  const CardLink = preview ? PreviewCardLink : Link;
 
   return (
     <article
@@ -87,7 +96,7 @@ export function CourseCard({
         className
       )}
     >
-      <Link
+      <CardLink
         href={`/courses/${course.slug}`}
         className="flex h-full flex-col outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         aria-label={translateUi(course.title)}
@@ -165,13 +174,13 @@ export function CourseCard({
             )}
           </div>
         </div>
-      </Link>
+      </CardLink>
 
-      <BookmarkButton
+      {!preview ? <BookmarkButton
         courseId={course.id}
         initialBookmarked={wishlisted}
         className="absolute top-2 right-2 z-10 size-10 sm:top-2.5 sm:right-2.5 sm:size-8"
-      />
+      /> : null}
     </article>
   );
 }

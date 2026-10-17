@@ -28,22 +28,22 @@ export const COURSE_WIZARD_STEP_META: readonly CourseWizardStepMeta[] = [
   {
     id: "details",
     title: "Details & thumbnail",
-    description: "Title, category, level, language, outcomes and thumbnail.",
+    description: "Add course basics.",
   },
   {
     id: "curriculum",
     title: "Curriculum",
-    description: "Organise sections and lessons, upload videos and set free previews.",
+    description: "Build your lessons.",
   },
   {
     id: "resources",
     title: "Pricing",
-    description: "Set the course price in INR or keep it free.",
+    description: "Set your price.",
   },
   {
     id: "review",
     title: "Review & submit",
-    description: "Check readiness and request administrator review.",
+    description: "Preview and submit.",
   },
 ] as const;
 
@@ -127,7 +127,7 @@ export function buildCourseWizardSteps(state: CourseWizardState): CourseWizardSt
       href,
       done: locked ? false : done,
       locked,
-      lockedReason: locked ? "Save the course details first to unlock this step." : undefined,
+      lockedReason: locked ? "Save details to unlock." : undefined,
     };
   });
 }

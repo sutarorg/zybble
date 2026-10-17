@@ -2,22 +2,17 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowRight,
   BookOpen,
   Check,
-  CheckCircle2,
-  Circle,
   Eye,
-  Globe2,
   Image as ImageIcon,
-  IndianRupee,
   Layers,
   Plus,
-  Signal,
-  Sparkles,
   Target,
   Trash2,
 } from "lucide-react";
@@ -29,6 +24,8 @@ import { saveCourse } from "@/app/creator/actions";
 import { inrPriceInputSchema, formatInr } from "@/lib/money";
 import { ThumbnailUpload, uploadThumbnail } from "@/components/creator/thumbnail-upload";
 import { imagePath } from "@/lib/image-path";
+import { CourseCard } from "@/components/courses/course-card";
+import type { Course } from "@/types";
 import { cn } from "@/lib/utils";
 
 export interface CourseDetailsInitial {
@@ -76,12 +73,6 @@ const EMPTY_INITIAL: CourseDetailsInitial = {
   thumbnailKey: null,
 };
 
-const LEVEL_LABELS: Record<CourseDetailsInitial["level"], string> = {
-  beginner: "Beginner",
-  intermediate: "Intermediate",
-  advanced: "Advanced",
-};
-
 export function CourseDetailsForm({
   initial,
   locked = false,
@@ -92,7 +83,7 @@ export function CourseDetailsForm({
   const [form, setForm] = React.useState<CourseDetailsInitial>(
     () => initial ?? EMPTY_INITIAL
   );
-  const [pricingMode, setPricingMode] = React.useState<"free" | "paid">(() => {
+  const [pricingMode] = React.useState<"free" | "paid">(() => {
     const parsed = inrPriceInputSchema.safeParse(
       (initial?.priceRupees ?? "0").trim() || "0"
     );
@@ -120,24 +111,8 @@ export function CourseDetailsForm({
     }
   }
 
-  function handlePricingModeChange(mode: "free" | "paid") {
-    if (locked) return;
-    setPricingMode(mode);
-    setSavedNotice(null);
-    if (mode === "free") {
-      set("priceRupees", "0");
-      set("compareAtRupees", "");
-    } else if (
-      form.priceRupees === "0" ||
-      form.priceRupees === "0.00" ||
-      !form.priceRupees.trim()
-    ) {
-      set("priceRupees", "999");
-    }
-  }
-
   async function saveAndNavigate(goToCurriculumAfterSave: boolean) {
-    if (locked) return;
+    if (locked || busy) return;
     setError(null);
     setSavedNotice(null);
 
@@ -151,6 +126,7 @@ export function CourseDetailsForm({
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       setError("Please review the highlighted fields before saving.");
+      document.getElementById(`cd-${Object.keys(errors)[0] === "categorySlug" ? "category" : Object.keys(errors)[0]}`)?.focus();
       return;
     }
 
@@ -179,25 +155,34 @@ export function CourseDetailsForm({
         return;
       }
 
-      if (!form.id && result.id) {
-        if (thumbnailFile.current) {
-          const uploadRes = await uploadThumbnail(result.id, thumbnailFile.current);
-          if (!uploadRes.ok) {
-            router.push(`/creator/courses/${result.id}/edit`);
-            return;
-          }
-        }
-        router.push(`/creator/courses/${result.id}/curriculum`);
+      const courseId = result.id ?? form.id;
+      if (!courseId) {
+        setError("The course could not be opened. Please try saving again.");
         return;
       }
 
-      if (goToCurriculumAfterSave && form.id) {
-        router.push(`/creator/courses/${form.id}/curriculum`);
+      // Keep the saved draft ID even if the optional cover upload fails, so a
+      // retry updates this draft rather than creating a second course.
+      setForm((previous) => ({ ...previous, id: courseId }));
+      if (thumbnailFile.current) {
+        try {
+          const upload = await uploadThumbnail(courseId, thumbnailFile.current);
+          if (upload.ok) thumbnailFile.current = null;
+          else toast.warning("Course saved. Add your thumbnail again in Details.");
+        } catch {
+          toast.warning("Course saved. Add your thumbnail again in Details.");
+        }
+      }
+
+      if (goToCurriculumAfterSave || !initial?.id) {
+        router.push(`/creator/courses/${courseId}/curriculum`);
         return;
       }
 
       setSavedNotice("Course details saved.");
       router.refresh();
+    } catch {
+      setError("Could not save the course. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -208,7 +193,6 @@ export function CourseDetailsForm({
     await saveAndNavigate(false);
   }
 
-  const selectedCategory = CATEGORIES.find((cat) => cat.slug === form.categorySlug);
   const parsedPricePaise = React.useMemo(() => {
     if (pricingMode === "free") return 0;
     const res = inrPriceInputSchema.safeParse(form.priceRupees.trim() || "0");
@@ -221,28 +205,33 @@ export function CourseDetailsForm({
     return res.success && res.data > parsedPricePaise ? res.data : null;
   }, [pricingMode, form.compareAtRupees, parsedPricePaise]);
 
-  const stepChecklist = [
-    {
-      label: "Course title (3+ characters)",
-      done: form.title.trim().length >= 3,
+  const previewCourse: Course = {
+    id: form.id ?? "draft-preview",
+    slug: "draft-preview",
+    title: form.title.trim() || "Your course title",
+    subtitle: form.subtitle.trim() || "Your short course description",
+    description: form.description,
+    longDescription: [],
+    category: (form.categorySlug || "development") as Course["category"],
+    instructorId: "preview-instructor",
+    instructor: {
+      id: "preview-instructor", username: "creator",
+      name: instructor?.name || "Your name",
+      initials: instructor?.initials || "CR",
+      headline: instructor?.headline || "", bio: "",
+      avatarColor: "bg-violet-100 text-violet-700",
+      country: "IN", languages: [form.language],
     },
-    {
-      label: "Course description",
-      done: form.description.trim().length > 0,
-    },
-    {
-      label: "Category selected",
-      done: Boolean(form.categorySlug.trim()),
-    },
-    {
-      label: "16:9 cover thumbnail",
-      done: Boolean(liveThumbnailUrl || form.thumbnailKey),
-    },
-  ];
-
-  const avatarUrl = instructor?.avatarKey
-    ? imagePath("avatars", instructor.avatarKey)
-    : null;
+    thumbnail: liveThumbnailUrl || "/images/courses/course-placeholder.svg",
+    pricePaise: parsedPricePaise,
+    compareAtPaise: parsedComparePaise,
+    rating: 0, ratingsCount: 0, studentsCount: 0,
+    level: form.level, language: form.language as Course["language"],
+    captions: [], durationMinutes: 0, lessonsCount: 0,
+    downloadableResources: 0, lastUpdated: "", createdAt: "",
+    whatYouLearn: form.whatYouLearn.filter((item) => item.trim()),
+    curriculum: [], requirements: form.requirements, audience: form.audience, tags: [],
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -492,133 +481,6 @@ export function CourseDetailsForm({
             </div>
           </section>
 
-          {/* Section 5: Course Pricing */}
-          <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <SectionHeading
-                icon={<IndianRupee className="size-4" aria-hidden="true" />}
-                tint="bg-accent text-primary"
-                title="Pricing"
-                hint="Free or paid in ₹ — change it any time."
-              />
-              <Badge variant={pricingMode === "free" ? "emerald" : "violet"}>
-                {pricingMode === "free" || parsedPricePaise === 0
-                  ? "Free"
-                  : formatInr(parsedPricePaise)}
-              </Badge>
-            </div>
-
-            <div
-              className="mt-4 grid gap-2.5 sm:grid-cols-2"
-              role="radiogroup"
-              aria-label="Course pricing model"
-            >
-              <button
-                type="button"
-                role="radio"
-                disabled={locked}
-                aria-checked={pricingMode === "free"}
-                onClick={() => handlePricingModeChange("free")}
-                className={cn(
-                  "flex items-start justify-between rounded-xl border p-3.5 text-left transition-colors",
-                  pricingMode === "free"
-                    ? "border-primary bg-primary/[0.06] text-foreground"
-                    : "border-border bg-white text-muted-foreground hover:bg-muted/40"
-                )}
-              >
-                <div>
-                  <p className="text-[13px] font-semibold text-foreground">
-                    Free course (₹0)
-                  </p>
-                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    Open enrollment with one click.
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
-                    pricingMode === "free"
-                      ? "border-primary bg-primary text-white"
-                      : "border-zinc-300"
-                  )}
-                >
-                  {pricingMode === "free" ? <Check className="size-2.5" /> : null}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                role="radio"
-                disabled={locked}
-                aria-checked={pricingMode === "paid"}
-                onClick={() => handlePricingModeChange("paid")}
-                className={cn(
-                  "flex items-start justify-between rounded-xl border p-3.5 text-left transition-colors",
-                  pricingMode === "paid"
-                    ? "border-primary bg-primary/[0.06] text-foreground"
-                    : "border-border bg-white text-muted-foreground hover:bg-muted/40"
-                )}
-              >
-                <div>
-                  <p className="text-[13px] font-semibold text-foreground">
-                    Paid course (INR)
-                  </p>
-                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    UPI, cards & netbanking via Razorpay.
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
-                    pricingMode === "paid"
-                      ? "border-primary bg-primary text-white"
-                      : "border-zinc-300"
-                  )}
-                >
-                  {pricingMode === "paid" ? <Check className="size-2.5" /> : null}
-                </span>
-              </button>
-            </div>
-
-            {pricingMode === "paid" ? (
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <Field
-                  id="cd-price"
-                  label="Price (INR ₹)"
-                  error={fieldErrors.priceRupees}
-                  hint="e.g. 999 or 1499.50"
-                >
-                  <Input
-                    id="cd-price"
-                    disabled={locked}
-                    inputMode="decimal"
-                    value={form.priceRupees}
-                    onChange={(e) => set("priceRupees", e.target.value)}
-                    aria-invalid={Boolean(fieldErrors.priceRupees)}
-                    placeholder="999"
-                  />
-                </Field>
-
-                <Field
-                  id="cd-compare-price"
-                  label="Compare-at price (₹, optional)"
-                  error={fieldErrors.compareAtRupees}
-                  hint="Must be higher than the selling price"
-                >
-                  <Input
-                    id="cd-compare-price"
-                    disabled={locked}
-                    inputMode="decimal"
-                    value={form.compareAtRupees}
-                    onChange={(e) => set("compareAtRupees", e.target.value)}
-                    aria-invalid={Boolean(fieldErrors.compareAtRupees)}
-                    placeholder="1999"
-                  />
-                </Field>
-              </div>
-            ) : null}
-          </section>
-
           {/* Form Action Footer */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
             <p className="text-[12.5px] text-muted-foreground">
@@ -646,7 +508,7 @@ export function CourseDetailsForm({
           </div>
         </div>
 
-        {/* Right column: Sticky Live Catalog Card Preview & Checklist */}
+        {/* Right column: Sticky Live Catalog Card Preview */}
         <aside className="space-y-5 xl:sticky xl:top-20">
           {/* Live Public Catalog Card Preview */}
           <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
@@ -660,152 +522,7 @@ export function CourseDetailsForm({
               </span>
             </div>
 
-            {/* Public CourseCard replica bound to live form state */}
-            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-              <div className="relative aspect-video w-full overflow-hidden border-b border-border bg-muted">
-                {liveThumbnailUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={liveThumbnailUrl}
-                    alt={form.title.trim() || "Course thumbnail preview"}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-violet-600/10 via-fuchsia-500/5 to-sky-500/10 px-4 text-center">
-                    <ImageIcon className="size-6 text-primary/60" aria-hidden="true" />
-                    <p className="text-[11.5px] font-semibold text-foreground">
-                      No thumbnail uploaded yet
-                    </p>
-                    <p className="text-[10.5px] text-muted-foreground">
-                      16:9 cover image will appear here
-                    </p>
-                  </div>
-                )}
-                <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
-                  <Badge variant="solid_white">
-                    {selectedCategory?.name ?? "Choose category"}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-3 p-4">
-                <div>
-                  <h3
-                    className={cn(
-                      "line-clamp-2 font-display text-[14.5px] font-semibold leading-snug",
-                      form.title.trim() ? "text-foreground" : "italic text-zinc-400"
-                    )}
-                  >
-                    {form.title.trim() || "Untitled course — enter a title"}
-                  </h3>
-                  <p
-                    className={cn(
-                      "mt-1 line-clamp-2 text-[12px] leading-relaxed",
-                      form.subtitle.trim() || form.description.trim()
-                        ? "text-muted-foreground"
-                        : "italic text-zinc-400"
-                    )}
-                  >
-                    {form.subtitle.trim() ||
-                      form.description.trim() ||
-                      "Your short subtitle or description will appear here."}
-                  </p>
-                </div>
-
-                {/* Real creator identity */}
-                {instructor ? (
-                  <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                    {avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatarUrl}
-                        alt={instructor.name}
-                        className="size-5 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-primary">
-                        {instructor.initials}
-                      </span>
-                    )}
-                    <span className="truncate font-medium text-foreground">
-                      {instructor.name}
-                    </span>
-                  </div>
-                ) : null}
-
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <Signal className="size-3 text-zinc-400" aria-hidden="true" />
-                    {LEVEL_LABELS[form.level]}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Globe2 className="size-3 text-zinc-400" aria-hidden="true" />
-                    {form.language}
-                  </span>
-                  {form.whatYouLearn.filter((s) => s.trim()).length > 0 ? (
-                    <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
-                      <Sparkles className="size-3" aria-hidden="true" />
-                      {form.whatYouLearn.filter((s) => s.trim()).length} outcomes
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="flex items-baseline justify-between border-t border-border pt-3">
-                  {parsedPricePaise === 0 ? (
-                    <span className="font-display text-[14px] font-semibold text-emerald-700">
-                      Free
-                    </span>
-                  ) : (
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="font-display text-[15px] font-bold text-foreground">
-                        {formatInr(parsedPricePaise)}
-                      </span>
-                      {parsedComparePaise ? (
-                        <span className="text-[11.5px] text-zinc-400 line-through">
-                          {formatInr(parsedComparePaise)}
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                  <span className="text-[11px] font-medium text-primary">
-                    View course →
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Readiness Checklist */}
-          <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
-            <h3 className="text-[12.5px] font-semibold text-foreground">
-              Before you continue
-            </h3>
-            <ul className="mt-2.5 space-y-2">
-              {stepChecklist.map((item) => (
-                <li key={item.label} className="flex items-center gap-2 text-[12px]">
-                  {item.done ? (
-                    <CheckCircle2
-                      className="size-3.5 shrink-0 text-emerald-600"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Circle
-                      className="size-3.5 shrink-0 text-zinc-300"
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span
-                    className={
-                      item.done
-                        ? "font-medium text-foreground"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {item.label}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <CourseCard course={previewCourse} preview />
           </div>
         </aside>
       </div>
