@@ -16,6 +16,7 @@ export const runtime = "nodejs";
 const uploadSchema = z.object({
   kind: z.enum(["thumbnail", "resource", "avatar"]),
   courseId: z.string().uuid().optional(),
+  lessonId: z.string().uuid().optional().nullable(),
   fileName: z.string().min(1).max(200),
   contentType: z.string().min(1).max(120),
   sizeBytes: z.number().int().positive(),
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
 async function handleUpload(request: Request, body: unknown, session: Awaited<ReturnType<typeof getSession>> & object) {
   const parsed = uploadSchema.safeParse(body);
   if (!parsed.success) return Response.json({ error: "Invalid request" }, { status: 400 });
-  const { kind, courseId, fileName, contentType, sizeBytes, title } = parsed.data;
+  const { kind, courseId, lessonId, fileName, contentType, sizeBytes, title } = parsed.data;
 
   const limit = rateLimit(
     clientKey(request, "storage-upload", session.id),
@@ -109,19 +110,28 @@ async function handleUpload(request: Request, body: unknown, session: Awaited<Re
   // deliberately does not: it is confirmed by `updateAvatar` only after the
   // browser's PUT has actually landed, so a failed upload can never leave a
   // profile pointing at an object that does not exist.
+  let resourceId: string | undefined;
   if (kind === "avatar") {
     // Nothing to persist yet — the response carries the key back to the caller.
   } else if (kind === "thumbnail" && courseId) {
     await service.from("courses").update({ thumbnail_key: key }).eq("id", courseId).eq("creator_id", session.id);
   } else if (kind === "resource" && courseId) {
-    await service.from("course_resources").insert({
-      course_id: courseId,
-      title: title ?? fileName,
-      object_key: key,
-      file_name: fileName,
-      content_type: contentType,
-      size_bytes: sizeBytes,
-    });
+    const { data: inserted } = await service
+      .from("course_resources")
+      .insert({
+        course_id: courseId,
+        lesson_id: lessonId ?? null,
+        title: title ?? fileName,
+        object_key: key,
+        file_name: fileName,
+        content_type: contentType,
+        size_bytes: sizeBytes,
+      })
+      .select("id")
+      .maybeSingle();
+    if (inserted?.id) {
+      resourceId = String(inserted.id);
+    }
     // Keep the denormalised counter on the course truthful — the catalog and
     // the review checklist read it, and `refreshCourseAggregates` only runs on
     // curriculum changes.
@@ -136,7 +146,10 @@ async function handleUpload(request: Request, body: unknown, session: Awaited<Re
       .eq("creator_id", session.id);
   }
 
-  return Response.json({ key, url, expiresInSeconds: 15 * 60 }, { status: 201, headers: rateLimitHeaders(limit) });
+  return Response.json(
+    { key, url, resourceId, expiresInSeconds: 15 * 60 },
+    { status: 201, headers: rateLimitHeaders(limit) }
+  );
 }
 
 async function handleDownload(request: Request, body: unknown, session: Awaited<ReturnType<typeof getSession>> & object) {

@@ -83,7 +83,20 @@ export async function POST(request: Request) {
     .update({ bunny_video_id: video.guid, bunny_status: "uploading", bunny_playback_ready: false })
     .eq("id", lessonId);
 
-  return Response.json({ ...grant, title: fileName }, { status: 201, headers: rateLimitHeaders(limit) });
+  return Response.json(
+    {
+      ...grant,
+      tusEndpoint: grant.endpoint,
+      headers: {
+        AuthorizationSignature: grant.signature,
+        AuthorizationExpire: String(grant.expiration),
+        VideoId: grant.videoId,
+        LibraryId: grant.libraryId,
+      },
+      title: fileName,
+    },
+    { status: 201, headers: rateLimitHeaders(limit) }
+  );
 }
 
 function authErrorResponse(error: unknown): Response {

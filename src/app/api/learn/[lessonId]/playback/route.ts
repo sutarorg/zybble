@@ -34,16 +34,18 @@ export async function POST(request: Request, context: { params: Promise<{ lesson
   const service = requireServiceClient();
   const { data: lesson } = await service
     .from("lessons")
-    .select("id, title, is_preview, bunny_video_id, bunny_status, bunny_playback_ready, course_id, courses ( title, status )")
+    .select("id, title, is_preview, bunny_video_id, bunny_status, bunny_playback_ready, course_id, courses ( title, status, creator_id )")
     .eq("id", lessonId)
     .maybeSingle();
 
-  const course = (lesson?.courses ?? null) as { title: string; status: string } | null;
+  const course = (lesson?.courses ?? null) as { title: string; status: string; creator_id?: string } | null;
   if (!lesson || !course) return Response.json({ error: "Lesson not found" }, { status: 404 });
 
   const isPreview = Boolean(lesson.is_preview) && course.status === "published";
+  const isOwnerOrStaff =
+    course.creator_id === session.id || session.role === "admin" || session.role === "moderator";
 
-  if (!isPreview) {
+  if (!isPreview && !isOwnerOrStaff) {
     const { data: entitlement } = await service
       .from("entitlements")
       .select("id")

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getCreatorCourse, getRouteOnboardingState } from "@/lib/server/creator";
+import { getSession } from "@/lib/server/session";
 import { paiseToRupees } from "@/lib/money";
 import { CourseDetailsForm } from "../../new/course-details-form";
 import { RouteBlockedNotice } from "../../../route-blocked-notice";
@@ -10,18 +11,33 @@ export const dynamic = "force-dynamic";
 
 export default async function EditCoursePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [course, route] = await Promise.all([getCreatorCourse(id), getRouteOnboardingState()]);
+  const [course, route, session] = await Promise.all([
+    getCreatorCourse(id),
+    getRouteOnboardingState(),
+    getSession(),
+  ]);
   if (!course) notFound();
 
   const locked = course.status === "published";
   // A course that has never been submitted keeps the wizard's "Save draft" action.
   const isFirstDraft = course.status === "draft" && !course.submittedAt;
 
+  const instructor = session
+    ? {
+        name: session.creator?.displayName || session.fullName || "Creator",
+        initials: session.initials || "CR",
+        headline: session.creator?.headline ?? null,
+        avatarKey: session.avatarKey ?? null,
+      }
+    : undefined;
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">Details &amp; thumbnail</h1>
+          <h1 className="font-display text-[26px] leading-tight font-bold tracking-tight">
+            Details &amp; thumbnail
+          </h1>
           <p className="mt-1.5 text-[14px] text-muted-foreground">{course.title}</p>
         </div>
         <StatusBadge status={course.status} />
@@ -37,7 +53,9 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
       {course.status === "changes_requested" || course.status === "rejected" ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5 text-[13px] text-amber-900">
           <p className="font-medium">
-            {course.status === "changes_requested" ? "The reviewers asked for changes." : "This submission was rejected."}
+            {course.status === "changes_requested"
+              ? "The reviewers asked for changes."
+              : "This submission was rejected."}
           </p>
           {course.rejectionReason ? <p className="mt-1">{course.rejectionReason}</p> : null}
           <p className="mt-1">
@@ -50,6 +68,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
 
       <CourseDetailsForm
         locked={locked}
+        instructor={instructor}
         submitLabel={isFirstDraft ? "Save draft" : "Save changes"}
         initial={{
           id: course.id,

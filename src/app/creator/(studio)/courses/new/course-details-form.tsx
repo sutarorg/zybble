@@ -1,15 +1,39 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { saveCourse } from "@/app/creator/actions";
-import { CATEGORIES, TEACHING_LANGUAGES } from "@/lib/config/catalog";
-import { rupeesToPaise } from "@/lib/money";
-import dynamic from "next/dynamic";
+import {
+  AlertCircle,
+  ArrowRight,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  Circle,
+  Eye,
+  FileUp,
+  Globe2,
+  HelpCircle,
+  Image as ImageIcon,
+  IndianRupee,
+  Layers,
+  Loader2,
+  Plus,
+  Signal,
+  Sparkles,
+  Target,
+  Trash2,
+  Video,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-const ThumbnailUpload = dynamic(() => import("@/components/creator/thumbnail-upload").then((m) => m.ThumbnailUpload), { ssr: false, loading: () => <div className="h-24 w-44 animate-pulse rounded-xl bg-muted" /> });
 import { Input, Textarea } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { CATEGORIES, TEACHING_LANGUAGES } from "@/lib/config/catalog";
+import { saveCourse } from "@/app/creator/actions";
+import { inrPriceInputSchema, formatInr } from "@/lib/money";
+import { ThumbnailUpload, uploadThumbnail } from "@/components/creator/thumbnail-upload";
+import { imagePath } from "@/lib/image-path";
+import { cn } from "@/lib/utils";
 
 export interface CourseDetailsInitial {
   id?: string;
@@ -27,485 +51,1044 @@ export interface CourseDetailsInitial {
   audience: string[];
 }
 
-const MAX_LIST_ITEMS = 20;
+export interface CreatorPreviewIdentity {
+  name: string;
+  initials: string;
+  headline?: string | null;
+  avatarKey?: string | null;
+}
 
-/**
- * Course details editor — wizard step 1.
- *
- * Price is typed in rupees for humans and converted to integer paise with exact
- * decimal arithmetic before it reaches the server. The server re-validates the
- * value, so the inline checks here are a convenience, not the authority. A
- * price of 0 keeps the course free.
- *
- * Saves go to the real course record through `saveCourse`; there is no separate
- * draft store. On create the wizard continues to the curriculum step; on edit
- * the form stays on this step so a creator can revisit earlier steps without
- * being yanked forward.
- */
+interface CourseDetailsFormProps {
+  initial?: CourseDetailsInitial;
+  locked?: boolean;
+  submitLabel?: string;
+  defaults?: {
+    language: string;
+    level: "beginner" | "intermediate" | "advanced";
+    priceRupees: string;
+  };
+  instructor?: CreatorPreviewIdentity;
+}
+
+const EMPTY_INITIAL: CourseDetailsInitial = {
+  title: "",
+  subtitle: "",
+  description: "",
+  categorySlug: "",
+  level: "beginner",
+  language: "English",
+  priceRupees: "0",
+  compareAtRupees: "",
+  whatYouLearn: [""],
+  requirements: [""],
+  audience: [""],
+  thumbnailKey: null,
+};
+
+const LEVEL_LABELS: Record<CourseDetailsInitial["level"], string> = {
+  beginner: "Beginner",
+  intermediate: "Intermediate",
+  advanced: "Advanced",
+};
+
 export function CourseDetailsForm({
   initial,
   locked = false,
   submitLabel = "Save draft",
-}: {
-  initial?: CourseDetailsInitial;
-  /** Published courses keep their existing editing restrictions: the form is read-only. */
-  locked?: boolean;
-  submitLabel?: string;
-}) {
+  defaults,
+  instructor,
+}: CourseDetailsFormProps) {
   const router = useRouter();
-  const [form, setForm] = React.useState<CourseDetailsInitial>(
-    initial ?? {
-      title: "",
-      subtitle: "",
-      description: "",
-      categorySlug: "",
-      level: "beginner",
-      language: "English",
-      priceRupees: "0",
-      compareAtRupees: "",
-      whatYouLearn: [""],
-      requirements: [""],
-      audience: [""],
-    }
-  );
-  const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [saved, setSaved] = React.useState(false);
+  const [form, setForm] = React.useState<CourseDetailsInitial>(() => {
+    if (initial) return initial;
+    return {
+      ...EMPTY_INITIAL,
+      language: defaults?.language ?? EMPTY_INITIAL.language,
+      level: defaults?.level ?? EMPTY_INITIAL.level,
+      priceRupees: defaults?.priceRupees ?? EMPTY_INITIAL.priceRupees,
+    };
+  });
+  const [pricingMode, setPricingMode] = React.useState<"free" | "paid">(() => {
+    const parsed = inrPriceInputSchema.safeParse(
+      (initial?.priceRupees ?? defaults?.priceRupees ?? "0").trim() || "0"
+    );
+    return parsed.success && parsed.data > 0 ? "paid" : "free";
+  });
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+  const [error, setError] = React.useState<string | null>(null);
+  const [savedNotice, setSavedNotice] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
+
   const thumbnailFile = React.useRef<File | null>(null);
+  const [liveThumbnailUrl, setLiveThumbnailUrl] = React.useState<string | null>(() =>
+    initial?.thumbnailKey ? imagePath("thumbnails", initial.thumbnailKey) : null
+  );
 
-  const isCreate = !initial?.id;
-
-  function update<K extends keyof CourseDetailsInitial>(key: K, value: CourseDetailsInitial[K]) {
-    setSaved(false);
-    setForm((current) => ({ ...current, [key]: value }));
-    setFieldErrors((current) => {
-      if (!current[key as string]) return current;
-      const next = { ...current };
-      delete next[key as string];
-      return next;
-    });
+  function set<K extends keyof CourseDetailsInitial>(key: K, value: CourseDetailsInitial[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setSavedNotice(null);
+    if (fieldErrors[key as string]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key as string];
+        return next;
+      });
+    }
   }
 
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    const errors = validateDetails(form);
-    setFieldErrors(errors);
+  function handlePricingModeChange(mode: "free" | "paid") {
+    if (locked) return;
+    setPricingMode(mode);
+    setSavedNotice(null);
+    if (mode === "free") {
+      set("priceRupees", "0");
+      set("compareAtRupees", "");
+    } else if (
+      form.priceRupees === "0" ||
+      form.priceRupees === "0.00" ||
+      !form.priceRupees.trim()
+    ) {
+      set("priceRupees", "999");
+    }
+  }
+
+  async function saveAndNavigate(goToCurriculumAfterSave: boolean) {
+    if (locked) return;
+    setError(null);
+    setSavedNotice(null);
+
+    const payloadToValidate: CourseDetailsInitial = {
+      ...form,
+      priceRupees: pricingMode === "free" ? "0" : form.priceRupees,
+      compareAtRupees: pricingMode === "free" ? "" : form.compareAtRupees,
+    };
+
+    const errors = validateDetails(payloadToValidate);
     if (Object.keys(errors).length > 0) {
-      setError("Check the highlighted fields and try again.");
+      setFieldErrors(errors);
+      setError("Please review the highlighted fields before saving.");
       return;
     }
 
     setBusy(true);
-    setError(null);
-    setSaved(false);
-    const result = await saveCourse({
-      id: form.id,
-      title: form.title,
-      subtitle: form.subtitle,
-      description: form.description,
-      categorySlug: form.categorySlug,
-      level: form.level,
-      language: form.language,
-      priceRupees: form.priceRupees,
-      compareAtRupees: form.compareAtRupees || undefined,
-      whatYouLearn: clean(form.whatYouLearn),
-      requirements: clean(form.requirements),
-      audience: clean(form.audience),
-    })
-      .then((value) => value)
-      .catch(() => ({ ok: false, error: "Something went wrong. Please try again." }) as Awaited<ReturnType<typeof saveCourse>>);
+    try {
+      const result = await saveCourse({
+        id: form.id,
+        title: form.title,
+        subtitle: form.subtitle,
+        description: form.description,
+        categorySlug: form.categorySlug,
+        level: form.level,
+        language: form.language,
+        priceRupees: pricingMode === "free" ? "0" : form.priceRupees,
+        compareAtRupees:
+          pricingMode === "paid" && form.compareAtRupees.trim()
+            ? form.compareAtRupees.trim()
+            : undefined,
+        whatYouLearn: form.whatYouLearn.map((s) => s.trim()).filter(Boolean),
+        requirements: form.requirements.map((s) => s.trim()).filter(Boolean),
+        audience: form.audience.map((s) => s.trim()).filter(Boolean),
+      });
 
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error ?? "Could not save the course");
-      return;
-    }
-
-    if (isCreate) {
-      if (thumbnailFile.current && result.id) {
-        const { uploadThumbnail } = await import("@/components/creator/thumbnail-upload");
-        await uploadThumbnail(result.id, thumbnailFile.current).catch(() => null);
+      if (!result.ok) {
+        setError(result.error ?? "Could not save course");
+        return;
       }
-      // First save creates the record; the wizard unlocks and continues.
-      router.push(`/creator/courses/${result.id}/curriculum`);
+
+      if (!form.id && result.id) {
+        if (thumbnailFile.current) {
+          const uploadRes = await uploadThumbnail(result.id, thumbnailFile.current);
+          if (!uploadRes.ok) {
+            router.push(`/creator/courses/${result.id}/edit`);
+            return;
+          }
+        }
+        router.push(`/creator/courses/${result.id}/curriculum`);
+        return;
+      }
+
+      if (goToCurriculumAfterSave && form.id) {
+        router.push(`/creator/courses/${form.id}/curriculum`);
+        return;
+      }
+
+      setSavedNotice("Course details saved.");
       router.refresh();
-      return;
+    } finally {
+      setBusy(false);
     }
-    setSaved(true);
-    router.refresh();
   }
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await saveAndNavigate(false);
+  }
+
+  const selectedCategory = CATEGORIES.find((cat) => cat.slug === form.categorySlug);
+  const parsedPricePaise = React.useMemo(() => {
+    if (pricingMode === "free") return 0;
+    const res = inrPriceInputSchema.safeParse(form.priceRupees.trim() || "0");
+    return res.success ? res.data : 0;
+  }, [pricingMode, form.priceRupees]);
+
+  const parsedComparePaise = React.useMemo(() => {
+    if (pricingMode === "free" || !form.compareAtRupees.trim()) return null;
+    const res = inrPriceInputSchema.safeParse(form.compareAtRupees.trim());
+    return res.success && res.data > parsedPricePaise ? res.data : null;
+  }, [pricingMode, form.compareAtRupees, parsedPricePaise]);
+
+  const stepChecklist = [
+    {
+      label: "Course title (3+ characters)",
+      done: form.title.trim().length >= 3,
+    },
+    {
+      label: "Course description",
+      done: form.description.trim().length > 0,
+    },
+    {
+      label: "Category selected",
+      done: Boolean(form.categorySlug.trim()),
+    },
+    {
+      label: "16:9 cover thumbnail",
+      done: Boolean(liveThumbnailUrl || form.thumbnailKey),
+    },
+  ];
+
+  const avatarUrl = instructor?.avatarKey
+    ? imagePath("avatars", instructor.avatarKey)
+    : null;
+
   return (
-    <form onSubmit={onSubmit} aria-busy={busy} className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
-      <FormError message={error} />
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+      {error ? (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-600" aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      ) : null}
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Basics                                                            */}
-      {/* ---------------------------------------------------------------- */}
-      <section aria-labelledby="cd-basics-heading">
-        <h2 id="cd-basics-heading" className="font-display text-[15px] font-semibold tracking-tight">
-          About this course
-        </h2>
+      {savedNotice ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-800"
+        >
+          <span className="inline-flex items-center gap-2 font-medium">
+            <Check className="size-4 text-emerald-600" aria-hidden="true" />
+            {savedNotice}
+          </span>
+          {form.id ? (
+            <Link
+              href={`/creator/courses/${form.id}/curriculum`}
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary underline-offset-4 hover:underline"
+            >
+              Continue to Curriculum
+              <ArrowRight className="size-3.5" aria-hidden="true" />
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="cd-title" required>
-              Course title
-            </FieldLabel>
-            <Input
-              id="cd-title"
-              required
-              maxLength={140}
+      <div className="grid gap-6 xl:grid-cols-[1fr_340px] xl:items-start">
+        {/* Left column: Structured form sections */}
+        <div className="space-y-6">
+          {/* Section 1: About this course */}
+          <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
+                <BookOpen className="size-4" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
+                  About this course
+                </h2>
+                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                  Give learners a clear title, a concise one-line hook, and a thorough overview of what the course covers.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <Field
+                id="cd-title"
+                label="Course title"
+                required
+                error={fieldErrors.title}
+                hint={`${form.title.length}/140 characters`}
+              >
+                <Input
+                  id="cd-title"
+                  required
+                  disabled={locked}
+                  value={form.title}
+                  onChange={(e) => set("title", e.target.value)}
+                  maxLength={140}
+                  aria-invalid={Boolean(fieldErrors.title)}
+                  aria-describedby={fieldErrors.title ? "cd-title-error" : "cd-title-help"}
+                  placeholder="e.g. Production AI Agents with LangGraph & Tool Calling"
+                />
+              </Field>
+
+              <Field
+                id="cd-subtitle"
+                label="Short description / subtitle"
+                error={fieldErrors.subtitle}
+                hint={`${form.subtitle.length}/180 characters`}
+              >
+                <Input
+                  id="cd-subtitle"
+                  disabled={locked}
+                  value={form.subtitle}
+                  onChange={(e) => set("subtitle", e.target.value)}
+                  maxLength={180}
+                  aria-invalid={Boolean(fieldErrors.subtitle)}
+                  placeholder="A crisp one-line summary of the practical outcome learners get"
+                />
+              </Field>
+
+              <Field
+                id="cd-description"
+                label="Full course description"
+                required
+                error={fieldErrors.description}
+                hint={`${form.description.length}/6,000 characters`}
+              >
+                <Textarea
+                  id="cd-description"
+                  rows={5}
+                  disabled={locked}
+                  maxLength={6000}
+                  value={form.description}
+                  onChange={(e) => set("description", e.target.value)}
+                  aria-invalid={Boolean(fieldErrors.description)}
+                  aria-describedby={
+                    fieldErrors.description ? "cd-description-error" : "cd-description-help"
+                  }
+                  placeholder="Describe the projects learners will build, the tools and workflows covered, and how the curriculum is structured…"
+                />
+              </Field>
+            </div>
+          </section>
+
+          {/* Section 2: Category, level and language */}
+          <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
+                <Layers className="size-4" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
+                  Category, level &amp; language
+                </h2>
+                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                  Help the right learners discover your course through catalog filters and search.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              <Field
+                id="cd-category"
+                label="Category"
+                required
+                error={fieldErrors.categorySlug}
+              >
+                <select
+                  id="cd-category"
+                  disabled={locked}
+                  value={form.categorySlug}
+                  onChange={(e) => set("categorySlug", e.target.value)}
+                  aria-invalid={Boolean(fieldErrors.categorySlug)}
+                  className="flex h-10 w-full rounded-lg border border-input bg-white px-3 text-[13.5px] text-foreground shadow-2xs outline-none focus:border-primary focus:ring-2 focus:ring-ring/20"
+                >
+                  <option value="">Choose a category…</option>
+                  {CATEGORIES.map((category) => (
+                    <option key={category.slug} value={category.slug}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field id="cd-level" label="Difficulty level" required>
+                <select
+                  id="cd-level"
+                  disabled={locked}
+                  value={form.level}
+                  onChange={(e) =>
+                    set("level", e.target.value as CourseDetailsInitial["level"])
+                  }
+                  className="flex h-10 w-full rounded-lg border border-input bg-white px-3 text-[13.5px] text-foreground shadow-2xs outline-none focus:border-primary focus:ring-2 focus:ring-ring/20"
+                >
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </Field>
+
+              <Field
+                id="cd-language"
+                label="Taught in"
+                required
+                error={fieldErrors.language}
+              >
+                <select
+                  id="cd-language"
+                  disabled={locked}
+                  value={form.language}
+                  onChange={(e) => set("language", e.target.value)}
+                  aria-invalid={Boolean(fieldErrors.language)}
+                  className="flex h-10 w-full rounded-lg border border-input bg-white px-3 text-[13.5px] text-foreground shadow-2xs outline-none focus:border-primary focus:ring-2 focus:ring-ring/20"
+                >
+                  {TEACHING_LANGUAGES.map((language) => (
+                    <option key={language} value={language}>
+                      {language}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </section>
+
+          {/* Section 3: Course Thumbnail */}
+          <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                  <ImageIcon className="size-4" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
+                    Course thumbnail
+                  </h2>
+                  <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                    Upload a crisp 16:9 cover image. It updates the live preview immediately and is required before submission.
+                  </p>
+                </div>
+              </div>
+              {liveThumbnailUrl ? (
+                <Badge variant="emerald">Uploaded</Badge>
+              ) : (
+                <Badge variant="amber">Required for review</Badge>
+              )}
+            </div>
+
+            <ThumbnailUpload
+              courseId={form.id}
+              thumbnailKey={form.thumbnailKey ?? null}
               disabled={locked}
-              placeholder="e.g. Build AI agents with Python"
-              value={form.title}
-              onChange={(e) => update("title", e.target.value)}
-              aria-invalid={Boolean(fieldErrors.title)}
-              aria-describedby={fieldErrors.title ? "cd-title-error" : "cd-title-help"}
+              onFile={(file) => {
+                thumbnailFile.current = file;
+              }}
+              onPreviewChange={(url) => setLiveThumbnailUrl(url)}
             />
-            <FieldHint
-              id="cd-title-help"
-              errorId="cd-title-error"
-              error={fieldErrors.title}
-              hint={`${form.title.trim().length}/140 characters · at least 3`}
-            />
-          </div>
+          </section>
 
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="cd-subtitle">Subtitle</FieldLabel>
-            <Input
-              id="cd-subtitle"
-              maxLength={180}
-              disabled={locked}
-              placeholder="One line that expands on the title"
-              value={form.subtitle}
-              onChange={(e) => update("subtitle", e.target.value)}
-              aria-invalid={Boolean(fieldErrors.subtitle)}
-              aria-describedby={fieldErrors.subtitle ? "cd-subtitle-error" : "cd-subtitle-help"}
-            />
-            <FieldHint
-              id="cd-subtitle-help"
-              errorId="cd-subtitle-error"
-              error={fieldErrors.subtitle}
-              hint={`Shown under the title in the catalog · ${form.subtitle.length}/180 characters`}
-            />
-          </div>
+          {/* Section 4: Learning outcomes, requirements & audience */}
+          <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <Target className="size-4" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
+                  Learning outcomes, prerequisites &amp; audience
+                </h2>
+                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                  Displayed on your public course landing page to help learners decide if this course fits their goals.
+                </p>
+              </div>
+            </div>
 
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="cd-description" required hint="Required before you can submit for review">
-              Description
-            </FieldLabel>
-            <Textarea
-              id="cd-description"
-              rows={6}
-              maxLength={6000}
-              disabled={locked}
-              placeholder="What does the course cover, and who teaches it best?"
-              value={form.description}
-              onChange={(e) => update("description", e.target.value)}
-              aria-invalid={Boolean(fieldErrors.description)}
-              aria-describedby={fieldErrors.description ? "cd-description-error" : "cd-description-help"}
-            />
-            <FieldHint
-              id="cd-description-help"
-              errorId="cd-description-error"
-              error={fieldErrors.description}
-              hint={`${form.description.length}/6,000 characters`}
-            />
+            <div className="mt-5 space-y-6">
+              <ListEditor
+                label="What learners will be able to do"
+                hint="Add concrete, practical outcomes (e.g. 'Build and deploy a multi-step AI agent with tool calling')."
+                items={form.whatYouLearn}
+                disabled={locked}
+                onChange={(items) => set("whatYouLearn", items)}
+                placeholder="e.g. Design, test, and deploy a multi-agent workflow"
+                addLabel="Add learning outcome"
+              />
+
+              <div className="border-t border-border pt-5">
+                <ListEditor
+                  label="Prerequisites & requirements"
+                  hint="Tools, accounts, or prior experience learners should have before starting."
+                  items={form.requirements}
+                  disabled={locked}
+                  onChange={(items) => set("requirements", items)}
+                  placeholder="e.g. Basic familiarity with JavaScript or Python"
+                  addLabel="Add requirement"
+                />
+              </div>
+
+              <div className="border-t border-border pt-5">
+                <ListEditor
+                  label="Who this course is for"
+                  hint="Describe the ideal learner profile or role."
+                  items={form.audience}
+                  disabled={locked}
+                  onChange={(items) => set("audience", items)}
+                  placeholder="e.g. Product engineers and builders shipping AI features"
+                  addLabel="Add target learner"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Section 5: Course Pricing */}
+          <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
+                  <IndianRupee className="size-4" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
+                    Course pricing
+                  </h2>
+                  <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                    Choose whether this course is free or paid in INR (₹). You can also adjust pricing in Step 3.
+                  </p>
+                </div>
+              </div>
+              <Badge variant={pricingMode === "free" ? "emerald" : "violet"}>
+                {pricingMode === "free" || parsedPricePaise === 0
+                  ? "Free"
+                  : formatInr(parsedPricePaise)}
+              </Badge>
+            </div>
+
+            <div
+              className="mt-4 grid gap-2.5 sm:grid-cols-2"
+              role="radiogroup"
+              aria-label="Course pricing model"
+            >
+              <button
+                type="button"
+                role="radio"
+                disabled={locked}
+                aria-checked={pricingMode === "free"}
+                onClick={() => handlePricingModeChange("free")}
+                className={cn(
+                  "flex items-start justify-between rounded-xl border p-3.5 text-left transition-colors",
+                  pricingMode === "free"
+                    ? "border-primary bg-primary/[0.06] text-foreground"
+                    : "border-border bg-white text-muted-foreground hover:bg-muted/40"
+                )}
+              >
+                <div>
+                  <p className="text-[13px] font-semibold text-foreground">
+                    Free course (₹0)
+                  </p>
+                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                    Open enrollment with one click — great for community reach.
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
+                    pricingMode === "free"
+                      ? "border-primary bg-primary text-white"
+                      : "border-zinc-300"
+                  )}
+                >
+                  {pricingMode === "free" ? <Check className="size-2.5" /> : null}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="radio"
+                disabled={locked}
+                aria-checked={pricingMode === "paid"}
+                onClick={() => handlePricingModeChange("paid")}
+                className={cn(
+                  "flex items-start justify-between rounded-xl border p-3.5 text-left transition-colors",
+                  pricingMode === "paid"
+                    ? "border-primary bg-primary/[0.06] text-foreground"
+                    : "border-border bg-white text-muted-foreground hover:bg-muted/40"
+                )}
+              >
+                <div>
+                  <p className="text-[13px] font-semibold text-foreground">
+                    Paid course (INR)
+                  </p>
+                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                    Charge in Indian Rupees via Razorpay Checkout (UPI, cards, netbanking).
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
+                    pricingMode === "paid"
+                      ? "border-primary bg-primary text-white"
+                      : "border-zinc-300"
+                  )}
+                >
+                  {pricingMode === "paid" ? <Check className="size-2.5" /> : null}
+                </span>
+              </button>
+            </div>
+
+            {pricingMode === "paid" ? (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Field
+                  id="cd-price"
+                  label="Price (INR ₹)"
+                  error={fieldErrors.priceRupees}
+                  hint="Up to 2 decimal places (e.g. 999 or 1499.50)"
+                >
+                  <Input
+                    id="cd-price"
+                    disabled={locked}
+                    inputMode="decimal"
+                    value={form.priceRupees}
+                    onChange={(e) => set("priceRupees", e.target.value)}
+                    aria-invalid={Boolean(fieldErrors.priceRupees)}
+                    placeholder="999"
+                  />
+                </Field>
+
+                <Field
+                  id="cd-compare-price"
+                  label="Compare-at price (INR ₹, optional)"
+                  error={fieldErrors.compareAtRupees}
+                  hint="Must be higher than the selling price"
+                >
+                  <Input
+                    id="cd-compare-price"
+                    disabled={locked}
+                    inputMode="decimal"
+                    value={form.compareAtRupees}
+                    onChange={(e) => set("compareAtRupees", e.target.value)}
+                    aria-invalid={Boolean(fieldErrors.compareAtRupees)}
+                    placeholder="1999"
+                  />
+                </Field>
+              </div>
+            ) : null}
+          </section>
+
+          {/* Form Action Footer */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white px-5 py-4 shadow-card">
+            <p className="text-[12.5px] text-muted-foreground">
+              {form.id
+                ? "Changes are saved to your course draft."
+                : "Saving creates your course draft and unlocks Step 2 (Curriculum)."}
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {form.id ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || locked}
+                  onClick={() => void saveAndNavigate(true)}
+                >
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Save &amp; continue to Curriculum
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Button>
+              ) : null}
+              <Button type="submit" disabled={busy || locked} loading={busy}>
+                {submitLabel}
+                {!form.id ? <ArrowRight className="size-3.5" aria-hidden="true" /> : null}
+              </Button>
+            </div>
           </div>
         </div>
-      </section>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Classification                                                    */}
-      {/* ---------------------------------------------------------------- */}
-      <section aria-labelledby="cd-class-heading" className="mt-7 border-t border-border pt-6">
-        <h2 id="cd-class-heading" className="font-display text-[15px] font-semibold tracking-tight">
-          Category, level and language
-        </h2>
+        {/* Right column: Sticky Live Catalog Card Preview & Wizard Guide */}
+        <aside className="space-y-5 xl:sticky xl:top-20">
+          {/* Live Public Catalog Card Preview */}
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground">
+                <Eye className="size-3.5 text-primary" aria-hidden="true" />
+                Live catalog card preview
+              </div>
+              <span className="rounded-md bg-muted px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground">
+                Updates as you type
+              </span>
+            </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="cd-category" required>
-              Category
-            </FieldLabel>
-            <select
-              id="cd-category"
-              required
-              disabled={locked}
-              aria-invalid={Boolean(fieldErrors.categorySlug)}
-              aria-describedby={fieldErrors.categorySlug ? "cd-category-error" : undefined}
-              className="h-9.5 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70"
-              value={form.categorySlug}
-              onChange={(e) => update("categorySlug", e.target.value)}
-            >
-              <option value="">Choose a category…</option>
-              {CATEGORIES.map((category) => (
-                <option key={category.slug} value={category.slug}>{category.name}</option>
+            {/* Public CourseCard replica bound to live form state */}
+            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+              <div className="relative aspect-video w-full overflow-hidden border-b border-border bg-muted">
+                {liveThumbnailUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={liveThumbnailUrl}
+                    alt={form.title.trim() || "Course thumbnail preview"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-violet-600/10 via-fuchsia-500/5 to-sky-500/10 px-4 text-center">
+                    <ImageIcon className="size-6 text-primary/60" aria-hidden="true" />
+                    <p className="text-[11.5px] font-semibold text-foreground">
+                      No thumbnail uploaded yet
+                    </p>
+                    <p className="text-[10.5px] text-muted-foreground">
+                      16:9 cover image will appear here
+                    </p>
+                  </div>
+                )}
+                <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
+                  <Badge variant="solid_white">
+                    {selectedCategory?.name ?? "Choose category"}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <div>
+                  <h3
+                    className={cn(
+                      "line-clamp-2 font-display text-[14.5px] font-semibold leading-snug",
+                      form.title.trim() ? "text-foreground" : "italic text-zinc-400"
+                    )}
+                  >
+                    {form.title.trim() || "Untitled course — enter a title"}
+                  </h3>
+                  <p
+                    className={cn(
+                      "mt-1 line-clamp-2 text-[12px] leading-relaxed",
+                      form.subtitle.trim() || form.description.trim()
+                        ? "text-muted-foreground"
+                        : "italic text-zinc-400"
+                    )}
+                  >
+                    {form.subtitle.trim() ||
+                      form.description.trim() ||
+                      "Your short subtitle or description will appear here."}
+                  </p>
+                </div>
+
+                {/* Real creator identity */}
+                {instructor ? (
+                  <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                    {avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatarUrl}
+                        alt={instructor.name}
+                        className="size-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-primary">
+                        {instructor.initials}
+                      </span>
+                    )}
+                    <span className="truncate font-medium text-foreground">
+                      {instructor.name}
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Signal className="size-3 text-zinc-400" aria-hidden="true" />
+                    {LEVEL_LABELS[form.level]}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Globe2 className="size-3 text-zinc-400" aria-hidden="true" />
+                    {form.language}
+                  </span>
+                  {form.whatYouLearn.filter((s) => s.trim()).length > 0 ? (
+                    <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+                      <Sparkles className="size-3" aria-hidden="true" />
+                      {form.whatYouLearn.filter((s) => s.trim()).length} outcomes
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="flex items-baseline justify-between border-t border-border pt-3">
+                  {parsedPricePaise === 0 ? (
+                    <span className="font-display text-[14px] font-semibold text-emerald-700">
+                      Free
+                    </span>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-display text-[15px] font-bold text-foreground">
+                        {formatInr(parsedPricePaise)}
+                      </span>
+                      {parsedComparePaise ? (
+                        <span className="text-[11.5px] text-zinc-400 line-through">
+                          {formatInr(parsedComparePaise)}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+                  <span className="text-[11px] font-medium text-primary">
+                    View course →
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 1 Readiness Checklist */}
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
+            <h3 className="text-[12.5px] font-semibold text-foreground">
+              Step 1 checklist
+            </h3>
+            <ul className="mt-2.5 space-y-2">
+              {stepChecklist.map((item) => (
+                <li key={item.label} className="flex items-center gap-2 text-[12px]">
+                  {item.done ? (
+                    <CheckCircle2
+                      className="size-3.5 shrink-0 text-emerald-600"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Circle
+                      className="size-3.5 shrink-0 text-zinc-300"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span
+                    className={
+                      item.done
+                        ? "font-medium text-foreground"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {item.label}
+                  </span>
+                </li>
               ))}
-            </select>
-            <FieldHint errorId="cd-category-error" error={fieldErrors.categorySlug} />
+            </ul>
           </div>
 
-          <div>
-            <FieldLabel htmlFor="cd-level">Level</FieldLabel>
-            <select
-              id="cd-level"
-              disabled={locked}
-              className="h-9.5 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70"
-              value={form.level}
-              onChange={(e) => update("level", e.target.value as CourseDetailsInitial["level"])}
-            >
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
+          {/* What's next in Step 2 (Curriculum) */}
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
+            <h3 className="text-[12.5px] font-semibold text-foreground">
+              What you&apos;ll build in Step 2
+            </h3>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
+              Once you save these details, you&apos;ll organize sections and add three types of lessons:
+            </p>
+            <ul className="mt-3 space-y-2.5 text-[11.5px]">
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-accent text-primary">
+                  <Video className="size-3.5" aria-hidden="true" />
+                </span>
+                <div>
+                  <strong className="font-semibold text-foreground">
+                    Video lessons
+                  </strong>
+                  <p className="text-muted-foreground">
+                    Upload MP4/MOV/WebM videos, set durations &amp; free previews.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-700">
+                  <HelpCircle className="size-3.5" aria-hidden="true" />
+                </span>
+                <div>
+                  <strong className="font-semibold text-foreground">
+                    Interactive quizzes
+                  </strong>
+                  <p className="text-muted-foreground">
+                    Add multiple-choice &amp; true/false questions, options &amp; passing scores.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-sky-50 text-sky-700">
+                  <FileUp className="size-3.5" aria-hidden="true" />
+                </span>
+                <div>
+                  <strong className="font-semibold text-foreground">
+                    Resources &amp; reading
+                  </strong>
+                  <p className="text-muted-foreground">
+                    Attach downloadable files (PDF, ZIP, templates) &amp; reference links.
+                  </p>
+                </div>
+              </li>
+            </ul>
           </div>
-
-          <div>
-            <FieldLabel htmlFor="cd-language">Taught in</FieldLabel>
-            <select
-              id="cd-language"
-              disabled={locked}
-              className="h-9.5 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70"
-              value={form.language}
-              onChange={(e) => update("language", e.target.value)}
-            >
-              {TEACHING_LANGUAGES.map((language) => (
-                <option key={language} value={language}>{language}</option>
-              ))}
-            </select>
-            <FieldHint hint="The language you teach in. Learners filter by it." />
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- */}
-      {/* Outcomes                                                          */}
-      {/* ---------------------------------------------------------------- */}
-      <section aria-labelledby="cd-outcomes-heading" className="mt-7 border-t border-border pt-6">
-        <h2 id="cd-outcomes-heading" className="font-display text-[15px] font-semibold tracking-tight">
-          Outcomes and audience
-        </h2>
-
-        <ListEditor
-          title="What learners will be able to do"
-          placeholder="e.g. Build and deploy an AI agent end to end"
-          values={form.whatYouLearn}
-          disabled={locked}
-          onChange={(whatYouLearn) => update("whatYouLearn", whatYouLearn)}
-        />
-        <ListEditor
-          title="Requirements"
-          placeholder="e.g. Basic Python familiarity"
-          values={form.requirements}
-          disabled={locked}
-          onChange={(requirements) => update("requirements", requirements)}
-        />
-        <ListEditor
-          title="Who this course is for"
-          placeholder="e.g. Developers who want to automate workflows"
-          values={form.audience}
-          disabled={locked}
-          onChange={(audience) => update("audience", audience)}
-        />
-      </section>
-
-      <section aria-labelledby="cd-thumb-heading" className="mt-7 border-t border-border pt-6">
-        <h2 id="cd-thumb-heading" className="font-display text-[15px] font-semibold tracking-tight">Thumbnail</h2>
-        <div className="mt-4"><ThumbnailUpload courseId={initial?.id} thumbnailKey={initial?.thumbnailKey ?? null} disabled={locked} onFile={isCreate ? (f) => { thumbnailFile.current = f; } : undefined} /></div>
-      </section>
-
-      {/* Actions                                                           */}
-      {/* ---------------------------------------------------------------- */}
-      <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-border pt-5">
-        <Button type="submit" disabled={busy || locked} loading={busy}>
-          {busy ? "Saving…" : submitLabel}
-        </Button>
-        {locked ? (
-          <p className="text-[12.5px] text-muted-foreground">
-            This course is published, so its details are read-only.
-          </p>
-        ) : saved ? (
-          <p role="status" className="text-[12.5px] text-emerald-700">
-            Changes saved.
-          </p>
-        ) : null}
+        </aside>
       </div>
     </form>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Field helpers                                                               */
-/* -------------------------------------------------------------------------- */
-
-function FieldLabel({
-  htmlFor,
+function Field({
+  id,
+  label,
   required,
   hint,
+  error,
   children,
 }: {
-  htmlFor: string;
+  id?: string;
+  label: string;
   required?: boolean;
   hint?: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
-    <Label htmlFor={htmlFor} className="mb-1.5 block text-[13px]">
-      {children}
-      {required ? (
-        <>
-          <span className="ml-0.5 text-red-600" aria-hidden>
-            *
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <label htmlFor={id} className="text-[13px] font-medium text-foreground">
+          {label}
+          {required ? <span className="ml-0.5 text-primary">*</span> : null}
+        </label>
+        {hint ? (
+          <span
+            id={id ? `${id}-help` : undefined}
+            className="text-[11.5px] text-zinc-400"
+          >
+            {hint}
           </span>
-          <span className="sr-only"> (required)</span>
-        </>
-      ) : (
-        <span className="ml-1.5 font-normal text-zinc-400">(optional)</span>
-      )}
-      {hint ? <span className="ml-1.5 font-normal text-zinc-400">— {hint}</span> : null}
-    </Label>
+        ) : null}
+      </div>
+      {children}
+      {error ? (
+        <p
+          id={id ? `${id}-error` : undefined}
+          className="text-[12px] text-red-600"
+        >
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
-function FieldHint({
-  id,
-  errorId,
-  error,
+function ListEditor({
+  label,
   hint,
+  items,
+  disabled,
+  onChange,
+  placeholder,
+  addLabel = "Add item",
 }: {
-  id?: string;
-  errorId?: string;
-  error?: string;
+  label: string;
   hint?: string;
+  items: string[];
+  disabled?: boolean;
+  onChange: (items: string[]) => void;
+  placeholder?: string;
+  addLabel?: string;
 }) {
-  if (error) {
-    return (
-      <p id={errorId} className="mt-1 text-[11.5px] font-medium text-red-600">
-        {error}
-      </p>
-    );
-  }
-  return hint ? (
-    <p id={id} className="mt-1 text-[11.5px] text-zinc-400">
-      {hint}
-    </p>
-  ) : null;
-}
-
-function FormError({ message }: { message: string | null }) {
-  if (!message) return null;
   return (
-    <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-700">
-      {message}
-    </p>
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <p className="text-[13px] font-medium text-foreground">{label}</p>
+          {hint ? (
+            <p className="mt-0.5 text-[11.5px] text-muted-foreground">{hint}</p>
+          ) : null}
+        </div>
+        <span className="text-[11px] text-zinc-400">{items.length}/20 items</span>
+      </div>
+
+      {items.length > 0 ? (
+        <div className="space-y-2">
+          {items.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40 font-mono text-[11px] text-muted-foreground">
+                {index + 1}
+              </span>
+              <Input
+                value={item}
+                disabled={disabled}
+                maxLength={400}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[index] = e.target.value;
+                  onChange(next);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && items.length < 20 && !disabled) {
+                    e.preventDefault();
+                    onChange([...items, ""]);
+                  }
+                }}
+                placeholder={placeholder}
+                aria-label={`${label} item ${index + 1}`}
+              />
+              {!disabled ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Remove ${label} item ${index + 1}`}
+                  onClick={() => onChange(items.filter((_, i) => i !== index))}
+                  className="text-muted-foreground hover:text-red-600"
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                </Button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3.5 py-2.5 text-[12px] text-muted-foreground">
+          No items added yet. Click{" "}
+          <strong className="font-medium text-foreground">{addLabel}</strong> below to add the first one.
+        </div>
+      )}
+
+      {items.length < 20 && !disabled ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onChange([...items, ""])}
+          className="gap-1.5"
+        >
+          <Plus className="size-3.5" aria-hidden="true" />
+          {addLabel}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
 /**
- * Inline validation mirroring the server rules in `courseSchema` /
- * `inrPriceInputSchema`. The server re-checks everything — this only moves the
- * error message next to the field that caused it.
+ * Client-side field validation mirroring `courseSchema` on the server so the
+ * creator gets immediate per-field feedback before the network round-trip.
  */
 export function validateDetails(form: CourseDetailsInitial): Record<string, string> {
   const errors: Record<string, string> = {};
-  const title = form.title.trim();
-  if (title.length < 3) errors.title = "Add a course title with at least 3 characters.";
-  else if (title.length > 140) errors.title = "Keep the title under 140 characters.";
-  if (form.subtitle.trim().length > 180) errors.subtitle = "Keep the subtitle under 180 characters.";
-  if (form.description.trim().length > 6000) errors.description = "Keep the description under 6,000 characters.";
-  if (!form.categorySlug) errors.categorySlug = "Choose a category.";
-  try {
-    rupeesToPaise(form.priceRupees || "");
-  } catch {
-    errors.priceRupees = "Enter a valid price in rupees (for example 0 or 499.50).";
+  if (form.title.trim().length < 3)
+    errors.title = "Enter a course title (at least 3 characters).";
+  if (form.title.trim().length > 140)
+    errors.title = "Keep the title under 140 characters.";
+  if (form.subtitle.trim().length > 180)
+    errors.subtitle = "Keep the subtitle under 180 characters.";
+  if (form.description.trim().length > 6000)
+    errors.description = "Keep the description under 6,000 characters.";
+  if (!form.categorySlug.trim()) errors.categorySlug = "Choose a category.";
+  if (!form.language.trim()) errors.language = "Enter the teaching language.";
+
+  const price = inrPriceInputSchema.safeParse(form.priceRupees.trim() || "0");
+  if (!price.success) {
+    errors.priceRupees =
+      price.error.issues[0]?.message ?? "Enter a valid INR amount (e.g. 999 or 999.50).";
   }
+
   if (form.compareAtRupees.trim()) {
-    try {
-      rupeesToPaise(form.compareAtRupees);
-    } catch {
-      errors.compareAtRupees = "Enter a valid comparison price in rupees.";
+    const compare = inrPriceInputSchema.safeParse(form.compareAtRupees.trim());
+    if (!compare.success) {
+      errors.compareAtRupees =
+        compare.error.issues[0]?.message ?? "Enter a valid compare-at price.";
+    } else if (price.success && compare.data <= price.data) {
+      errors.compareAtRupees =
+        "Compare-at price must be higher than the course price.";
     }
   }
-  for (const [key, values] of Object.entries({
-    whatYouLearn: form.whatYouLearn,
-    requirements: form.requirements,
-    audience: form.audience,
-  })) {
-    const filled = values.map((value) => value.trim()).filter(Boolean);
-    if (filled.length > MAX_LIST_ITEMS) errors[key] = `Use at most ${MAX_LIST_ITEMS} items.`;
-    if (filled.some((value) => value.length > 400)) errors[key] = "Keep each item under 400 characters.";
-  }
   return errors;
-}
-
-function previewPaise(value: string): string {
-  try {
-    return rupeesToPaise(value || "").toLocaleString("en-IN");
-  } catch {
-    return "—";
-  }
-}
-
-function clean(values: string[]): string[] {
-  return values.map((value) => value.trim()).filter(Boolean);
-}
-
-function ListEditor({
-  title,
-  placeholder,
-  values,
-  disabled,
-  onChange,
-}: {
-  title: string;
-  placeholder?: string;
-  values: string[];
-  disabled?: boolean;
-  onChange: (values: string[]) => void;
-}) {
-  return (
-    <fieldset className="mt-5" disabled={disabled}>
-      <legend className="mb-2 text-[13px] font-medium">{title}</legend>
-      <div className="space-y-2">
-        {values.map((value, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <Input
-              aria-label={`${title} item ${index + 1}`}
-              maxLength={400}
-              placeholder={placeholder}
-              value={value}
-              onChange={(event) => {
-                const next = [...values];
-                next[index] = event.target.value;
-                onChange(next);
-              }}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={`Remove ${title.toLowerCase()} item ${index + 1}`}
-              disabled={values.length <= 1}
-              onClick={() => onChange(values.filter((_, i) => i !== index))}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mt-2"
-        disabled={values.length >= MAX_LIST_ITEMS}
-        onClick={() => onChange([...values, ""])}
-      >
-        Add item
-      </Button>
-    </fieldset>
-  );
 }

@@ -28,6 +28,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import {
+  getCleanLessonDescription,
+  parseLessonQuiz,
+  parseLessonResources,
+} from "@/lib/course-wizard";
 import { formatDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -325,19 +330,36 @@ export function LearnPlayer({
       <div className="mx-auto flex w-full max-w-[1500px] flex-1">
         <main className="min-w-0 flex-1 px-3 pb-16 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-4xl pt-4">
-            <VideoPlayer
-              key={current.id}
-              lessonId={current.id}
-              courseId={course.id}
-              title={current.title}
-              hasVideo={current.hasVideo}
-              videoReady={current.videoReady}
-              onEnded={() => {
-                if (!isCurrentDone) {
-                  toast.info("Lesson finished", { action: { label: "Mark complete", onClick: () => void markComplete(current.id) } });
-                }
-              }}
-            />
+            {current.kind === "quiz" ? (
+              <LearnerQuizView
+                key={current.id}
+                title={current.title}
+                rawDescription={current.description}
+                onPass={() => {
+                  if (!isCurrentDone) void markComplete(current.id);
+                }}
+              />
+            ) : current.kind === "reading" && !current.hasVideo ? (
+              <LearnerReadingResourcesView
+                key={current.id}
+                title={current.title}
+                rawDescription={current.description}
+              />
+            ) : (
+              <VideoPlayer
+                key={current.id}
+                lessonId={current.id}
+                courseId={course.id}
+                title={current.title}
+                hasVideo={current.hasVideo}
+                videoReady={current.videoReady}
+                onEnded={() => {
+                  if (!isCurrentDone) {
+                    toast.info("Lesson finished", { action: { label: "Mark complete", onClick: () => void markComplete(current.id) } });
+                  }
+                }}
+              />
+            )}
 
             <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -394,8 +416,10 @@ export function LearnPlayer({
               </TabsList>
 
               <TabsContent value="overview" className="max-w-3xl">
-                {current.description ? (
-                  <p className="text-[14px] leading-relaxed text-muted-foreground">{current.description}</p>
+                {getCleanLessonDescription(current.description) ? (
+                  <p className="whitespace-pre-line text-[14px] leading-relaxed text-muted-foreground">
+                    {getCleanLessonDescription(current.description)}
+                  </p>
                 ) : (
                   <p className="text-[14px] leading-relaxed text-muted-foreground">
                     {current.kind} lesson in section “{sectionTitle}”. Follow along, take notes, and mark the lesson complete
@@ -473,6 +497,217 @@ export function LearnPlayer({
           <div className="h-full">{curriculumPanel}</div>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+function LearnerQuizView({
+  title,
+  rawDescription,
+  onPass,
+}: {
+  title: string;
+  rawDescription: string | null;
+  onPass: () => void;
+}) {
+  const parsed = React.useMemo(() => parseLessonQuiz(rawDescription), [rawDescription]);
+  const [answers, setAnswers] = React.useState<Record<string, string>>({});
+  const [checked, setChecked] = React.useState(false);
+
+  const questions = parsed.questions;
+  const correctCount = questions.filter(
+    (q) => answers[q.id] && answers[q.id] === q.correctOptionId
+  ).length;
+  const scorePercent =
+    questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 100;
+  const passed = scorePercent >= parsed.passingScorePercent;
+
+  function handleCheckAnswers() {
+    setChecked(true);
+    if (questions.length > 0) {
+      const nextCorrect = questions.filter(
+        (q) => answers[q.id] && answers[q.id] === q.correctOptionId
+      ).length;
+      const pct = Math.round((nextCorrect / questions.length) * 100);
+      if (pct >= parsed.passingScorePercent) {
+        onPass();
+      }
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-zinc-50/70 p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
+        <div>
+          <span className="inline-flex items-center rounded-md bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+            Interactive Quiz · Passing score {parsed.passingScorePercent}%
+          </span>
+          <h2 className="mt-1.5 font-display text-lg font-bold text-foreground">{title}</h2>
+          {parsed.instructions ? (
+            <p className="mt-1 text-[13px] text-muted-foreground">{parsed.instructions}</p>
+          ) : null}
+        </div>
+        {checked ? (
+          <div
+            className={cn(
+              "rounded-xl border px-3.5 py-2 text-right",
+              passed
+                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                : "border-amber-300 bg-amber-50 text-amber-800"
+            )}
+          >
+            <p className="text-[12px] font-semibold">
+              Score: {scorePercent}% ({correctCount}/{questions.length})
+            </p>
+            <p className="text-[11px]">
+              {passed ? "Passed! Great work." : `Need ${parsed.passingScorePercent}% to pass`}
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      {questions.length === 0 ? (
+        <p className="mt-4 text-[13.5px] text-muted-foreground">
+          {parsed.instructions || "Review the material in this section and mark the quiz complete when ready."}
+        </p>
+      ) : (
+        <div className="mt-5 space-y-5">
+          {questions.map((q, qIdx) => {
+            const selectedId = answers[q.id];
+            return (
+              <div key={q.id} className="rounded-xl border border-border bg-white p-4">
+                <p className="text-[14px] font-semibold text-foreground">
+                  {qIdx + 1}. {q.question}
+                </p>
+                <div className="mt-3 space-y-2">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = selectedId === opt.id;
+                    const isCorrect = opt.id === q.correctOptionId;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setChecked(false);
+                          setAnswers((prev) => ({ ...prev, [q.id]: opt.id }));
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-lg border px-3.5 py-2.5 text-left text-[13px] transition-colors",
+                          checked && isCorrect
+                            ? "border-emerald-400 bg-emerald-50 font-medium text-emerald-900"
+                            : checked && isSelected && !isCorrect
+                              ? "border-red-300 bg-red-50 text-red-900"
+                              : isSelected
+                                ? "border-primary bg-accent font-medium text-foreground"
+                                : "border-border bg-white hover:bg-zinc-50"
+                        )}
+                      >
+                        <span>
+                          <strong className="mr-2 font-mono text-[11.5px] text-muted-foreground">
+                            {String.fromCharCode(65 + optIdx)}.
+                          </strong>
+                          {opt.text}
+                        </span>
+                        {checked && isCorrect ? (
+                          <span className="text-[11px] font-semibold text-emerald-700">Correct</span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+                {checked && q.explanation ? (
+                  <p className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-[12px] text-muted-foreground">
+                    <strong className="font-semibold text-foreground">Explanation: </strong>
+                    {q.explanation}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+            <span className="text-[12px] text-muted-foreground">
+              {Object.keys(answers).length} of {questions.length} answered
+            </span>
+            <div className="flex items-center gap-2">
+              {checked ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAnswers({});
+                    setChecked(false);
+                  }}
+                >
+                  Retry quiz
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                disabled={Object.keys(answers).length < questions.length}
+                onClick={handleCheckAnswers}
+              >
+                Check answers
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LearnerReadingResourcesView({
+  title,
+  rawDescription,
+}: {
+  title: string;
+  rawDescription: string | null;
+}) {
+  const parsed = React.useMemo(() => parseLessonResources(rawDescription), [rawDescription]);
+
+  return (
+    <div className="rounded-2xl border border-border bg-zinc-50/70 p-5 sm:p-6">
+      <span className="inline-flex items-center rounded-md bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
+        Reading &amp; Supplementary Resources
+      </span>
+      <h2 className="mt-1.5 font-display text-lg font-bold text-foreground">{title}</h2>
+
+      {parsed.notes ? (
+        <div className="mt-3 rounded-xl border border-border bg-white p-4 text-[14px] leading-relaxed whitespace-pre-line text-foreground">
+          {parsed.notes}
+        </div>
+      ) : null}
+
+      {parsed.links.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          <h3 className="text-[13px] font-semibold text-foreground">
+            Reference links ({parsed.links.length})
+          </h3>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {parsed.links.map((lnk) => (
+              <li
+                key={lnk.id}
+                className="rounded-xl border border-border bg-white p-3.5 transition-colors hover:border-primary/40"
+              >
+                <a
+                  href={lnk.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block font-medium text-[13.5px] text-primary hover:underline"
+                >
+                  {lnk.title} ↗
+                </a>
+                {lnk.description ? (
+                  <p className="mt-1 text-[12px] text-muted-foreground">{lnk.description}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

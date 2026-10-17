@@ -338,3 +338,188 @@ test("lesson validation covers the supported kinds, durations and previews", () 
   assert.equal(bare.isPreview, false);
   assert.equal(bare.durationMinutes, 0);
 });
+
+test("quiz question and config schemas validate options, correct answers and passing scores", () => {
+  const validMcq = {
+    id: "q-1",
+    type: "multiple-choice",
+    question: "Which mechanism lets an LLM invoke an external API?",
+    options: [
+      { id: "opt-a", text: "Tool calling" },
+      { id: "opt-b", text: "Beam search" },
+      { id: "opt-c", text: "Byte-pair encoding" },
+    ],
+    correctOptionId: "opt-a",
+    explanation: "Tool calling provides structured function arguments.",
+  };
+
+  assert.equal(wizard.quizQuestionSchema.safeParse(validMcq).success, true);
+
+  // Missing question prompt fails
+  assert.equal(
+    wizard.quizQuestionSchema.safeParse({ ...validMcq, question: "   " }).success,
+    false
+  );
+
+  // Fewer than 2 options fails
+  assert.equal(
+    wizard.quizQuestionSchema.safeParse({
+      ...validMcq,
+      options: [{ id: "opt-a", text: "Only one option" }],
+    }).success,
+    false
+  );
+
+  // Correct option ID not matching any option fails
+  assert.equal(
+    wizard.quizQuestionSchema.safeParse({
+      ...validMcq,
+      correctOptionId: "non-existent",
+    }).success,
+    false
+  );
+
+  // Empty quiz questions array fails quizConfigSchema
+  assert.equal(
+    wizard.quizConfigSchema.safeParse({ passingScorePercent: 75, questions: [] }).success,
+    false
+  );
+
+  assert.equal(
+    wizard.quizConfigSchema.safeParse({ passingScorePercent: 75, questions: [validMcq] }).success,
+    true
+  );
+});
+
+test("serializeLessonQuiz and parseLessonQuiz round-trip instructions, questions and passing score", () => {
+  const questions = [
+    {
+      id: "q-1",
+      type: "multiple-choice",
+      question: "What does RAG stand for?",
+      options: [
+        { id: "o-1", text: "Retrieval-Augmented Generation" },
+        { id: "o-2", text: "Recurrent Attention Graph" },
+      ],
+      correctOptionId: "o-1",
+      explanation: "RAG combines retrieval with generation.",
+      points: 1,
+    },
+    {
+      id: "q-2",
+      type: "true-false",
+      question: "Vector embeddings capture semantic similarity.",
+      options: [
+        { id: "o-t", text: "True" },
+        { id: "o-f", text: "False" },
+      ],
+      correctOptionId: "o-t",
+      explanation: "",
+      points: 1,
+    },
+  ];
+
+  const serialized = wizard.serializeLessonQuiz({
+    instructions: "Answer both questions to complete Module 1.",
+    passingScorePercent: 80,
+    questions,
+  });
+
+  assert.equal(
+    wizard.getCleanLessonDescription(serialized),
+    "Answer both questions to complete Module 1."
+  );
+
+  const parsed = wizard.parseLessonQuiz(serialized);
+  assert.equal(parsed.instructions, "Answer both questions to complete Module 1.");
+  assert.equal(parsed.passingScorePercent, 80);
+  assert.equal(parsed.questions.length, 2);
+  assert.equal(parsed.questions[0].question, "What does RAG stand for?");
+  assert.equal(parsed.questions[0].correctOptionId, "o-1");
+  assert.equal(parsed.questions[1].type, "true-false");
+});
+
+test("serializeLessonResources and parseLessonResources round-trip reading notes and external links", () => {
+  const links = [
+    {
+      id: "lnk-1",
+      title: "LangGraph Documentation",
+      url: "https://langchain-ai.github.io/langgraph/",
+      description: "Official reference guide",
+    },
+  ];
+
+  assert.equal(wizard.lessonResourceLinkSchema.safeParse(links[0]).success, true);
+  assert.equal(
+    wizard.lessonResourceLinkSchema.safeParse({
+      ...links[0],
+      url: "javascript:alert(1)",
+    }).success,
+    false
+  );
+
+  const serialized = wizard.serializeLessonResources({
+    notes: "Download the starter template and open the docs below.",
+    links,
+  });
+
+  assert.equal(
+    wizard.getCleanLessonDescription(serialized),
+    "Download the starter template and open the docs below."
+  );
+
+  const parsed = wizard.parseLessonResources(serialized);
+  assert.equal(parsed.notes, "Download the starter template and open the docs below.");
+  assert.equal(parsed.links.length, 1);
+  assert.equal(parsed.links[0].title, "LangGraph Documentation");
+  assert.equal(parsed.links[0].url, "https://langchain-ai.github.io/langgraph/");
+});
+
+test("lessonSchema accepts optional quizConfig and resourceLinks for end-to-end saveLesson persistence", () => {
+  const withQuiz = wizard.lessonSchema.safeParse({
+    courseId: COURSE_ID,
+    sectionId: SECTION_ID,
+    title: "Module 1 Quiz",
+    kind: "quiz",
+    sortOrder: 0,
+    durationMinutes: 10,
+    isPreview: false,
+    quizConfig: {
+      passingScorePercent: 70,
+      questions: [
+        {
+          id: "q-1",
+          type: "multiple-choice",
+          question: "Which HTTP status indicates a created resource?",
+          options: [
+            { id: "o-1", text: "201 Created" },
+            { id: "o-2", text: "404 Not Found" },
+          ],
+          correctOptionId: "o-1",
+        },
+      ],
+    },
+  });
+  assert.equal(withQuiz.success, true);
+
+  const withResources = wizard.lessonSchema.safeParse({
+    courseId: COURSE_ID,
+    sectionId: SECTION_ID,
+    title: "Module 1 Cheat Sheet",
+    kind: "reading",
+    sortOrder: 1,
+    durationMinutes: 5,
+    isPreview: true,
+    resourceLinks: [
+      {
+        id: "lnk-1",
+        title: "Starter Repo",
+        url: "https://github.com/example/repo",
+        description: "Clone before starting Lesson 2",
+      },
+    ],
+  });
+  assert.equal(withResources.success, true);
+});
+
+

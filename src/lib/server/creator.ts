@@ -157,7 +157,7 @@ export const getCreatorResources = cache(async (courseId: string) => {
   const supabase = await createServerClient();
   const { data } = await supabase
     .from("course_resources")
-    .select("id, title, file_name, content_type, size_bytes, created_at")
+    .select("id, lesson_id, title, file_name, content_type, size_bytes, created_at")
     .eq("course_id", courseId)
     .order("created_at");
   return (data ?? []) as Array<Record<string, unknown>>;
