@@ -14,7 +14,7 @@
     "test:wizard": "node --experimental-strip-types --test tests/course-wizard.mjs",
     "test:security": "node --experimental-strip-types --test tests/security.mjs",
     "test:rls": "node --experimental-strip-types --test tests/rls.mjs",
-    "test:unit": "node --experimental-strip-types --test tests/money.mjs tests/chatbot.mjs tests/security.mjs tests/rls.mjs tests/rsc-props.mjs tests/course-wizard.mjs"
+    "test:unit": "node --experimental-strip-types --test tests/money.mjs tests/chatbot.mjs tests/security.mjs tests/rls.mjs tests/rsc-props.mjs tests/course-wizard.mjs tests/course-details-navigation.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1151.0",

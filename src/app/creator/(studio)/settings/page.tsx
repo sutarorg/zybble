@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Settings2 } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { requireCreator } from "@/lib/server/session";
 import { getCreatorStudioPreferences } from "@/lib/server/creator";
 import { CreatorSettingsForm } from "./creator-settings-form";
@@ -72,19 +72,7 @@ export default async function CreatorSettingsPage() {
         </Link>
       </section>
 
-      <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
-        <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold">
-          <Settings2 className="size-4.5 text-primary" aria-hidden /> Not configurable here
-        </h2>
-        <ul className="mt-3 space-y-2 text-[13px] leading-relaxed text-muted-foreground">
-          <li>
-            • Your commission rate is a marketplace setting snapshotted onto each order at purchase time, not a
-            personal preference.
-          </li>
-          <li>• Payout destinations and requests are managed on the Payouts page, where they are encrypted at rest.</li>
-          <li>• Account status, role and email address are managed from your learner settings and by administrators.</li>
-        </ul>
-      </section>
+
     </div>
   );
 }
