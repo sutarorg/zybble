@@ -11,19 +11,15 @@ import {
   CheckCircle2,
   Circle,
   Eye,
-  FileUp,
   Globe2,
-  HelpCircle,
   Image as ImageIcon,
   IndianRupee,
   Layers,
-  Loader2,
   Plus,
   Signal,
   Sparkles,
   Target,
   Trash2,
-  Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -62,11 +58,6 @@ interface CourseDetailsFormProps {
   initial?: CourseDetailsInitial;
   locked?: boolean;
   submitLabel?: string;
-  defaults?: {
-    language: string;
-    level: "beginner" | "intermediate" | "advanced";
-    priceRupees: string;
-  };
   instructor?: CreatorPreviewIdentity;
 }
 
@@ -94,23 +85,16 @@ const LEVEL_LABELS: Record<CourseDetailsInitial["level"], string> = {
 export function CourseDetailsForm({
   initial,
   locked = false,
-  submitLabel = "Save draft",
-  defaults,
+  submitLabel = "Save course",
   instructor,
 }: CourseDetailsFormProps) {
   const router = useRouter();
-  const [form, setForm] = React.useState<CourseDetailsInitial>(() => {
-    if (initial) return initial;
-    return {
-      ...EMPTY_INITIAL,
-      language: defaults?.language ?? EMPTY_INITIAL.language,
-      level: defaults?.level ?? EMPTY_INITIAL.level,
-      priceRupees: defaults?.priceRupees ?? EMPTY_INITIAL.priceRupees,
-    };
-  });
+  const [form, setForm] = React.useState<CourseDetailsInitial>(
+    () => initial ?? EMPTY_INITIAL
+  );
   const [pricingMode, setPricingMode] = React.useState<"free" | "paid">(() => {
     const parsed = inrPriceInputSchema.safeParse(
-      (initial?.priceRupees ?? defaults?.priceRupees ?? "0").trim() || "0"
+      (initial?.priceRupees ?? "0").trim() || "0"
     );
     return parsed.success && parsed.data > 0 ? "paid" : "free";
   });
@@ -261,7 +245,7 @@ export function CourseDetailsForm({
     : null;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
       {error ? (
         <div
           role="alert"
@@ -293,24 +277,16 @@ export function CourseDetailsForm({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_340px] xl:items-start">
-        {/* Left column: Structured form sections */}
-        <div className="space-y-6">
+      <div className="grid gap-5 xl:grid-cols-[1fr_340px] xl:items-start">
+        {/* Left column: form sections */}
+        <div className="space-y-5">
           {/* Section 1: About this course */}
           <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
-            <div className="flex items-start gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
-                <BookOpen className="size-4" aria-hidden="true" />
-              </span>
-              <div>
-                <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
-                  About this course
-                </h2>
-                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-                  Give learners a clear title, a concise one-line hook, and a thorough overview of what the course covers.
-                </p>
-              </div>
-            </div>
+            <SectionHeading
+              icon={<BookOpen className="size-4" aria-hidden="true" />}
+              tint="bg-accent text-primary"
+              title="About this course"
+            />
 
             <div className="mt-5 space-y-4">
               <Field
@@ -318,7 +294,7 @@ export function CourseDetailsForm({
                 label="Course title"
                 required
                 error={fieldErrors.title}
-                hint={`${form.title.length}/140 characters`}
+                hint={`${form.title.length}/140`}
               >
                 <Input
                   id="cd-title"
@@ -329,15 +305,15 @@ export function CourseDetailsForm({
                   maxLength={140}
                   aria-invalid={Boolean(fieldErrors.title)}
                   aria-describedby={fieldErrors.title ? "cd-title-error" : "cd-title-help"}
-                  placeholder="e.g. Production AI Agents with LangGraph & Tool Calling"
+                  placeholder="e.g. Production AI Agents with LangGraph"
                 />
               </Field>
 
               <Field
                 id="cd-subtitle"
-                label="Short description / subtitle"
+                label="Short description"
                 error={fieldErrors.subtitle}
-                hint={`${form.subtitle.length}/180 characters`}
+                hint={`${form.subtitle.length}/180`}
               >
                 <Input
                   id="cd-subtitle"
@@ -346,20 +322,20 @@ export function CourseDetailsForm({
                   onChange={(e) => set("subtitle", e.target.value)}
                   maxLength={180}
                   aria-invalid={Boolean(fieldErrors.subtitle)}
-                  placeholder="A crisp one-line summary of the practical outcome learners get"
+                  placeholder="A one-line summary of the outcome learners get"
                 />
               </Field>
 
               <Field
                 id="cd-description"
-                label="Full course description"
+                label="Full description"
                 required
                 error={fieldErrors.description}
-                hint={`${form.description.length}/6,000 characters`}
+                hint={`${form.description.length}/6,000`}
               >
                 <Textarea
                   id="cd-description"
-                  rows={5}
+                  rows={4}
                   disabled={locked}
                   maxLength={6000}
                   value={form.description}
@@ -368,7 +344,7 @@ export function CourseDetailsForm({
                   aria-describedby={
                     fieldErrors.description ? "cd-description-error" : "cd-description-help"
                   }
-                  placeholder="Describe the projects learners will build, the tools and workflows covered, and how the curriculum is structured…"
+                  placeholder="What will learners build, and how is the curriculum structured?"
                 />
               </Field>
             </div>
@@ -376,19 +352,11 @@ export function CourseDetailsForm({
 
           {/* Section 2: Category, level and language */}
           <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
-            <div className="flex items-start gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
-                <Layers className="size-4" aria-hidden="true" />
-              </span>
-              <div>
-                <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
-                  Category, level &amp; language
-                </h2>
-                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-                  Help the right learners discover your course through catalog filters and search.
-                </p>
-              </div>
-            </div>
+            <SectionHeading
+              icon={<Layers className="size-4" aria-hidden="true" />}
+              tint="bg-sky-50 text-sky-700"
+              title="Category, level & language"
+            />
 
             <div className="mt-5 grid gap-4 sm:grid-cols-3">
               <Field
@@ -405,7 +373,7 @@ export function CourseDetailsForm({
                   aria-invalid={Boolean(fieldErrors.categorySlug)}
                   className="flex h-10 w-full rounded-lg border border-input bg-white px-3 text-[13.5px] text-foreground shadow-2xs outline-none focus:border-primary focus:ring-2 focus:ring-ring/20"
                 >
-                  <option value="">Choose a category…</option>
+                  <option value="">Choose…</option>
                   {CATEGORIES.map((category) => (
                     <option key={category.slug} value={category.slug}>
                       {category.name}
@@ -414,7 +382,7 @@ export function CourseDetailsForm({
                 </select>
               </Field>
 
-              <Field id="cd-level" label="Difficulty level" required>
+              <Field id="cd-level" label="Difficulty" required>
                 <select
                   id="cd-level"
                   disabled={locked}
@@ -457,19 +425,12 @@ export function CourseDetailsForm({
           {/* Section 3: Course Thumbnail */}
           <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
-                  <ImageIcon className="size-4" aria-hidden="true" />
-                </span>
-                <div>
-                  <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
-                    Course thumbnail
-                  </h2>
-                  <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-                    Upload a crisp 16:9 cover image. It updates the live preview immediately and is required before submission.
-                  </p>
-                </div>
-              </div>
+              <SectionHeading
+                icon={<ImageIcon className="size-4" aria-hidden="true" />}
+                tint="bg-amber-50 text-amber-700"
+                title="Course thumbnail"
+                hint="A 16:9 cover image for your catalog card."
+              />
               {liveThumbnailUrl ? (
                 <Badge variant="emerald">Uploaded</Badge>
               ) : (
@@ -490,52 +451,42 @@ export function CourseDetailsForm({
 
           {/* Section 4: Learning outcomes, requirements & audience */}
           <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
-            <div className="flex items-start gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                <Target className="size-4" aria-hidden="true" />
-              </span>
-              <div>
-                <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
-                  Learning outcomes, prerequisites &amp; audience
-                </h2>
-                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-                  Displayed on your public course landing page to help learners decide if this course fits their goals.
-                </p>
-              </div>
-            </div>
+            <SectionHeading
+              icon={<Target className="size-4" aria-hidden="true" />}
+              tint="bg-emerald-50 text-emerald-700"
+              title="Outcomes & audience"
+              hint="Shown on your public course page."
+            />
 
             <div className="mt-5 space-y-6">
               <ListEditor
                 label="What learners will be able to do"
-                hint="Add concrete, practical outcomes (e.g. 'Build and deploy a multi-step AI agent with tool calling')."
                 items={form.whatYouLearn}
                 disabled={locked}
                 onChange={(items) => set("whatYouLearn", items)}
-                placeholder="e.g. Design, test, and deploy a multi-agent workflow"
-                addLabel="Add learning outcome"
+                placeholder="e.g. Build and deploy a multi-agent AI workflow"
+                addLabel="Add outcome"
               />
 
               <div className="border-t border-border pt-5">
                 <ListEditor
-                  label="Prerequisites & requirements"
-                  hint="Tools, accounts, or prior experience learners should have before starting."
+                  label="Prerequisites"
                   items={form.requirements}
                   disabled={locked}
                   onChange={(items) => set("requirements", items)}
-                  placeholder="e.g. Basic familiarity with JavaScript or Python"
-                  addLabel="Add requirement"
+                  placeholder="e.g. Basic familiarity with JavaScript"
+                  addLabel="Add prerequisite"
                 />
               </div>
 
               <div className="border-t border-border pt-5">
                 <ListEditor
                   label="Who this course is for"
-                  hint="Describe the ideal learner profile or role."
                   items={form.audience}
                   disabled={locked}
                   onChange={(items) => set("audience", items)}
-                  placeholder="e.g. Product engineers and builders shipping AI features"
-                  addLabel="Add target learner"
+                  placeholder="e.g. Engineers shipping AI features"
+                  addLabel="Add learner"
                 />
               </div>
             </div>
@@ -543,20 +494,13 @@ export function CourseDetailsForm({
 
           {/* Section 5: Course Pricing */}
           <section className="rounded-2xl border border-border bg-white p-5 shadow-card sm:p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
-                  <IndianRupee className="size-4" aria-hidden="true" />
-                </span>
-                <div>
-                  <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
-                    Course pricing
-                  </h2>
-                  <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-                    Choose whether this course is free or paid in INR (₹). You can also adjust pricing in Step 3.
-                  </p>
-                </div>
-              </div>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <SectionHeading
+                icon={<IndianRupee className="size-4" aria-hidden="true" />}
+                tint="bg-accent text-primary"
+                title="Pricing"
+                hint="Free or paid in ₹ — change it any time."
+              />
               <Badge variant={pricingMode === "free" ? "emerald" : "violet"}>
                 {pricingMode === "free" || parsedPricePaise === 0
                   ? "Free"
@@ -587,7 +531,7 @@ export function CourseDetailsForm({
                     Free course (₹0)
                   </p>
                   <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    Open enrollment with one click — great for community reach.
+                    Open enrollment with one click.
                   </p>
                 </div>
                 <span
@@ -620,7 +564,7 @@ export function CourseDetailsForm({
                     Paid course (INR)
                   </p>
                   <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    Charge in Indian Rupees via Razorpay Checkout (UPI, cards, netbanking).
+                    UPI, cards & netbanking via Razorpay.
                   </p>
                 </div>
                 <span
@@ -642,7 +586,7 @@ export function CourseDetailsForm({
                   id="cd-price"
                   label="Price (INR ₹)"
                   error={fieldErrors.priceRupees}
-                  hint="Up to 2 decimal places (e.g. 999 or 1499.50)"
+                  hint="e.g. 999 or 1499.50"
                 >
                   <Input
                     id="cd-price"
@@ -657,7 +601,7 @@ export function CourseDetailsForm({
 
                 <Field
                   id="cd-compare-price"
-                  label="Compare-at price (INR ₹, optional)"
+                  label="Compare-at price (₹, optional)"
                   error={fieldErrors.compareAtRupees}
                   hint="Must be higher than the selling price"
                 >
@@ -680,7 +624,7 @@ export function CourseDetailsForm({
             <p className="text-[12.5px] text-muted-foreground">
               {form.id
                 ? "Changes are saved to your course draft."
-                : "Saving creates your course draft and unlocks Step 2 (Curriculum)."}
+                : "You'll add lessons, quizzes and resources next."}
             </p>
             <div className="flex flex-wrap items-center gap-2.5">
               {form.id ? (
@@ -690,7 +634,6 @@ export function CourseDetailsForm({
                   disabled={busy || locked}
                   onClick={() => void saveAndNavigate(true)}
                 >
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : null}
                   Save &amp; continue to Curriculum
                   <ArrowRight className="size-3.5" aria-hidden="true" />
                 </Button>
@@ -703,14 +646,14 @@ export function CourseDetailsForm({
           </div>
         </div>
 
-        {/* Right column: Sticky Live Catalog Card Preview & Wizard Guide */}
+        {/* Right column: Sticky Live Catalog Card Preview & Checklist */}
         <aside className="space-y-5 xl:sticky xl:top-20">
           {/* Live Public Catalog Card Preview */}
           <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground">
                 <Eye className="size-3.5 text-primary" aria-hidden="true" />
-                Live catalog card preview
+                Catalog card preview
               </div>
               <span className="rounded-md bg-muted px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground">
                 Updates as you type
@@ -832,10 +775,10 @@ export function CourseDetailsForm({
             </div>
           </div>
 
-          {/* Step 1 Readiness Checklist */}
+          {/* Readiness Checklist */}
           <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
             <h3 className="text-[12.5px] font-semibold text-foreground">
-              Step 1 checklist
+              Before you continue
             </h3>
             <ul className="mt-2.5 space-y-2">
               {stepChecklist.map((item) => (
@@ -864,60 +807,38 @@ export function CourseDetailsForm({
               ))}
             </ul>
           </div>
-
-          {/* What's next in Step 2 (Curriculum) */}
-          <div className="rounded-2xl border border-border bg-white p-4 shadow-card">
-            <h3 className="text-[12.5px] font-semibold text-foreground">
-              What you&apos;ll build in Step 2
-            </h3>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
-              Once you save these details, you&apos;ll organize sections and add three types of lessons:
-            </p>
-            <ul className="mt-3 space-y-2.5 text-[11.5px]">
-              <li className="flex items-start gap-2.5">
-                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-accent text-primary">
-                  <Video className="size-3.5" aria-hidden="true" />
-                </span>
-                <div>
-                  <strong className="font-semibold text-foreground">
-                    Video lessons
-                  </strong>
-                  <p className="text-muted-foreground">
-                    Upload MP4/MOV/WebM videos, set durations &amp; free previews.
-                  </p>
-                </div>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-700">
-                  <HelpCircle className="size-3.5" aria-hidden="true" />
-                </span>
-                <div>
-                  <strong className="font-semibold text-foreground">
-                    Interactive quizzes
-                  </strong>
-                  <p className="text-muted-foreground">
-                    Add multiple-choice &amp; true/false questions, options &amp; passing scores.
-                  </p>
-                </div>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-sky-50 text-sky-700">
-                  <FileUp className="size-3.5" aria-hidden="true" />
-                </span>
-                <div>
-                  <strong className="font-semibold text-foreground">
-                    Resources &amp; reading
-                  </strong>
-                  <p className="text-muted-foreground">
-                    Attach downloadable files (PDF, ZIP, templates) &amp; reference links.
-                  </p>
-                </div>
-              </li>
-            </ul>
-          </div>
         </aside>
       </div>
     </form>
+  );
+}
+
+/** Shared section header so every form section aligns identically. */
+function SectionHeading({
+  icon,
+  tint,
+  title,
+  hint,
+}: {
+  icon: React.ReactNode;
+  tint: string;
+  title: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", tint)}>
+        {icon}
+      </span>
+      <div>
+        <h2 className="font-display text-[15px] font-semibold tracking-tight text-foreground">
+          {title}
+        </h2>
+        {hint ? (
+          <p className="mt-0.5 text-[12.5px] text-muted-foreground">{hint}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -946,7 +867,7 @@ function Field({
         {hint ? (
           <span
             id={id ? `${id}-help` : undefined}
-            className="text-[11.5px] text-zinc-400"
+            className="text-[11px] text-zinc-400"
           >
             {hint}
           </span>
@@ -967,7 +888,6 @@ function Field({
 
 function ListEditor({
   label,
-  hint,
   items,
   disabled,
   onChange,
@@ -975,7 +895,6 @@ function ListEditor({
   addLabel = "Add item",
 }: {
   label: string;
-  hint?: string;
   items: string[];
   disabled?: boolean;
   onChange: (items: string[]) => void;
@@ -985,13 +904,8 @@ function ListEditor({
   return (
     <div className="space-y-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <p className="text-[13px] font-medium text-foreground">{label}</p>
-          {hint ? (
-            <p className="mt-0.5 text-[11.5px] text-muted-foreground">{hint}</p>
-          ) : null}
-        </div>
-        <span className="text-[11px] text-zinc-400">{items.length}/20 items</span>
+        <p className="text-[13px] font-medium text-foreground">{label}</p>
+        <span className="text-[11px] text-zinc-400">{items.length}/20</span>
       </div>
 
       {items.length > 0 ? (
@@ -1036,8 +950,7 @@ function ListEditor({
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3.5 py-2.5 text-[12px] text-muted-foreground">
-          No items added yet. Click{" "}
-          <strong className="font-medium text-foreground">{addLabel}</strong> below to add the first one.
+          Nothing added yet — use <strong className="font-medium text-foreground">{addLabel}</strong>.
         </div>
       )}
 
