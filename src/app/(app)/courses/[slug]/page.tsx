@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CourseDetailView } from "@/components/courses/course-detail-view";
+import { getCleanLessonDescription } from "@/lib/course-wizard";
 import {
   courseCategory,
   getCourseLessons,
@@ -67,7 +68,7 @@ export default async function CourseDetailPage({
       durationMinutes: Number(lesson.duration_minutes ?? 0),
       type: String(lesson.kind ?? "video") as "video" | "reading" | "quiz",
       freePreview: Boolean(lesson.is_preview),
-      description: (lesson.description as string) ?? undefined,
+      description: getCleanLessonDescription(lesson.description as string) || undefined,
     })),
   }));
   void sectionMap;

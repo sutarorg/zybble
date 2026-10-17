@@ -27,6 +27,8 @@ import {
   courseSchema,
   lessonSchema,
   sectionSchema,
+  serializeLessonQuiz,
+  serializeLessonResources,
 } from "@/lib/course-wizard";
 
 export interface CreatorActionResult {
@@ -880,11 +882,25 @@ export async function saveLesson(input: unknown): Promise<CreatorActionResult> {
     await assertOwnsCourse(parsed.data.courseId, session.id);
     const service = createServiceClient()!;
 
+    let serializedDescription = parsed.data.description || null;
+    if (parsed.data.kind === "quiz" && parsed.data.quizConfig) {
+      serializedDescription = serializeLessonQuiz({
+        instructions: parsed.data.description ?? "",
+        passingScorePercent: parsed.data.quizConfig.passingScorePercent,
+        questions: parsed.data.quizConfig.questions,
+      });
+    } else if (parsed.data.kind === "reading" && parsed.data.resourceLinks) {
+      serializedDescription = serializeLessonResources({
+        notes: parsed.data.description ?? "",
+        links: parsed.data.resourceLinks,
+      });
+    }
+
     const payload = {
       course_id: parsed.data.courseId,
       section_id: parsed.data.sectionId ?? null,
       title: parsed.data.title,
-      description: parsed.data.description || null,
+      description: serializedDescription,
       kind: parsed.data.kind,
       sort_order: parsed.data.sortOrder,
       duration_minutes: parsed.data.durationMinutes,
@@ -895,6 +911,7 @@ export async function saveLesson(input: unknown): Promise<CreatorActionResult> {
       await service.from("lessons").update(payload).eq("id", parsed.data.id).eq("course_id", parsed.data.courseId);
       await refreshCourseAggregates(service, parsed.data.courseId);
       revalidatePath(`/creator/courses/${parsed.data.courseId}/curriculum`);
+      revalidatePath(`/creator/courses/${parsed.data.courseId}/publish`);
       return { ok: true, id: parsed.data.id };
     }
 
@@ -928,6 +945,7 @@ export async function saveLesson(input: unknown): Promise<CreatorActionResult> {
     }
 
     revalidatePath(`/creator/courses/${parsed.data.courseId}/curriculum`);
+    revalidatePath(`/creator/courses/${parsed.data.courseId}/publish`);
 
     const notifiedLearners = announcement?.notified ?? 0;
     return {
@@ -1095,6 +1113,40 @@ async function refreshCourseAggregates(service: NonNullable<ReturnType<typeof cr
 /* Resources and settings                                                      */
 /* -------------------------------------------------------------------------- */
 
+const updateResourceSchema = z.object({
+  resourceId: z.string().uuid(),
+  courseId: z.string().uuid(),
+  title: z.string().trim().min(1, "Enter a resource title").max(200, "Resource title must be 200 characters or fewer"),
+});
+
+export async function updateResource(input: unknown): Promise<CreatorActionResult> {
+  try {
+    const session = await requireCreator();
+    const parsed = updateResourceSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid resource title" };
+    }
+    await assertOwnsCourse(parsed.data.courseId, session.id);
+    const service = createServiceClient()!;
+
+    const { error } = await service
+      .from("course_resources")
+      .update({ title: parsed.data.title })
+      .eq("id", parsed.data.resourceId)
+      .eq("course_id", parsed.data.courseId);
+    if (error) {
+      return { ok: false, error: "Could not update the resource title" };
+    }
+
+    revalidatePath(`/creator/courses/${parsed.data.courseId}/curriculum`);
+    revalidatePath(`/creator/courses/${parsed.data.courseId}/content`);
+    revalidatePath(`/creator/courses/${parsed.data.courseId}/publish`);
+    return { ok: true, message: "Resource updated" };
+  } catch (error) {
+    return fail(error, "Could not update the resource");
+  }
+}
+
 export async function deleteResource(resourceId: string, courseId: string): Promise<CreatorActionResult> {
   try {
     const session = await requireCreator();
@@ -1121,7 +1173,9 @@ export async function deleteResource(resourceId: string, courseId: string): Prom
     }
 
     await refreshCourseAggregates(service, courseId);
+    revalidatePath(`/creator/courses/${courseId}/curriculum`);
     revalidatePath(`/creator/courses/${courseId}/content`);
+    revalidatePath(`/creator/courses/${courseId}/publish`);
     return { ok: true };
   } catch (error) {
     return fail(error, "Could not delete the resource");

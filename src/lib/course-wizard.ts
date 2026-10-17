@@ -140,6 +140,7 @@ export interface CourseReadinessLesson {
   kind: string;
   playbackReady: boolean;
   hasVideo: boolean;
+  quizReady?: boolean;
 }
 
 export interface CourseReadinessInput {
@@ -216,7 +217,11 @@ export function computeCourseReadiness(input: CourseReadinessInput): CourseReadi
         "Video lessons must have a video and finish encoding on Bunny Stream before learners can watch them. Reading and quiz lessons are ready as soon as they exist.",
       done:
         lessons.length > 0 &&
-        lessons.every((lesson) => (lesson.kind === "video" ? lesson.playbackReady : true)),
+        lessons.every((lesson) => {
+          if (lesson.kind === "video") return lesson.playbackReady;
+          if (lesson.kind === "quiz" && typeof lesson.quizReady === "boolean") return lesson.quizReady;
+          return true;
+        }),
       fixStep: "curriculum",
     },
     {
@@ -243,6 +248,272 @@ export function computeCourseReadiness(input: CourseReadinessInput): CourseReadi
     ready: checks.every((check) => check.done),
     missing: checks.filter((check) => !check.done).map((check) => check.label),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Quiz & Lesson Resource Payload Schemas & Serialization                      */
+/* -------------------------------------------------------------------------- */
+
+export const QUIZ_QUESTION_TYPES = ["multiple-choice", "true-false"] as const;
+export type QuizQuestionType = (typeof QUIZ_QUESTION_TYPES)[number];
+
+export interface QuizOption {
+  id: string;
+  text: string;
+}
+
+export interface QuizQuestion {
+  id: string;
+  type: QuizQuestionType;
+  question: string;
+  options: QuizOption[];
+  correctOptionId: string;
+  explanation?: string;
+  points?: number;
+}
+
+export interface QuizConfig {
+  passingScorePercent: number;
+  questions: QuizQuestion[];
+}
+
+export const quizOptionSchema = z.object({
+  id: z.string().trim().min(1, "Option ID is required").max(80),
+  text: z
+    .string()
+    .trim()
+    .min(1, "Enter text for each answer option")
+    .max(300, "Answer option must be 300 characters or fewer"),
+});
+
+export const quizQuestionSchema = z
+  .object({
+    id: z.string().trim().min(1, "Question ID is required").max(80),
+    type: z.enum(QUIZ_QUESTION_TYPES).default("multiple-choice"),
+    question: z
+      .string()
+      .trim()
+      .min(1, "Enter a question prompt")
+      .max(500, "Question prompt must be 500 characters or fewer"),
+    options: z
+      .array(quizOptionSchema)
+      .min(2, "Each question requires at least 2 answer options")
+      .max(6, "Each question can have at most 6 answer options"),
+    correctOptionId: z.string().trim().min(1, "Select the correct answer"),
+    explanation: z
+      .string()
+      .trim()
+      .max(600, "Explanation must be 600 characters or fewer")
+      .optional()
+      .default(""),
+    points: z.coerce.number().int().min(1).max(100).optional().default(1),
+  })
+  .refine(
+    (q) => q.options.some((opt) => opt.id === q.correctOptionId && opt.text.trim().length > 0),
+    {
+      path: ["correctOptionId"],
+      message: "Select one of the answer options as the correct answer",
+    }
+  );
+
+export const quizConfigSchema = z.object({
+  passingScorePercent: z.coerce.number().int().min(0).max(100).default(70),
+  questions: z
+    .array(quizQuestionSchema)
+    .min(1, "Add at least one question before saving the quiz")
+    .max(50, "A quiz can have at most 50 questions"),
+});
+
+export interface LessonResourceLink {
+  id: string;
+  title: string;
+  url: string;
+  description?: string;
+}
+
+export const lessonResourceLinkSchema = z.object({
+  id: z.string().trim().min(1, "Link ID is required").max(80),
+  title: z
+    .string()
+    .trim()
+    .min(1, "Enter a resource title")
+    .max(160, "Resource title must be 160 characters or fewer"),
+  url: z
+    .string()
+    .trim()
+    .url("Enter a valid URL starting with https:// or http://")
+    .refine((value) => /^https?:\/\//i.test(value), "URL must start with https:// or http://"),
+  description: z
+    .string()
+    .trim()
+    .max(400, "Resource description must be 400 characters or fewer")
+    .optional()
+    .default(""),
+});
+
+const QUIZ_MARKER_PREFIX = "<!--zybble-quiz:";
+const RESOURCES_MARKER_PREFIX = "<!--zybble-resources:";
+const MARKER_SUFFIX = "-->";
+
+/**
+ * Strips any embedded quiz or resource metadata comment from a lesson
+ * description so plain-text views only render the human-readable instructions.
+ */
+export function getCleanLessonDescription(rawDescription: string | null | undefined): string {
+  if (!rawDescription) return "";
+  let text = rawDescription;
+  for (const prefix of [QUIZ_MARKER_PREFIX, RESOURCES_MARKER_PREFIX]) {
+    const idx = text.indexOf(prefix);
+    if (idx !== -1) {
+      text = text.slice(0, idx);
+    }
+  }
+  return text.trim();
+}
+
+/**
+ * Serializes human-readable quiz instructions alongside structured quiz
+ * questions and settings into the lesson `description` column.
+ */
+export function serializeLessonQuiz(input: {
+  instructions?: string;
+  passingScorePercent?: number;
+  questions: QuizQuestion[];
+}): string {
+  const cleanInstructions = getCleanLessonDescription(input.instructions ?? "").slice(0, 2000);
+  const payload: QuizConfig = {
+    passingScorePercent: Math.max(0, Math.min(100, Math.round(input.passingScorePercent ?? 70))),
+    questions: input.questions.map((q) => ({
+      id: q.id.trim(),
+      type: q.type ?? "multiple-choice",
+      question: q.question.trim(),
+      options: q.options.map((o) => ({ id: o.id.trim(), text: o.text.trim() })),
+      correctOptionId: q.correctOptionId.trim(),
+      explanation: (q.explanation ?? "").trim(),
+      points: q.points ?? 1,
+    })),
+  };
+  const encoded = `${QUIZ_MARKER_PREFIX}${JSON.stringify(payload)}${MARKER_SUFFIX}`;
+  return cleanInstructions ? `${cleanInstructions}\n\n${encoded}` : encoded;
+}
+
+/**
+ * Parses a lesson `description` into quiz instructions, passing score, and
+ * validated questions. Gracefully handles legacy plain-text quiz descriptions.
+ */
+export function parseLessonQuiz(rawDescription: string | null | undefined): {
+  instructions: string;
+  passingScorePercent: number;
+  questions: QuizQuestion[];
+} {
+  const instructions = getCleanLessonDescription(rawDescription);
+  if (!rawDescription) {
+    return { instructions: "", passingScorePercent: 70, questions: [] };
+  }
+  const startIdx = rawDescription.indexOf(QUIZ_MARKER_PREFIX);
+  if (startIdx === -1) {
+    return { instructions, passingScorePercent: 70, questions: [] };
+  }
+  const jsonStart = startIdx + QUIZ_MARKER_PREFIX.length;
+  const endIdx = rawDescription.indexOf(MARKER_SUFFIX, jsonStart);
+  const rawJson = endIdx !== -1 ? rawDescription.slice(jsonStart, endIdx) : rawDescription.slice(jsonStart);
+  try {
+    const parsed = JSON.parse(rawJson) as Partial<QuizConfig>;
+    const passingScorePercent =
+      typeof parsed.passingScorePercent === "number" && Number.isFinite(parsed.passingScorePercent)
+        ? Math.max(0, Math.min(100, Math.round(parsed.passingScorePercent)))
+        : 70;
+    const questions = Array.isArray(parsed.questions)
+      ? parsed.questions
+          .map((q): QuizQuestion | null => {
+            if (!q || typeof q !== "object") return null;
+            const options = Array.isArray(q.options)
+              ? q.options
+                  .filter((o) => o && typeof o.id === "string" && typeof o.text === "string")
+                  .map((o) => ({ id: o.id, text: o.text }))
+              : [];
+            if (!q.id || typeof q.question !== "string" || options.length < 2) return null;
+            return {
+              id: String(q.id),
+              type: q.type === "true-false" ? "true-false" : "multiple-choice",
+              question: q.question,
+              options,
+              correctOptionId:
+                typeof q.correctOptionId === "string" && options.some((o) => o.id === q.correctOptionId)
+                  ? q.correctOptionId
+                  : options[0].id,
+              explanation: typeof q.explanation === "string" ? q.explanation : "",
+              points: typeof q.points === "number" ? q.points : 1,
+            };
+          })
+          .filter((q): q is QuizQuestion => q !== null)
+      : [];
+    return { instructions, passingScorePercent, questions };
+  } catch {
+    return { instructions, passingScorePercent: 70, questions: [] };
+  }
+}
+
+/**
+ * Serializes lesson reading notes alongside supplementary external resource
+ * links into the lesson `description` column.
+ */
+export function serializeLessonResources(input: {
+  notes?: string;
+  links: LessonResourceLink[];
+}): string {
+  const cleanNotes = getCleanLessonDescription(input.notes ?? "").slice(0, 2000);
+  if (!input.links || input.links.length === 0) {
+    return cleanNotes;
+  }
+  const links = input.links.map((l) => ({
+    id: l.id.trim(),
+    title: l.title.trim(),
+    url: l.url.trim(),
+    description: (l.description ?? "").trim(),
+  }));
+  const encoded = `${RESOURCES_MARKER_PREFIX}${JSON.stringify({ links })}${MARKER_SUFFIX}`;
+  return cleanNotes ? `${cleanNotes}\n\n${encoded}` : encoded;
+}
+
+/**
+ * Parses a lesson `description` into reading notes and supplementary external
+ * resource links.
+ */
+export function parseLessonResources(rawDescription: string | null | undefined): {
+  notes: string;
+  links: LessonResourceLink[];
+} {
+  const notes = getCleanLessonDescription(rawDescription);
+  if (!rawDescription) return { notes: "", links: [] };
+  const startIdx = rawDescription.indexOf(RESOURCES_MARKER_PREFIX);
+  if (startIdx === -1) return { notes, links: [] };
+  const jsonStart = startIdx + RESOURCES_MARKER_PREFIX.length;
+  const endIdx = rawDescription.indexOf(MARKER_SUFFIX, jsonStart);
+  const rawJson = endIdx !== -1 ? rawDescription.slice(jsonStart, endIdx) : rawDescription.slice(jsonStart);
+  try {
+    const parsed = JSON.parse(rawJson) as { links?: unknown[] };
+    const links = Array.isArray(parsed.links)
+      ? parsed.links
+          .map((item): LessonResourceLink | null => {
+            if (!item || typeof item !== "object") return null;
+            const rec = item as Record<string, unknown>;
+            if (typeof rec.id !== "string" || typeof rec.title !== "string" || typeof rec.url !== "string") {
+              return null;
+            }
+            return {
+              id: rec.id,
+              title: rec.title,
+              url: rec.url,
+              description: typeof rec.description === "string" ? rec.description : "",
+            };
+          })
+          .filter((l): l is LessonResourceLink => l !== null)
+      : [];
+    return { notes, links };
+  } catch {
+    return { notes, links: [] };
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -278,16 +549,21 @@ export const sectionSchema = z.object({
   sortOrder: z.number().int().min(0).max(999),
 });
 
+export const LESSON_KINDS = ["video", "reading", "quiz"] as const;
+export type LessonKind = (typeof LESSON_KINDS)[number];
+
 export const lessonSchema = z.object({
   courseId: z.string().uuid(),
   id: z.string().uuid().optional(),
   sectionId: z.string().uuid().optional().nullable(),
   title: z.string().trim().min(1, "Lesson title is required").max(160),
-  description: z.string().trim().max(2000).optional(),
-  kind: z.enum(["video", "reading", "quiz"]).default("video"),
+  description: z.string().trim().max(50000).optional(),
+  kind: z.enum(LESSON_KINDS).default("video"),
   sortOrder: z.number().int().min(0).max(9999),
   durationMinutes: z.number().int().min(0).max(600).default(0),
   isPreview: z.boolean().default(false),
+  quizConfig: quizConfigSchema.optional(),
+  resourceLinks: z.array(lessonResourceLinkSchema).max(30).optional(),
 });
 
 export type CourseDetailsInput = z.infer<typeof courseSchema>;
