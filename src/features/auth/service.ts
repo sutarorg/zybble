@@ -1,5 +1,6 @@
 import { inngest } from "@/inngest/client";
 import { listWorkspaces } from "@/features/workspaces/access";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AppError, UnauthenticatedError } from "@/lib/errors";
 import { env, isSupabaseConfigured } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -29,13 +30,26 @@ export type SessionState = {
     email: string;
     emailVerified: boolean;
   };
+  /** Mirrors `UserProfile` in `src/lib/app/types.ts`. */
   profile: {
     id: string;
-    fullName: string | null;
+    name: string | null;
+    email: string;
     timezone: string;
+    emailVerified: boolean;
     onboardingCompletedAt: string | null;
   };
-  workspaces: Array<{ id: string; name: string; slug: string; plan: string; role: string }>;
+  /** Mirrors `Workspace` in `src/lib/app/types.ts`. */
+  workspaces: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    plan: "free" | "pro";
+    seats: number;
+    timezone: string;
+    createdAt: string;
+    role: string;
+  }>;
   /** True when the user has no workspace yet and must complete onboarding. */
   requiresOnboarding: boolean;
   capabilities: {
@@ -138,15 +152,20 @@ export async function getSessionState(
     },
     profile: {
       id: profile.id,
-      fullName: profile.full_name,
+      name: profile.full_name,
+      email: profile.email ?? user.email ?? "",
       timezone: profile.timezone,
+      emailVerified: Boolean(user.email_confirmed_at),
       onboardingCompletedAt: profile.onboarding_completed_at,
     },
     workspaces: workspaces.map((workspace) => ({
       id: workspace.id,
       name: workspace.name,
       slug: workspace.slug,
-      plan: workspace.plan,
+      plan: workspace.plan === "pro" ? ("pro" as const) : ("free" as const),
+      seats: workspace.seats ?? 1,
+      timezone: workspace.timezone,
+      createdAt: workspace.created_at,
       role: "owner",
     })),
     requiresOnboarding: workspaces.length === 0,
@@ -358,6 +377,176 @@ async function queueWelcomeEmail(userId: string): Promise<void> {
       error: error instanceof Error ? error.message : "unknown",
     });
   }
+}
+
+/**
+ * Update the caller's own profile.
+ *
+ * The email is deliberately *not* changeable here: an email change in Supabase
+ * Auth requires re-verification through the provider's own flow, and silently
+ * changing it would desynchronise `auth.users` from `public.profiles`.
+ */
+export async function updateProfile(input: {
+  fullName?: string | null;
+  timezone?: string;
+}): Promise<{ profile: { id: string; name: string | null; email: string; timezone: string; emailVerified: boolean; onboardingCompletedAt: string | null } }> {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new UnauthenticatedError("Sign in to continue.");
+
+  const patch: { full_name?: string | null; timezone?: string } = {};
+
+  if (input.fullName !== undefined) {
+    const value = input.fullName?.trim() ?? "";
+    patch.full_name = value.length > 0 ? value.slice(0, 80) : null;
+  }
+
+  if (input.timezone !== undefined) {
+    patch.timezone = assertTimeZone(input.timezone);
+  }
+
+  if (Object.keys(patch).length === 0) {
+    const state = await getSessionState(supabase, user);
+    return { profile: state.profile };
+  }
+
+  await ensureProfile(supabase, user);
+
+  const { data: row, error } = await supabase
+    .from("profiles")
+    .update(patch)
+    .eq("id", user.id)
+    .select("id, full_name, email, timezone, onboarding_completed_at")
+    .maybeSingle();
+
+  if (error || !row) {
+    throw new AppError("internal_error", "Could not save your profile.");
+  }
+
+  return {
+    profile: {
+      id: row.id,
+      name: row.full_name,
+      email: row.email ?? user.email ?? "",
+      timezone: row.timezone,
+      emailVerified: Boolean(user.email_confirmed_at),
+      onboardingCompletedAt: row.onboarding_completed_at,
+    },
+  };
+}
+
+/**
+ * Account deletion (right to erasure).
+ *
+ * Order matters: cancel billing first (so no further invoice is raised), then
+ * purge every workspace the user owns — which deletes secrets, media rows,
+ * posts, analytics and audit logs inside one transaction each — and finally
+ * delete the auth user. Storage objects are removed by the caller before the
+ * purge so no orphaned blobs are left behind.
+ *
+ * The audit log is intentionally *not* retained after this: the rows belong to
+ * the workspaces being deleted. The deletion itself is recorded by the caller.
+ */
+export async function deleteAccount(confirmation: { password: string }): Promise<{
+  deleted: true;
+  workspacesPurged: number;
+  cancellationQueued: boolean;
+}> {
+  const supabase = await createSupabaseServerClient();
+  const admin = createSupabaseAdminClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new UnauthenticatedError("Sign in to continue.");
+
+  // Re-authenticate before destroying anything: a session left open on a shared
+  // machine must not be enough to erase an account.
+  const { error: confirmError } = await supabase.auth.signInWithPassword({
+    email: user.email ?? "",
+    password: confirmation.password,
+  });
+
+  if (confirmError) {
+    throw new AppError("validation_failed", "That password was not correct.");
+  }
+
+  const { data: memberships, error: memberError } = await admin
+    .from("workspace_members")
+    .select("workspace_id, role")
+    .eq("user_id", user.id);
+
+  if (memberError) {
+    throw new AppError("internal_error", "Could not read your workspaces.");
+  }
+
+  const rows = (memberships ?? []) as Array<{ workspace_id: string; role: string }>;
+  const owned = rows.filter((row) => row.role === "owner").map((row) => row.workspace_id);
+
+  let cancellationQueued = false;
+
+  // Cancel any live subscription before the rows disappear, so Dodo cannot
+  // bill a customer that no longer exists.
+  for (const workspaceId of owned) {
+    const { data: subscription } = await admin
+      .from("subscriptions")
+      .select("dodo_subscription_id, status, plan")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+
+    const row = subscription as { dodo_subscription_id: string | null; status: string | null; plan: string | null } | null;
+
+    if (!row?.dodo_subscription_id || row.plan !== "pro") continue;
+    if (!["active", "past_due", "pending", "on_hold", "paused"].includes(row.status ?? "")) continue;
+
+    try {
+      await inngest.send({
+        name: "billing/subscription.cancel",
+        data: { workspaceId, reason: "account_deleted" },
+      });
+      cancellationQueued = true;
+    } catch (error) {
+      logger.error("auth.cancel_on_delete_failed", {
+        workspaceId,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  }
+
+  // Leave workspaces owned by someone else first, so the "one owner" guard
+  // elsewhere is never tripped by a dangling membership.
+  for (const row of rows.filter((item) => item.role !== "owner")) {
+    await admin
+      .from("workspace_members")
+      .update({ status: "removed" })
+      .eq("workspace_id", row.workspace_id)
+      .eq("user_id", user.id);
+  }
+
+  for (const workspaceId of owned) {
+    const { error } = await admin.rpc("purge_workspace_data", { target_workspace: workspaceId });
+    if (error) {
+      logger.error("auth.purge_workspace_failed", { workspaceId, error: error.message });
+      throw new AppError("internal_error", "Could not delete every workspace. Nothing was removed.");
+    }
+  }
+
+  // Consume any in-flight OAuth attempt belonging to this user.
+  await admin.from("linkedin_oauth_states").delete().eq("user_id", user.id);
+
+  const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+
+  if (deleteError) {
+    logger.error("auth.delete_user_failed", { error: deleteError.message });
+    throw new AppError("internal_error", "Could not delete the account. Please contact support.");
+  }
+
+  return { deleted: true, workspacesPurged: owned.length, cancellationQueued };
 }
 
 /**

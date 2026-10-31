@@ -12,7 +12,11 @@ import {
   nightlyAnalyticsSync,
 } from "@/inngest/functions/analytics";
 import { checkLinkedInConnections } from "@/inngest/functions/linkedin-connections";
-import { syncWorkspaceSeats, reconcileSubscriptions } from "@/inngest/functions/billing";
+import {
+  syncWorkspaceSeats,
+  reconcileSubscriptions,
+  cancelSubscriptionOnDelete,
+} from "@/inngest/functions/billing";
 import { sendTransactionalEmail } from "@/inngest/functions/email";
 import { deleteWorkspace } from "@/inngest/functions/workspace-delete";
 
@@ -38,6 +42,7 @@ export const functions = [
   // billing
   syncWorkspaceSeats,
   reconcileSubscriptions,
+  cancelSubscriptionOnDelete,
   // lifecycle
   deleteWorkspace,
 ];

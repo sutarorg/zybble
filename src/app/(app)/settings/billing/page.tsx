@@ -262,7 +262,7 @@ export default function BillingSettingsPage() {
             <div>
               <dt className="text-[13px] text-slate-500">Active members</dt>
               <dd className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900">
-                {members.loading ? "…" : (members.data?.filter((m) => m.status === "active").length ?? 0)}
+                {members.loading ? "…" : (members.data?.members.filter((member) => member.status === "active").length ?? 0)}
               </dd>
             </div>
             <div>

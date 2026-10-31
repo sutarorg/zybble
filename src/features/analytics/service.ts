@@ -10,6 +10,7 @@ import {
 } from "@/lib/linkedin/analytics";
 import type { MetricType } from "@/lib/linkedin/analytics";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { permalinkFor } from "@/features/posts/queries";
 import type { ServerSupabase } from "@/lib/supabase/server";
 import type {
   AnalyticsSnapshotRow,
@@ -19,6 +20,7 @@ import type {
 } from "@/lib/supabase/database.types";
 import { addDays, startOfUtcDay, toIsoDate } from "@/lib/time";
 import {
+  BEST_TIME_CONFIG,
   computeBestTime,
   type BestTimeObservation,
   type BestTimeResult,
@@ -441,8 +443,14 @@ export async function getAnalyticsOverview(input: {
   const previousFrom = toIsoDate(addDays(today, -(rangeDays * 2 - 1)));
   const previousTo = toIsoDate(addDays(today, -rangeDays));
 
-  const [{ data: accounts }, { data: currentRows }, { data: previousRows }, { data: snapshots }, { data: bestTimeRows }] =
-    await Promise.all([
+  const [
+    { data: accounts },
+    { data: currentRows },
+    { data: previousRows },
+    { data: snapshots },
+    { data: bestTimeRows },
+    { data: observationRows },
+  ] = await Promise.all([
       supabase
         .from("linkedin_accounts")
         .select("id, can_read_analytics, status")
@@ -469,6 +477,15 @@ export async function getAnalyticsOverview(input: {
         ? supabase
             .from("best_time_recommendations")
             .select("*")
+            .eq("workspace_id", workspaceId)
+        : Promise.resolve({ data: [] }),
+      // How many published posts the best-time engine can actually learn from.
+      // Only fetched for Pro, where the full history is visible: on Free the
+      // RLS window on `post_analytics` would undercount it.
+      entitlements.bestTimeInsights
+        ? supabase
+            .from("post_analytics")
+            .select("post_id")
             .eq("workspace_id", workspaceId)
         : Promise.resolve({ data: [] }),
     ]);
@@ -549,33 +566,44 @@ export async function getAnalyticsOverview(input: {
   if (topPostIds.length > 0) {
     const { data: posts } = await supabase
       .from("posts")
-      .select("id, body, published_at")
+      .select("id, body, published_at, linkedin_post_urn")
       .in("id", topPostIds)
       .eq("workspace_id", workspaceId);
 
-    topPosts = ((posts ?? []) as Array<{ id: string; body: string; published_at: string | null }>).map(
-      (post) => {
-        const metrics = perPost.get(post.id) ?? {
-          impressions: 0,
-          reactions: 0,
-          comments: 0,
-          reposts: 0,
-        };
+    topPosts = ((
+      posts ?? []
+    ) as Array<{
+      id: string;
+      body: string;
+      published_at: string | null;
+      linkedin_post_urn: string | null;
+    }>).map((post) => {
+      const metrics = perPost.get(post.id) ?? {
+        impressions: 0,
+        reactions: 0,
+        comments: 0,
+        reposts: 0,
+      };
 
-        return {
+      return {
+        postId: post.id,
+        text: post.body,
+        publishedAt: post.published_at,
+        permalink: permalinkFor(post.linkedin_post_urn),
+        metrics: {
           postId: post.id,
-          text: post.body,
-          publishedAt: post.published_at,
-          metrics: {
-            ...metrics,
-            engagementRate: computeEngagementRate(metrics),
-          },
-        };
-      },
-    );
+          ...metrics,
+          engagementRate: computeEngagementRate(metrics),
+        },
+      };
+    });
   }
 
   const bestTimeRowList = (bestTimeRows ?? []) as BestTimeRecommendationRow[];
+
+  const observationCount = new Set(
+    ((observationRows ?? []) as Array<{ post_id: string }>).map((row) => row.post_id),
+  ).size;
 
   return {
     rangeDays,
@@ -591,12 +619,36 @@ export async function getAnalyticsOverview(input: {
         weekday: row.weekday,
         hour: row.hour,
         score: Number(row.score),
+        sampleSize: row.sample_size,
+        confidence: Number(row.confidence),
       })),
       insufficientData:
         entitlements.bestTimeInsights && bestTimeRowList.length === 0
-          ? { requiredPosts: 12, observedPosts: 0 }
+          ? {
+              requiredPosts: BEST_TIME_CONFIG.minObservations,
+              observedPosts: observationCount,
+            }
           : null,
-      meta: null,
+      meta:
+        entitlements.bestTimeInsights && bestTimeRowList.length > 0
+          ? {
+              timeZone: input.timeZone,
+              observations: observationCount,
+              halfLifeDays: BEST_TIME_CONFIG.halfLifeDays,
+              priorStrength: BEST_TIME_CONFIG.priorStrength,
+              minObservations: BEST_TIME_CONFIG.minObservations,
+              minCellSample: BEST_TIME_CONFIG.minCellSample,
+              computedAt: bestTimeRowList[0]!.computed_at,
+              topSlots: [...bestTimeRowList]
+                .sort((a, b) => Number(b.score) - Number(a.score))
+                .slice(0, 3)
+                .map((row) => ({
+                  weekday: row.weekday,
+                  hour: row.hour,
+                  score: Number(row.score),
+                })),
+            }
+          : null,
     },
     capabilities: {
       analyticsPermission,

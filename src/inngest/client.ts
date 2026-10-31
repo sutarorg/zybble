@@ -72,6 +72,16 @@ export type Events = {
     data: { reason: "cron" | "manual" };
   };
   /**
+   * Cancel a live subscription at the provider immediately.
+   *
+   * Used when the workspace (or the account that owns it) is being deleted —
+   * the subscription row is about to disappear, so the provider has to be told
+   * first or Dodo would keep billing a customer that no longer exists.
+   */
+  "billing/subscription.cancel": {
+    data: { workspaceId: string; reason: "workspace_deleted" | "account_deleted" };
+  };
+  /**
    * Queue a transactional email.
    *
    * The event carries ids only — never an email address — because Inngest

@@ -10,9 +10,13 @@ import type {
   LinkedInAccount,
   LinkedInCapabilities,
   NotificationItem,
+  PlanEntitlements,
   SessionState,
-  TeamMember,
+  NotificationPreferences,
+  TeamRole,
+  TeamRoster,
   UsageSummary,
+  Workspace,
 } from "@/lib/app/types";
 
 /**
@@ -160,6 +164,37 @@ export function useBilling(): Resource<BillingState> {
   return useApiResource<BillingState>("/api/billing");
 }
 
+/** The active workspace (resolved server-side from the session cookie). */
+export function useWorkspace(): Resource<{
+  workspace: Workspace;
+  role: TeamRole;
+  entitlements: PlanEntitlements;
+  usage: UsageSummary;
+}> {
+  return useApiResource<{
+    workspace: Workspace;
+    role: TeamRole;
+    entitlements: PlanEntitlements;
+    usage: UsageSummary;
+  }>("/api/workspaces/current");
+}
+
+/** Email preferences, read before every send. */
+export function useNotificationPreferences(): Resource<NotificationPreferences> {
+  const query = useApiResource<{ preferences: NotificationPreferences }>(
+    "/api/notifications/preferences",
+  );
+
+  return {
+    data: query.data?.preferences ?? null,
+    error: query.error,
+    loading: query.loading,
+    reload: query.reload,
+    setData: () => undefined,
+    setError: query.setError,
+  };
+}
+
 /**
  * Usage for the active workspace.
  *
@@ -170,16 +205,8 @@ export function useUsage(): Resource<UsageSummary> {
   return useApiResource<UsageSummary>("/api/workspaces/current/usage");
 }
 
-export function useMembers(): Resource<TeamMember[]> {
-  const query = useApiResource<{ members: TeamMember[] }>("/api/workspaces/current/members");
-  return {
-    data: query.data?.members ?? null,
-    error: query.error,
-    loading: query.loading,
-    reload: query.reload,
-    setData: () => undefined,
-    setError: query.setError,
-  };
+export function useMembers(): Resource<TeamRoster> {
+  return useApiResource<TeamRoster>("/api/workspaces/current/members");
 }
 
 export function useNotifications(limit = 20): Resource<NotificationItem[]> {

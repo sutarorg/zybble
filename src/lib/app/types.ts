@@ -41,6 +41,8 @@ export interface Workspace {
   seats: number; // Pro: billed seats; Free: 1
   timezone: string;
   createdAt: string; // ISO
+  /** The caller's role in this workspace. */
+  role: TeamRole;
 }
 
 export interface SessionState {
@@ -161,6 +163,8 @@ export interface TopPostRow {
   postId: string;
   text: string;
   publishedAt: string | null;
+  /** LinkedIn permalink; null until the post is published. */
+  permalink: string | null;
   metrics: PostMetrics;
 }
 
@@ -222,6 +226,14 @@ export interface TeamMember {
   joinedAt: string | null;
   invitedAt: string | null;
   inviteExpiresAt: string | null;
+}
+
+/** `/api/workspaces/current/members` payload. */
+export interface TeamRoster {
+  members: TeamMember[];
+  /** The caller's role — decides whether the management controls are enabled. */
+  role: TeamRole;
+  seats: number;
 }
 
 export type SubscriptionStatus =
