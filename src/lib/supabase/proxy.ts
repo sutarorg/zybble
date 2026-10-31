@@ -20,7 +20,14 @@ import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/env";
  * the refreshed session.
  */
 
-const PROTECTED_PREFIXES = ["/dashboard", "/posts", "/calendar", "/analytics", "/settings"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/posts",
+  "/calendar",
+  "/analytics",
+  "/settings",
+  "/onboarding",
+];
 const AUTH_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 function isProtected(pathname: string): boolean {

@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Bell, Info, Loader2 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { SettingsNav } from "@/components/app/settings-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,26 +88,25 @@ export default function WorkspaceSettingsPage() {
     "/api/notifications/preferences",
   );
 
-  const [name, setName] = useState<string | null>(null);
-  const [tz, setTz] = useState<string | null>(null);
-  const [switches, setSwitches] = useState<NotificationPreferences | null>(null);
+  // Both forms are patches over the loaded values, so a reload can never
+  // overwrite an edit the user has not saved yet.
+  const [draft, setDraft] = useState<{ name?: string; timezone?: string }>({});
+  const [preferenceDraft, setPreferenceDraft] = useState<Partial<NotificationPreferences>>({});
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!workspace.data) return;
-    setName((current) => current ?? workspace.data!.workspace.name);
-    setTz((current) => current ?? workspace.data!.workspace.timezone);
-  }, [workspace.data]);
-
-  useEffect(() => {
-    if (!preferences.data) return;
-    setSwitches((current) => current ?? { ...DEFAULT_PREFERENCES, ...preferences.data!.preferences });
-  }, [preferences.data]);
-
   const canManage = workspace.data?.role === "owner" || workspace.data?.role === "admin";
-  const resolvedTz = tz ?? detectedTz;
+
+  const name = draft.name ?? workspace.data?.workspace.name ?? "";
+  const resolvedTz = draft.timezone ?? workspace.data?.workspace.timezone ?? detectedTz;
+
+  const switches: NotificationPreferences = {
+    ...DEFAULT_PREFERENCES,
+    ...(preferences.data?.preferences ?? {}),
+    ...preferenceDraft,
+  };
+
   const loading = workspace.loading || preferences.loading;
 
   async function onSave(event: FormEvent) {
@@ -117,12 +116,10 @@ export default function WorkspaceSettingsPage() {
     setNotice(null);
 
     try {
-      if (canManage && name !== null && tz !== null) {
-        await apiPatch("/api/workspaces/current", { name, timezone: tz });
+      if (canManage) {
+        await apiPatch("/api/workspaces/current", { name, timezone: resolvedTz });
       }
-      if (switches !== null) {
-        await apiPatch("/api/notifications/preferences", switches);
-      }
+      await apiPatch("/api/notifications/preferences", switches);
       setNotice("Saved.");
       workspace.reload();
       preferences.reload();
@@ -133,7 +130,7 @@ export default function WorkspaceSettingsPage() {
     }
   }
 
-  if (loading || name === null || tz === null || switches === null) {
+  if (loading || workspace.data === null || preferences.data === null) {
     return (
       <div className="mx-auto max-w-3xl">
         <SettingsNav />
@@ -181,14 +178,20 @@ export default function WorkspaceSettingsPage() {
               <Input
                 id="ws-name"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) =>
+                  setDraft((previous) => ({ ...previous, name: event.target.value }))
+                }
                 maxLength={80}
                 disabled={!canManage}
               />
             </div>
             <div>
               <Label htmlFor="ws-tz">Default timezone</Label>
-              <Select value={resolvedTz} onValueChange={setTz} disabled={!canManage}>
+              <Select
+                value={resolvedTz}
+                onValueChange={(zone) => setDraft((previous) => ({ ...previous, timezone: zone }))}
+                disabled={!canManage}
+              >
                 <SelectTrigger id="ws-tz">
                   <SelectValue />
                 </SelectTrigger>
@@ -247,9 +250,7 @@ export default function WorkspaceSettingsPage() {
                   id={`notif-${option.id}`}
                   checked={switches[option.id]}
                   onCheckedChange={(checked) =>
-                    setSwitches((previous) =>
-                      previous ? { ...previous, [option.id]: checked } : previous,
-                    )
+                    setPreferenceDraft((previous) => ({ ...previous, [option.id]: checked }))
                   }
                   aria-label={option.label}
                 />

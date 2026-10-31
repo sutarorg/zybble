@@ -45,38 +45,42 @@ export function useApiResource<T>(
   path: string | null,
   options: { params?: Record<string, string | number | boolean | undefined>; refreshMs?: number } = {},
 ): Resource<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setErrorState] = useState<string | null>(null);
-  const [loading, setLoading] = useState(Boolean(path));
   const [nonce, setNonce] = useState(0);
 
   const params = options.params;
   const paramKey = useMemo(() => JSON.stringify(params ?? {}), [params]);
   const refreshMs = options.refreshMs;
 
+  /**
+   * One result object keyed by the request it came from.
+   *
+   * `loading` is *derived* — the resource is loading until a result arrives for
+   * the current key — so no state has to be written during render or
+   * synchronously inside an effect. A background reload keeps showing the
+   * previous result rather than flashing a skeleton, which is why `nonce` is
+   * deliberately not part of the key.
+   */
+  const key = path === null ? null : `${path}?${paramKey}`;
+  const [result, setResult] = useState<{
+    key: string | null;
+    data: T | null;
+    error: string | null;
+  }>({ key: null, data: null, error: null });
+
   useEffect(() => {
-    if (!path) {
-      setLoading(false);
-      return;
-    }
+    if (key === null) return;
 
     const controller = new AbortController();
     let cancelled = false;
 
-    setLoading(true);
-
-    apiGet<T>(path, params, controller.signal)
-      .then((result) => {
+    apiGet<T>(path!, params, controller.signal)
+      .then((payload) => {
         if (cancelled) return;
-        setData(result);
-        setErrorState(null);
+        setResult({ key, data: payload, error: null });
       })
       .catch((caught: unknown) => {
         if (cancelled || (caught instanceof Error && caught.name === "AbortError")) return;
-        setErrorState(errorMessage(caught, "Could not load this data."));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setResult({ key, data: null, error: errorMessage(caught, "Could not load this data.") });
       });
 
     return () => {
@@ -84,24 +88,28 @@ export function useApiResource<T>(
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, paramKey, nonce, refreshMs]);
+  }, [key, nonce]);
 
   useEffect(() => {
-    if (!refreshMs || !path) return;
+    if (!refreshMs || key === null) return;
 
     const timer = setInterval(() => setNonce((value) => value + 1), refreshMs);
     return () => clearInterval(timer);
-  }, [refreshMs, path]);
+  }, [refreshMs, key]);
 
   const reload = useCallback(() => setNonce((value) => value + 1), []);
 
+  const matches = result.key === key;
+
   return {
-    data,
-    error,
-    loading,
+    data: matches ? result.data : null,
+    error: matches ? result.error : null,
+    loading: key !== null && !matches,
     reload,
-    setData,
-    setError: setErrorState,
+    setData: (next: T | null) =>
+      setResult((previous) => ({ key, data: next, error: previous.error })),
+    setError: (message: string | null) =>
+      setResult((previous) => ({ key, data: previous.data, error: message })),
   };
 }
 

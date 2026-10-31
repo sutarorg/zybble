@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Info, KeyRound, Loader2, MonitorSmartphone, ShieldAlert, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { SettingsNav } from "@/components/app/settings-nav";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,8 +37,9 @@ export default function AccountSettingsPage() {
 
   const profile = session.data?.profile ?? null;
 
-  const [name, setName] = useState<string | null>(null);
-  const [timezone, setTimezone] = useState<string | null>(null);
+  // The form is a patch over the loaded profile rather than a copy of it: no
+  // seeding effect, and an unsaved edit is never clobbered by a reload.
+  const [draft, setDraft] = useState<{ name?: string; timezone?: string }>({});
   const [saving, setSaving] = useState(false);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -50,17 +51,14 @@ export default function AccountSettingsPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Seed the form once the session resolves, then leave it alone.
-  useEffect(() => {
-    if (!profile) return;
-    setName((current) => current ?? profile.name ?? "");
-    setTimezone((current) => current ?? profile.timezone);
-  }, [profile]);
-
   const email = session.data?.user.email ?? "";
+
+  const name = draft.name ?? profile?.name ?? "";
+  const timezone = draft.timezone ?? profile?.timezone ?? detectedTz;
   const dirty =
     profile !== null &&
-    ((name ?? "") !== (profile.name ?? "") || (timezone ?? "") !== profile.timezone);
+    ((draft.name !== undefined && draft.name !== (profile.name ?? "")) ||
+      (draft.timezone !== undefined && draft.timezone !== profile.timezone));
 
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
@@ -71,10 +69,9 @@ export default function AccountSettingsPage() {
     try {
       const result = await apiPatch<{ profile: { name: string | null; timezone: string } }>(
         "/api/auth/profile",
-        { fullName: name ?? "", timezone: timezone ?? undefined },
+        { fullName: name, timezone },
       );
-      setName(result.profile.name ?? "");
-      setTimezone(result.profile.timezone);
+      setDraft({ name: result.profile.name ?? "", timezone: result.profile.timezone });
       setProfileNotice("Saved.");
       session.reload();
     } catch (error) {
@@ -137,7 +134,7 @@ export default function AccountSettingsPage() {
                   <Input
                     id="acct-name"
                     value={name}
-                    onChange={(event) => setName(event.target.value)}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
                     placeholder="Your name"
                     autoComplete="name"
                     maxLength={80}
@@ -158,7 +155,7 @@ export default function AccountSettingsPage() {
                 <select
                   id="acct-tz"
                   value={timezone ?? ""}
-                  onChange={(event) => setTimezone(event.target.value)}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, timezone: event.target.value }))}
                   className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-brand-600"
                 >
                   {TIMEZONE_OPTIONS.includes(detectedTz) ? null : (
