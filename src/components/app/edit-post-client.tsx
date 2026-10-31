@@ -6,14 +6,22 @@ import { PostComposer } from "@/components/app/post-composer";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useClientMounted, useLocalPosts } from "@/lib/app/hooks";
+import { useApiResource, useLinkedInAccounts, useUsage } from "@/lib/app/hooks";
+import type { DashboardPost } from "@/lib/app/types";
 
+/**
+ * Edit shell for `/posts/[postId]/edit`.
+ *
+ * Loads the post from `/api/posts/[postId]` — which is RLS-scoped, so a post
+ * from another workspace is a 404 here rather than a leaked record — and hands
+ * it to the composer, which PATCHes the same route.
+ */
 export function EditPostClient({ postId }: { postId: string }) {
-  const posts = useLocalPosts();
-  const mounted = useClientMounted();
-  const post = posts.find((p) => p.id === postId);
+  const post = useApiResource<{ post: DashboardPost }>(`/api/posts/${postId}`);
+  const accounts = useLinkedInAccounts();
+  const usage = useUsage();
 
-  if (!mounted) {
+  if (post.loading || accounts.loading || usage.loading) {
     return (
       <div className="mx-auto max-w-6xl space-y-6">
         <Skeleton className="h-72 w-full" />
@@ -22,13 +30,16 @@ export function EditPostClient({ postId }: { postId: string }) {
     );
   }
 
-  if (!post) {
+  if (post.error || post.data === null) {
     return (
       <div className="mx-auto max-w-2xl">
         <EmptyState
           icon={FileQuestion}
           title="Post not found"
-          description="This post isn't in your local preview store — it may have been deleted, or it was created on another device. Server-synced posts arrive with the backend."
+          description={
+            post.error ??
+            "This post doesn't exist in the active workspace, or it was deleted. It may belong to another workspace you're a member of — switch workspaces to edit it."
+          }
         >
           <Button asChild>
             <Link href="/posts">Back to posts</Link>
@@ -38,5 +49,11 @@ export function EditPostClient({ postId }: { postId: string }) {
     );
   }
 
-  return <PostComposer initialPost={post} />;
+  return (
+    <PostComposer
+      initialPost={post.data.post}
+      accounts={accounts.data?.connections ?? []}
+      remainingScheduleSlots={usage.data?.remaining ?? null}
+    />
+  );
 }

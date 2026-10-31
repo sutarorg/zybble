@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PostComposer } from "@/components/app/post-composer";
+import { PostComposerWithContext } from "@/components/app/composer-with-context";
 
 export const metadata: Metadata = { title: "New post" };
 
@@ -9,5 +9,5 @@ export default async function NewPostPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
-  return <PostComposer initialDate={date} />;
+  return <PostComposerWithContext initialDate={date} />;
 }

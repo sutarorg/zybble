@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# Environment (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Testing / coverage
+coverage/
+.vitest/
+
+# Editors & OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+*.log
+
+# Supabase local state
+.supabase/
+supabase/.temp/
