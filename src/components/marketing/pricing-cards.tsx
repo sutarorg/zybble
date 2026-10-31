@@ -120,6 +120,7 @@ export function PricingSection() {
         <Reveal>
           <SectionHeading
             eyebrow="Pricing"
+            headingId="pricing-heading"
             title="Start free. Upgrade when consistency pays off."
             description="Two plans, no tiers to decode, no credit card to begin. Pro is $15 per seat per month — cancel anytime."
           />

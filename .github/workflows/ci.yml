@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["main"]
+
+# A second push to the same branch should cancel the first run rather than
+# queue up behind it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The build must never depend on a real secret. Every integration reports
+  # itself unconfigured and the UI degrades to a capability-gated state, which
+  # is exactly what a CI build should prove.
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  TOKEN_ENCRYPTION_KEY: ci-only-not-a-real-key-0000000000000000=
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  unit:
+    name: Unit and integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # tests/db/* runs real Postgres (PGlite) and asserts the migrations apply
+      # in order and that RLS actually isolates tenants.
+      - run: npm test
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: .next
+          retention-days: 3
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Fails the build on high or critical advisories in production
+      # dependencies. Moderate findings are reported, not blocked, because
+      # transitive noise otherwise makes the gate meaningless.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Report all advisories
+        if: always()
+        run: npm audit --omit=dev || true
+
+  e2e:
+    name: End-to-end (public surface)
+    runs-on: ubuntu-latest
+    # E2E needs the build, but should not block a quick feedback loop on lint.
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Without E2E_REAL_BACKEND the authenticated suites skip themselves and
+      # only the public surface is exercised. See DEPLOYMENT.md §K for how to
+      # run the full suite against a staging project.
+      - run: npm run test:e2e
+        env:
+          E2E_REAL_BACKEND: ${{ secrets.E2E_REAL_BACKEND }}
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: .playwright/report
+          retention-days: 7

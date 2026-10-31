@@ -34,6 +34,7 @@ export function HowItWorks() {
         <Reveal>
           <SectionHeading
             eyebrow="How Zybble works"
+            headingId="how-heading"
             title="From idea to insight in three steps"
             description="A setup you finish in minutes, then a weekly rhythm that keeps your LinkedIn presence consistent."
           />
@@ -45,22 +46,23 @@ export function HowItWorks() {
             aria-hidden
             className="absolute left-0 right-0 top-7 hidden border-t border-dashed border-slate-300 lg:block"
           />
+          {/* `as="li"` makes Reveal itself the list item. Wrapping another
+              <li> inside it produced <li> inside <li>, which is invalid and
+              left the inner items outside any list for assistive tech. */}
           {steps.map((step, i) => (
-            <Reveal as="li" key={step.step} delay={i * 120}>
-              <li className="relative">
-                <div className="flex items-center gap-4">
-                  <span className="relative z-10 flex size-14 items-center justify-center rounded-2xl bg-white text-brand-600 shadow-soft ring-1 ring-slate-200">
-                    <step.icon className="size-6" aria-hidden />
-                  </span>
-                  <span className="text-sm font-semibold tabular-nums text-slate-400">
-                    {step.step}
-                  </span>
-                </div>
-                <h3 className="mt-5 text-lg font-semibold tracking-tight text-slate-900">
-                  {step.title}
-                </h3>
-                <p className="mt-2 max-w-sm text-[15px] leading-7 text-slate-600">{step.copy}</p>
-              </li>
+            <Reveal as="li" key={step.step} delay={i * 120} className="relative">
+              <div className="flex items-center gap-4">
+                <span className="relative z-10 flex size-14 items-center justify-center rounded-2xl bg-white text-brand-600 shadow-soft ring-1 ring-slate-200">
+                  <step.icon className="size-6" aria-hidden />
+                </span>
+                <span className="text-sm font-semibold tabular-nums text-slate-500">
+                  {step.step}
+                </span>
+              </div>
+              <h3 className="mt-5 text-lg font-semibold tracking-tight text-slate-900">
+                {step.title}
+              </h3>
+              <p className="mt-2 max-w-sm text-[15px] leading-7 text-slate-600">{step.copy}</p>
             </Reveal>
           ))}
         </ol>

@@ -93,6 +93,7 @@ export function FeatureBento() {
         <Reveal>
           <SectionHeading
             eyebrow="Core features"
+            headingId="features-heading"
             title="Everything LinkedIn growth needs. Nothing it doesn't."
             description="Zybble deliberately does one job. Every screen exists to help you publish consistently and learn from the results."
           />

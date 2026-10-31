@@ -2,17 +2,18 @@
 
 import { format, isAfter } from "date-fns";
 import {
+  AlertTriangle,
   CalendarClock,
   FileText,
   Film,
   Globe2,
   ImageIcon,
-  Info,
+  Loader2,
   Save,
+  Send,
   ThumbsUp,
   MessageCircle,
   Repeat2,
-  Send,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,15 +31,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Tooltip } from "@/components/ui/tooltip";
+import { ConnectLinkedInDialog } from "@/components/app/connect-linkedin-dialog";
+import { apiPatch, apiPost, apiUpload, errorMessage } from "@/lib/api/client";
 import { useLocalTimezone } from "@/lib/app/hooks";
-import { createLocalPost, updateLocalPost, type LocalPost } from "@/lib/app/local-posts";
+import type { DashboardPost, LinkedInAccount, MediaAssetRef } from "@/lib/app/types";
 import { cn } from "@/lib/utils";
+
+/**
+ * Post composer.
+ *
+ * Writes go straight to `/api/posts` (create) or `/api/posts/[id]` (update);
+ * files are uploaded to private storage first and attached by id, so a post row
+ * and its media can never disagree. The wall-clock date/time plus the chosen
+ * IANA zone are sent as typed fields — the server resolves the UTC instant, so
+ * DST is handled where the timezone database lives rather than in the browser.
+ */
 
 const LINKEDIN_MAX_CHARS = 3000;
 const MAX_IMAGES = 9;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // LinkedIn image uploads: 5 MB
-const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024;
+
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif"];
 
 const TIMEZONES = [
   "UTC",
@@ -47,164 +62,315 @@ const TIMEZONES = [
   "America/New_York",
   "America/Chicago",
   "America/Los_Angeles",
+  "Asia/Kolkata",
   "Asia/Singapore",
   "Asia/Tokyo",
   "Australia/Sydney",
 ];
 
-interface PendingMedia {
-  id: string;
-  file: File;
-  previewUrl: string;
-}
+type PendingMedia = {
+  assetId: string;
+  kind: MediaAssetRef["kind"];
+  name: string;
+  bytes: number;
+  url: string | null;
+  uploading: boolean;
+};
 
-interface ComposerErrors {
+type ComposerErrors = {
   text?: string;
   media?: string;
   schedule?: string;
-}
+  account?: string;
+  form?: string;
+};
 
-interface PostComposerProps {
-  /** Present in edit mode — the local preview post being edited. */
-  initialPost?: LocalPost;
+export type PostComposerProps = {
+  /** Present in edit mode. */
+  initialPost?: DashboardPost;
   /** "yyyy-MM-dd" prefill from calendar day clicks. */
   initialDate?: string;
-}
+  /** Connected accounts that can publish. */
+  accounts: LinkedInAccount[];
+  /** Remaining Free-plan slots; null on Pro. */
+  remainingScheduleSlots: number | null;
+};
 
-/**
- * Post composer — fully interactive, saved to the local preview store only.
- * Every action is labelled as local; nothing claims to hit a server.
- */
-export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
+export function PostComposer({
+  initialPost,
+  initialDate,
+  accounts,
+  remainingScheduleSlots,
+}: PostComposerProps) {
   const router = useRouter();
   const detectedTz = useLocalTimezone();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+
+  const publishable = accounts.filter((account) => account.canPublish && account.status === "active");
 
   const [text, setText] = useState(initialPost?.text ?? "");
-  const [media, setMedia] = useState<PendingMedia[]>([]);
-  const preexistingMedia = initialPost?.media ?? [];
+  const [media, setMedia] = useState<PendingMedia[]>(
+    (initialPost?.media ?? []).map((asset) => ({
+      assetId: asset.id,
+      kind: asset.kind,
+      name: asset.name,
+      bytes: asset.bytes,
+      url: asset.url,
+      uploading: false,
+    })),
+  );
   const [intent, setIntent] = useState<"draft" | "schedule">(
     initialPost?.status === "scheduled" ? "schedule" : "draft",
   );
-  const [date, setDate] = useState(
-    initialPost?.scheduledAt?.slice(0, 10) ?? initialDate ?? "",
+  const [authorAccountId, setAuthorAccountId] = useState(
+    initialPost?.authorAccountId ?? publishable[0]?.id ?? "",
   );
+  const [date, setDate] = useState(initialPost?.scheduledAt?.slice(0, 10) ?? initialDate ?? "");
   const [time, setTime] = useState(
     initialPost?.scheduledAt ? format(new Date(initialPost.scheduledAt), "HH:mm") : "09:30",
   );
   const [timezone, setTimezone] = useState(initialPost?.timezone ?? "");
   const [errors, setErrors] = useState<ComposerErrors>({});
-  const [saved, setSaved] = useState<{ status: "draft" | "scheduled"; id: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<{
+    status: "draft" | "scheduled";
+    id: string;
+    scheduledAt: string | null;
+    warning: string | null;
+  } | null>(null);
+  // Generated once per mount so a double-submitted form creates one post.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
-  const resolvedTz = timezone || detectedTz;
+  const resolvedTz = timezone || initialPost?.timezone || detectedTz;
   const charCount = text.length;
+  const uploading = media.some((asset) => asset.uploading);
 
   const scheduledInstant = useMemo(() => {
     if (!date || !time) return null;
-    // Interpret the wall time in the chosen timezone via a trick: build a
-    // local Date, then note the tz label for the backend in Prompt 3.
     const [h, m] = time.split(":").map(Number);
-    const d = new Date(`${date}T00:00:00`);
-    if (Number.isNaN(d.getTime())) return null;
-    d.setHours(h, m, 0, 0);
-    return d;
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    const local = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(local.getTime())) return null;
+    local.setHours(h, m, 0, 0);
+    return local;
   }, [date, time]);
 
   function validate(): boolean {
     const next: ComposerErrors = {};
-    if (!text.trim() && media.length === 0 && preexistingMedia.length === 0) {
-      next.text = "Write something — or attach at least one image.";
+
+    if (!text.trim() && media.length === 0) {
+      next.text = "Write something — or attach an image, video or document.";
     } else if (charCount > LINKEDIN_MAX_CHARS) {
       next.text = `LinkedIn posts are limited to ${LINKEDIN_MAX_CHARS.toLocaleString()} characters.`;
     }
+
+    if (!authorAccountId) {
+      next.account = "Connect a LinkedIn account to publish through before saving.";
+    }
+
+    if (uploading) {
+      next.media = "Wait for the uploads to finish.";
+    }
+
     if (intent === "schedule") {
       if (!scheduledInstant) {
         next.schedule = "Pick a date and time for this post.";
       } else if (!isAfter(scheduledInstant, new Date())) {
         next.schedule = "Scheduled time must be in the future.";
+      } else if (remainingScheduleSlots !== null && remainingScheduleSlots <= 0 && !initialPost) {
+        next.schedule =
+          "You have used all scheduled posts included in the Free plan this month. Upgrade to Pro for unlimited scheduling.";
       }
     }
+
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  function save() {
+  async function save(publishNow = false) {
     if (!validate()) return;
+
+    setSaving(true);
+    setErrors({});
+
     const payload = {
-      text: text.trim(),
-      media: [
-        ...preexistingMedia,
-        ...media.map((m) => ({ id: m.id, name: m.file.name, mimeType: m.file.type, bytes: m.file.size })),
-      ],
-      scheduledAt: intent === "schedule" && scheduledInstant ? scheduledInstant.toISOString() : null,
-      timezone: intent === "schedule" ? resolvedTz : null,
+      authorAccountId,
+      body: text.trim(),
+      timezone: resolvedTz,
+      mediaAssetIds: media.map((asset) => asset.assetId),
+      intent: publishNow ? ("publish_now" as const) : intent === "schedule" ? ("schedule" as const) : ("draft" as const),
+      ...(intent === "schedule" && !publishNow
+        ? { scheduleDate: date, scheduleTime: time }
+        : {}),
+      ...(initialPost ? {} : { idempotencyKey }),
     };
-    const result = initialPost
-      ? (updateLocalPost(initialPost.id, { ...payload, status: intent === "schedule" ? "scheduled" : "draft" }),
-        initialPost.id)
-      : createLocalPost({ ...payload, status: intent === "schedule" ? "scheduled" : "draft" }).id;
-    setSaved({ status: intent === "schedule" ? "scheduled" : "draft", id: result });
+
+    try {
+      const result = initialPost
+        ? await apiPatch<{ post: DashboardPost; warning: string | null }>(
+            `/api/posts/${initialPost.id}`,
+            payload,
+          )
+        : await apiPost<{ post: DashboardPost; warning: string | null }>("/api/posts", payload);
+
+      setSaved({
+        status: result.post.status === "published" ? "scheduled" : (result.post.status as "draft" | "scheduled"),
+        id: result.post.id,
+        scheduledAt: result.post.scheduledAt,
+        warning: result.warning,
+      });
+      router.refresh();
+    } catch (error) {
+      setErrors({ form: errorMessage(error, "Could not save this post.") });
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function onFilesPicked(files: FileList | null) {
+  async function uploadFiles(files: FileList | null, kind: "image" | "video" | "document") {
     if (!files?.length) return;
-    const incoming = Array.from(files);
+
     const problems: string[] = [];
-    const accepted: PendingMedia[] = [];
-    for (const file of incoming) {
-      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-        problems.push(`${file.name}: only PNG, JPEG, GIF or WebP images (LinkedIn's supported image formats).`);
-        continue;
+    const accepted: File[] = [];
+
+    for (const file of Array.from(files)) {
+      if (kind === "image") {
+        if (!IMAGE_TYPES.includes(file.type)) {
+          problems.push(`${file.name}: LinkedIn accepts JPG, PNG or GIF images.`);
+          continue;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+          problems.push(`${file.name}: images must be under 5 MB.`);
+          continue;
+        }
       }
-      if (file.size > MAX_IMAGE_BYTES) {
-        problems.push(`${file.name}: images must be under 5 MB.`);
-        continue;
+
+      if (kind === "video") {
+        if (file.type !== "video/mp4") {
+          problems.push(`${file.name}: LinkedIn accepts MP4 video.`);
+          continue;
+        }
+        if (file.size > MAX_VIDEO_BYTES) {
+          problems.push(`${file.name}: video must be under 200 MB.`);
+          continue;
+        }
+        if (media.some((asset) => asset.kind !== "image")) {
+          problems.push("A post carries either one video, one document, or up to 9 images.");
+          continue;
+        }
       }
-      accepted.push({ id: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) });
+
+      if (kind === "document") {
+        if (file.type !== "application/pdf") {
+          problems.push(`${file.name}: documents must be PDF.`);
+          continue;
+        }
+        if (file.size > MAX_DOCUMENT_BYTES) {
+          problems.push(`${file.name}: documents must be under 100 MB.`);
+          continue;
+        }
+        if (media.some((asset) => asset.kind !== "image")) {
+          problems.push("A post carries either one video, one document, or up to 9 images.");
+          continue;
+        }
+      }
+
+      accepted.push(file);
     }
-    if (media.length + preexistingMedia.length + accepted.length > MAX_IMAGES) {
+
+    if (kind === "image" && media.filter((asset) => asset.kind === "image").length + accepted.length > MAX_IMAGES) {
       problems.push(`LinkedIn allows up to ${MAX_IMAGES} images per post.`);
-    } else if (accepted.length) {
-      setMedia((prev) => [...prev, ...accepted]);
     }
-    if (problems.length) setErrors((e) => ({ ...e, media: problems.join(" ") }));
-    else setErrors((e) => ({ ...e, media: undefined }));
+
+    if (problems.length > 0) {
+      setErrors((previous) => ({ ...previous, media: problems.join(" ") }));
+      return;
+    }
+
+    setErrors((previous) => ({ ...previous, media: undefined }));
+
+    for (const file of accepted) {
+      const placeholderId = crypto.randomUUID();
+      setMedia((previous) => [
+        ...previous,
+        { assetId: placeholderId, kind, name: file.name, bytes: file.size, url: null, uploading: true },
+      ]);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const uploaded = await apiUpload<{ asset: MediaAssetRef }>("/api/posts/media", formData);
+        setMedia((previous) =>
+          previous.map((asset) =>
+            asset.assetId === placeholderId
+              ? {
+                  assetId: uploaded.asset.id,
+                  kind: uploaded.asset.kind,
+                  name: uploaded.asset.name,
+                  bytes: uploaded.asset.bytes,
+                  url: uploaded.asset.url,
+                  uploading: false,
+                }
+              : asset,
+          ),
+        );
+      } catch (error) {
+        setMedia((previous) => previous.filter((asset) => asset.assetId !== placeholderId));
+        setErrors((previous) => ({
+          ...previous,
+          media: errorMessage(error, `Could not upload ${file.name}.`),
+        }));
+      }
+    }
   }
 
-  function removeMedia(id: string) {
-    setMedia((prev) => {
-      const target = prev.find((m) => m.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return prev.filter((m) => m.id !== id);
-    });
+  function removeMedia(assetId: string) {
+    setMedia((previous) => previous.filter((asset) => asset.assetId !== assetId));
   }
 
   const tzOptions = TIMEZONES.includes(resolvedTz) ? TIMEZONES : [resolvedTz, ...TIMEZONES];
 
   /* ------------------------------- success ------------------------------- */
   if (saved) {
+    const scheduled = saved.status === "scheduled";
+
     return (
       <div className="mx-auto max-w-2xl">
         <div className="rounded-2xl bg-white p-10 text-center ring-1 ring-slate-200 shadow-xs">
           <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
-            {saved.status === "scheduled" ? (
-              <CalendarClock className="size-5" aria-hidden />
-            ) : (
-              <Save className="size-5" aria-hidden />
-            )}
+            {scheduled ? <CalendarClock className="size-5" aria-hidden /> : <Save className="size-5" aria-hidden />}
           </span>
           <h2 className="mt-4 text-xl font-semibold tracking-tight text-slate-950">
-            {saved.status === "scheduled" ? "Scheduled — locally" : "Draft saved — locally"}
+            {scheduled ? "Scheduled" : "Draft saved"}
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
-            This {saved.status === "scheduled" ? "post is on your calendar" : "draft is in Posts"}{" "}
-            as a <strong className="font-medium">browser-local preview</strong>. Server sync,
-            real queueing and LinkedIn publishing activate when the backend ships.
+            {scheduled && saved.scheduledAt ? (
+              <>
+                This post is queued for{" "}
+                <strong className="font-medium">
+                  {format(new Date(saved.scheduledAt), "EEEE d MMMM 'at' HH:mm")}
+                </strong>{" "}
+                ({resolvedTz}). Zybble publishes it through the LinkedIn API at that moment — no
+                browser tab required.
+              </>
+            ) : (
+              "The draft is saved in your workspace. Schedule it whenever you are ready."
+            )}
           </p>
+
+          {saved.warning && (
+            <p className="mx-auto mt-4 max-w-md rounded-xl bg-amber-50 px-4 py-3 text-[13px] leading-6 text-amber-900 ring-1 ring-amber-200">
+              {saved.warning}
+            </p>
+          )}
+
           <div className="mt-7 flex flex-wrap justify-center gap-2.5">
             <Button asChild>
-              <Link href={saved.status === "scheduled" ? "/calendar" : "/posts"}>
-                {saved.status === "scheduled" ? "View in calendar" : "View drafts"}
+              <Link href={scheduled ? "/calendar" : "/posts"}>
+                {scheduled ? "View in calendar" : "View drafts"}
               </Link>
             </Button>
             <Button
@@ -213,10 +379,7 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
                 setSaved(null);
                 if (!initialPost) {
                   setText("");
-                  setMedia((prev) => {
-                    prev.forEach((m) => URL.revokeObjectURL(m.previewUrl));
-                    return [];
-                  });
+                  setMedia([]);
                   setErrors({});
                 }
               }}
@@ -233,14 +396,29 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
   return (
     <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="space-y-6">
+        {publishable.length === 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+            <AlertTriangle className="size-5 shrink-0 text-amber-600" aria-hidden />
+            <p className="min-w-0 flex-1 text-[13px] leading-6 text-amber-900">
+              No LinkedIn account with publishing permission is connected yet. Connect one to save
+              and schedule posts.
+            </p>
+            <ConnectLinkedInDialog>
+              <Button size="sm">Connect LinkedIn</Button>
+            </ConnectLinkedInDialog>
+          </div>
+        )}
+
         {/* Editor card */}
         <section aria-label="Post editor" className="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-xs">
           <div className="flex items-center justify-between">
-            <Label htmlFor="composer-text" className="!mb-0">Post text</Label>
+            <Label htmlFor="composer-text" className="!mb-0">
+              Post text
+            </Label>
             <span
               className={cn(
                 "text-xs tabular-nums",
-                charCount > LINKEDIN_MAX_CHARS ? "font-semibold text-red-600" : "text-slate-400",
+                charCount > LINKEDIN_MAX_CHARS ? "font-semibold text-red-600" : "text-slate-500",
               )}
               aria-live="polite"
             >
@@ -250,7 +428,7 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
           <Textarea
             id="composer-text"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(event) => setText(event.target.value)}
             rows={9}
             placeholder="Share a lesson, a take, a question… Write it once and schedule it for when your audience is actually reading."
             aria-invalid={Boolean(errors.text)}
@@ -269,40 +447,66 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => imageInputRef.current?.click()}
             >
               <ImageIcon aria-hidden />
-              Add images
+              Images
             </Button>
             <input
-              ref={fileInputRef}
+              ref={imageInputRef}
               type="file"
-              accept={ACCEPTED_IMAGE_TYPES.join(",")}
+              accept={IMAGE_TYPES.join(",")}
               multiple
               className="sr-only"
               aria-label="Upload images"
-              onChange={(e) => {
-                onFilesPicked(e.target.files);
-                e.target.value = "";
+              onChange={(event) => {
+                void uploadFiles(event.target.files, "image");
+                event.target.value = "";
               }}
             />
-            <Tooltip content="Video uploads require LinkedIn video API approval — enabled when the backend ships.">
-              <span className="inline-flex">
-                <Button type="button" variant="ghost" size="sm" disabled>
-                  <Film aria-hidden />
-                  Video
-                </Button>
-              </span>
-            </Tooltip>
-            <Tooltip content="Document carousels require LinkedIn document API approval — enabled when the backend ships.">
-              <span className="inline-flex">
-                <Button type="button" variant="ghost" size="sm" disabled>
-                  <FileText aria-hidden />
-                  Document
-                </Button>
-              </span>
-            </Tooltip>
-            <span className="ml-auto text-xs text-slate-400">PNG, JPEG, GIF, WebP · max 5 MB · up to 9</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => videoInputRef.current?.click()}
+            >
+              <Film aria-hidden />
+              Video
+            </Button>
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4"
+              className="sr-only"
+              aria-label="Upload a video"
+              onChange={(event) => {
+                void uploadFiles(event.target.files, "video");
+                event.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => documentInputRef.current?.click()}
+            >
+              <FileText aria-hidden />
+              Document
+            </Button>
+            <input
+              ref={documentInputRef}
+              type="file"
+              accept="application/pdf"
+              className="sr-only"
+              aria-label="Upload a document"
+              onChange={(event) => {
+                void uploadFiles(event.target.files, "document");
+                event.target.value = "";
+              }}
+            />
+            <span className="ml-auto text-xs text-slate-500">
+              JPG/PNG/GIF ≤ 5 MB · MP4 ≤ 200 MB · PDF ≤ 100 MB
+            </span>
           </div>
           {errors.media && (
             <p role="alert" className="mt-2 text-sm text-red-600">
@@ -311,33 +515,49 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
           )}
 
           {/* Media previews */}
-          {(media.length > 0 || preexistingMedia.length > 0) && (
+          {media.length > 0 && (
             <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {preexistingMedia.map((m) => (
-                <li key={m.id} className="relative overflow-hidden rounded-xl ring-1 ring-slate-200">
+              {media.map((asset) => (
+                <li
+                  key={asset.assetId}
+                  className="group relative overflow-hidden rounded-xl ring-1 ring-slate-200"
+                >
                   <div className="flex aspect-[4/3] flex-col items-center justify-center bg-slate-50 p-3 text-center">
-                    <ImageIcon className="size-5 text-slate-300" aria-hidden />
-                    <p className="mt-2 line-clamp-2 break-all text-[11px] text-slate-500">{m.name}</p>
-                    <p className="mt-1 text-[10px] text-slate-400">preview from earlier session</p>
+                    {asset.uploading ? (
+                      <Loader2 className="size-5 animate-spin text-brand-600" aria-hidden />
+                    ) : asset.kind === "image" && asset.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={asset.url}
+                        alt={`Preview of ${asset.name}`}
+                        className="aspect-[4/3] w-full object-cover"
+                      />
+                    ) : (
+                      <>
+                        {asset.kind === "video" ? (
+                          <Film className="size-5 text-slate-300" aria-hidden />
+                        ) : (
+                          <FileText className="size-5 text-slate-300" aria-hidden />
+                        )}
+                        <p className="mt-2 line-clamp-2 break-all text-[11px] text-slate-500">
+                          {asset.name}
+                        </p>
+                      </>
+                    )}
+                    {asset.uploading && (
+                      <p className="mt-2 text-[10px] text-slate-500">Uploading…</p>
+                    )}
                   </div>
-                </li>
-              ))}
-              {media.map((m) => (
-                <li key={m.id} className="group relative overflow-hidden rounded-xl ring-1 ring-slate-200">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={m.previewUrl}
-                    alt={`Preview of ${m.file.name}`}
-                    className="aspect-[4/3] w-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeMedia(m.id)}
-                    aria-label={`Remove ${m.file.name}`}
-                    className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-slate-950/70 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white"
-                  >
-                    <X className="size-3.5" aria-hidden />
-                  </button>
+                  {!asset.uploading && (
+                    <button
+                      type="button"
+                      onClick={() => removeMedia(asset.assetId)}
+                      aria-label={`Remove ${asset.name}`}
+                      className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-slate-950/70 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white"
+                    >
+                      <X className="size-3.5" aria-hidden />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -346,7 +566,35 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
 
         {/* Intent + schedule card */}
         <section aria-label="Publish options" className="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-xs">
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1" role="group" aria-label="Save as draft or schedule">
+          {publishable.length > 0 && (
+            <div className="mb-5">
+              <Label htmlFor="author-account">Publish through</Label>
+              <Select value={authorAccountId} onValueChange={setAuthorAccountId}>
+                <SelectTrigger id="author-account" aria-label="LinkedIn account">
+                  <SelectValue placeholder="Choose an account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {publishable.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.displayName ?? account.profileUrn}
+                      {account.canReadAnalytics ? "" : " · publishing only"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.account && (
+                <p role="alert" className="mt-2 text-sm text-red-600">
+                  {errors.account}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div
+            className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1"
+            role="group"
+            aria-label="Save as draft or schedule"
+          >
             {(
               [
                 { id: "draft", label: "Save as draft", icon: Save },
@@ -381,7 +629,7 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
                     type="date"
                     value={date}
                     min={format(new Date(), "yyyy-MM-dd")}
-                    onChange={(e) => setDate(e.target.value)}
+                    onChange={(event) => setDate(event.target.value)}
                     aria-invalid={Boolean(errors.schedule)}
                   />
                 </div>
@@ -391,7 +639,7 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
                     id="schedule-time"
                     type="time"
                     value={time}
-                    onChange={(e) => setTime(e.target.value)}
+                    onChange={(event) => setTime(event.target.value)}
                     aria-invalid={Boolean(errors.schedule)}
                   />
                 </div>
@@ -403,9 +651,9 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
                     <SelectValue placeholder="Timezone" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tzOptions.map((tz) => (
-                      <SelectItem key={tz} value={tz}>
-                        {tz === detectedTz ? `${tz} (detected)` : tz}
+                    {tzOptions.map((zone) => (
+                      <SelectItem key={zone} value={zone}>
+                        {zone === detectedTz ? `${zone} (detected)` : zone}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -414,6 +662,11 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
                   <p className="mt-2.5 flex items-center gap-1.5 text-[13px] text-slate-500">
                     <Globe2 className="size-3.5" aria-hidden />
                     Publishes {format(scheduledInstant, "EEEE d MMMM yyyy 'at' HH:mm")} ({resolvedTz})
+                  </p>
+                )}
+                {remainingScheduleSlots !== null && !initialPost && (
+                  <p className="mt-2 text-[13px] text-slate-500">
+                    {remainingScheduleSlots} of 10 Free-plan scheduled posts left this month.
                   </p>
                 )}
                 {errors.schedule && (
@@ -425,28 +678,45 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
             </div>
           )}
 
+          {errors.form && (
+            <p role="alert" className="mt-4 text-sm text-red-600">
+              {errors.form}
+            </p>
+          )}
+
           <div className="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
-            <Button size="lg" onClick={save} className="sm:min-w-36">
-              {intent === "schedule" ? (
-                <>
-                  <CalendarClock aria-hidden />
-                  Schedule post
-                </>
+            <Button size="lg" onClick={() => void save(false)} disabled={saving} className="sm:min-w-36">
+              {saving ? (
+                <Loader2 className="animate-spin" aria-hidden />
+              ) : intent === "schedule" ? (
+                <CalendarClock aria-hidden />
               ) : (
-                <>
-                  <Save aria-hidden />
-                  Save draft
-                </>
+                <Save aria-hidden />
               )}
+              {intent === "schedule" ? "Schedule post" : "Save draft"}
             </Button>
+
+            {initialPost && initialPost.status !== "published" && (
+              <Button
+                variant="secondary"
+                size="lg"
+                disabled={saving || uploading}
+                onClick={() => void save(true)}
+              >
+                <Send aria-hidden />
+                Publish now
+              </Button>
+            )}
+
             {initialPost && (
               <Button variant="ghost" size="lg" onClick={() => router.push("/posts")}>
                 Cancel
               </Button>
             )}
-            <p className="flex items-start gap-1.5 text-xs leading-5 text-slate-400 sm:ml-auto sm:max-w-56">
-              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              Preview mode: saved to this browser only — nothing leaves your device yet.
+
+            <p className="text-xs leading-5 text-slate-500 sm:ml-auto sm:max-w-56">
+              The server converts this wall time to a UTC instant, so daylight saving is handled
+              correctly.
             </p>
           </div>
         </section>
@@ -461,12 +731,17 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
         <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-soft">
           <div className="flex items-start gap-3 p-4">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
-              You
+              {(publishable.find((account) => account.id === authorAccountId)?.displayName ?? "You")
+                .slice(0, 2)
+                .toUpperCase()}
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900">Your name</p>
+              <p className="text-sm font-semibold text-slate-900">
+                {publishable.find((account) => account.id === authorAccountId)?.displayName ??
+                  "Your LinkedIn name"}
+              </p>
               <p className="truncate text-xs text-slate-500">Your headline on LinkedIn</p>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-400">
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                 {intent === "schedule" && scheduledInstant
                   ? format(scheduledInstant, "d MMM · HH:mm")
                   : "Now"}{" "}
@@ -482,16 +757,17 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
             ) : (
               <p className="text-sm italic text-slate-300">Your post text appears here as you type…</p>
             )}
-            {charCount > 240 && (
-              <span className="text-sm font-medium text-slate-400">…more</span>
-            )}
+            {charCount > 240 && <span className="text-sm font-medium text-slate-500">…more</span>}
           </div>
           {media.length > 0 && (
             <div className={cn("grid gap-0.5", media.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
-              {media.slice(0, 4).map((m) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={m.id} src={m.previewUrl} alt="" className="h-40 w-full object-cover" />
-              ))}
+              {media
+                .filter((asset) => asset.kind === "image" && asset.url)
+                .slice(0, 4)
+                .map((asset) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={asset.assetId} src={asset.url!} alt="" className="h-40 w-full object-cover" />
+                ))}
             </div>
           )}
           <div className="flex items-center justify-between border-t border-slate-100 px-2 py-1.5">
@@ -500,10 +776,13 @@ export function PostComposer({ initialPost, initialDate }: PostComposerProps) {
               { icon: MessageCircle, label: "Comment" },
               { icon: Repeat2, label: "Repost" },
               { icon: Send, label: "Send" },
-            ].map((a) => (
-              <span key={a.label} className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-slate-500">
-                <a.icon className="size-4" aria-hidden />
-                <span className="hidden sm:inline">{a.label}</span>
+            ].map((action) => (
+              <span
+                key={action.label}
+                className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-slate-500"
+              >
+                <action.icon className="size-4" aria-hidden />
+                <span className="hidden sm:inline">{action.label}</span>
               </span>
             ))}
           </div>

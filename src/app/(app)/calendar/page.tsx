@@ -11,17 +11,22 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { CalendarPlus, ChevronLeft, ChevronRight, Globe2, Save } from "lucide-react";
+import { AlertTriangle, CalendarPlus, ChevronLeft, ChevronRight, Globe2, Save } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ScheduleDialog } from "@/components/app/schedule-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useClientMounted, useLocalPosts, useLocalTimezone } from "@/lib/app/hooks";
-import type { LocalPost } from "@/lib/app/local-posts";
+import {
+  useApiResource,
+  useLinkedInAccounts,
+  useLocalTimezone,
+  usePosts,
+  useUsage,
+} from "@/lib/app/hooks";
+import type { CalendarPost } from "@/lib/app/types";
 import { cn } from "@/lib/utils";
 
 const WEEK_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -30,44 +35,62 @@ function dayKey(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
 
-function groupByDay(posts: LocalPost[]) {
-  const map = new Map<string, LocalPost[]>();
-  for (const post of posts) {
-    if (!post.scheduledAt) continue;
-    const key = dayKey(new Date(post.scheduledAt));
-    map.set(key, [...(map.get(key) ?? []), post]);
+function groupByDay(days: Record<string, CalendarPost[]>) {
+  const map = new Map<string, CalendarPost[]>();
+  for (const [key, posts] of Object.entries(days)) {
+    map.set(key, posts);
   }
   return map;
 }
 
-function PostChip({ post, onOpen }: { post: LocalPost; onOpen: () => void }) {
+function PostChip({ post, onOpen }: { post: CalendarPost; onOpen: () => void }) {
+  const failed = post.status === "failed";
+
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="group/chip block w-full truncate rounded-md bg-brand-600 px-2 py-1 text-left text-[11px] font-medium text-white shadow-xs transition hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
-      title={post.text}
+      className={cn(
+        "group/chip block w-full truncate rounded-md px-2 py-1 text-left text-[11px] font-medium text-white shadow-xs transition focus-visible:outline-2 focus-visible:outline-brand-600",
+        failed ? "bg-red-600 hover:bg-red-700" : "bg-brand-600 hover:bg-brand-700",
+      )}
+      title={failed ? `Failed: ${post.failureReason ?? "unknown error"}` : post.text}
     >
-      <span className="tabular-nums">{post.scheduledAt ? format(new Date(post.scheduledAt), "HH:mm") : ""}</span>{" "}
-      <span className="opacity-90">{post.text.slice(0, 24) || "Untitled"}</span>
+      <span className="tabular-nums">{post.localTime ?? ""}</span>{" "}
+      <span className="opacity-90">
+        {failed ? "Failed — retry" : post.text.slice(0, 24) || "Untitled"}
+      </span>
     </button>
   );
 }
 
 export default function CalendarPage() {
   const router = useRouter();
-  const posts = useLocalPosts();
-  const mounted = useClientMounted();
   const tz = useLocalTimezone();
   const [view, setView] = useState<"month" | "week">("month");
   const [cursor, setCursor] = useState<Date>(() => new Date());
   const [pickedDay, setPickedDay] = useState<Date | null>(null);
 
-  const byDay = useMemo(
-    () => groupByDay(posts.filter((p) => p.status === "scheduled")),
-    [posts],
-  );
-  const drafts = posts.filter((p) => p.status === "draft");
+  const accounts = useLinkedInAccounts();
+  const usage = useUsage();
+  const drafts = usePosts({ status: "draft", limit: 50 });
+
+  const range = useMemo(() => {
+    if (view === "month") {
+      const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 });
+      return { from: format(start, "yyyy-MM-dd"), to: format(addDays(start, 41), "yyyy-MM-dd") };
+    }
+    const start = startOfWeek(cursor, { weekStartsOn: 1 });
+    return { from: format(start, "yyyy-MM-dd"), to: format(addDays(start, 6), "yyyy-MM-dd") };
+  }, [view, cursor]);
+
+  // Server buckets each post into an IANA-local calendar day, so a 23:30 IST
+  // post is not shown under the wrong date for a viewer in another zone.
+  const calendar = useApiResource<{ days: Record<string, CalendarPost[]> }>("/api/calendar", {
+    params: { from: range.from, to: range.to, timezone: tz },
+  });
+
+  const byDay = useMemo(() => groupByDay(calendar.data?.days ?? {}), [calendar.data]);
 
   const monthDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 });
@@ -88,7 +111,7 @@ export default function CalendarPage() {
       ? format(cursor, "MMMM yyyy")
       : `${format(weekDays[0], "d MMM")} – ${format(weekDays[6], "d MMM yyyy")}`;
 
-  if (!mounted) {
+  if (calendar.loading) {
     return (
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex items-center justify-between">
@@ -96,6 +119,20 @@ export default function CalendarPage() {
           <Skeleton className="h-9 w-40" />
         </div>
         <Skeleton className="h-[520px] w-full" />
+      </div>
+    );
+  }
+
+  if (calendar.error) {
+    return (
+      <div className="mx-auto flex max-w-2xl items-start gap-3 rounded-2xl bg-red-50 p-5 ring-1 ring-red-200">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-600" aria-hidden />
+        <div>
+          <p className="text-sm font-medium text-red-900">The calendar could not load.</p>
+          <p className="mt-1 whitespace-pre-line text-[13px] leading-6 text-red-800">
+            {calendar.error}
+          </p>
+        </div>
       </div>
     );
   }
@@ -134,7 +171,7 @@ export default function CalendarPage() {
           {headingLabel}
         </h2>
         <div className="ml-auto flex items-center gap-3">
-          <p className="hidden items-center gap-1.5 text-[13px] text-slate-400 md:flex">
+          <p className="hidden items-center gap-1.5 text-[13px] text-slate-500 md:flex">
             <Globe2 className="size-3.5" aria-hidden />
             {tz}
           </p>
@@ -147,19 +184,13 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {posts.some((p) => p.status === "scheduled") && (
-        <p className="mt-4 flex items-center gap-2 text-[13px] text-slate-500">
-          <Badge variant="neutral">Local preview</Badge>
-          Scheduled items below are stored in this browser.
-        </p>
-      )}
 
       {/* Month view */}
       {view === "month" && (
         <div className="mt-5 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-xs">
           <div className="grid grid-cols-7 border-b border-slate-100">
             {WEEK_LABELS.map((d) => (
-              <p key={d} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <p key={d} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 {d}
               </p>
             ))}
@@ -185,7 +216,7 @@ export default function CalendarPage() {
                           ? "bg-brand-600 font-semibold text-white"
                           : inMonth
                             ? "font-medium text-slate-700"
-                            : "text-slate-400",
+                            : "text-slate-500",
                       )}
                     >
                       {format(day, "d")}
@@ -210,7 +241,7 @@ export default function CalendarPage() {
                       />
                     ))}
                     {dayPosts.length > 2 && (
-                      <p className="px-1 text-[10px] font-medium text-slate-400">
+                      <p className="px-1 text-[10px] font-medium text-slate-500">
                         +{dayPosts.length - 2} more
                       </p>
                     )}
@@ -238,7 +269,7 @@ export default function CalendarPage() {
                 )}
               >
                 <header className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                     {format(day, "EEE")}
                   </p>
                   <span
@@ -268,7 +299,7 @@ export default function CalendarPage() {
                 <button
                   type="button"
                   onClick={() => setPickedDay(day)}
-                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-slate-400 transition hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
+                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
                 >
                   <CalendarPlus className="size-3.5" aria-hidden />
                   Schedule
@@ -280,22 +311,22 @@ export default function CalendarPage() {
       )}
 
       {/* Unscheduled drafts */}
-      {drafts.length > 0 && (
+      {(drafts.data?.length ?? 0) > 0 && (
         <section aria-labelledby="unscheduled-heading" className="mt-8">
           <h2 id="unscheduled-heading" className="text-sm font-semibold text-slate-900">
             Unscheduled drafts
-            <span className="ml-2 text-xs font-normal text-slate-400">
-              {drafts.length} waiting for a slot
+            <span className="ml-2 text-xs font-normal text-slate-500">
+              {drafts.data?.length} waiting for a slot
             </span>
           </h2>
           <ul className="mt-3 flex flex-wrap gap-2">
-            {drafts.map((draft) => (
+            {drafts.data?.map((draft) => (
               <li key={draft.id}>
                 <Link
                   href={`/posts/${draft.id}/edit`}
                   className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-[13px] font-medium text-slate-600 ring-1 ring-slate-200 transition hover:ring-slate-300 focus-visible:outline-2 focus-visible:outline-brand-600"
                 >
-                  <Save className="size-3.5 text-slate-400" aria-hidden />
+                  <Save className="size-3.5 text-slate-500" aria-hidden />
                   {draft.text.slice(0, 32) || "Untitled draft"}
                   {draft.text.length > 32 ? "…" : ""}
                 </Link>
@@ -307,8 +338,11 @@ export default function CalendarPage() {
 
       <ScheduleDialog
         date={pickedDay}
+        accounts={accounts.data?.connections ?? []}
+        remainingScheduleSlots={usage.data?.remaining ?? null}
         onClose={() => setPickedDay(null)}
         onOpenComposer={(day) => router.push(`/posts/new?date=${format(day, "yyyy-MM-dd")}`)}
+        onScheduled={() => calendar.reload()}
       />
     </div>
   );

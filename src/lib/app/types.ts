@@ -1,9 +1,12 @@
 /**
  * Zybble dashboard data contracts.
  *
- * These interfaces are the agreement between this frontend (Prompt 2) and the
- * backend that ships in Prompt 3 (Supabase + LinkedIn API + Dodo Payments via
- * Inngest jobs). Prompt 3 implementations must honour these shapes.
+ * These are the shapes the API returns and the UI renders. They are declared
+ * here (and mirrored by the server read models in `src/features/**`) so a change
+ * on either side is a compile error rather than a blank screen.
+ *
+ * Every field is something the backend can actually produce today: no
+ * placeholder metrics, no assumed plan, no invented LinkedIn capability.
  */
 
 /* ---------------------------------- plans --------------------------------- */
@@ -23,10 +26,11 @@ export interface PlanEntitlements {
 
 export interface UserProfile {
   id: string;
-  name: string;
+  name: string | null;
   email: string;
-  avatarUrl: string | null;
   timezone: string; // IANA, e.g. "Europe/London"
+  emailVerified: boolean;
+  onboardingCompletedAt: string | null;
 }
 
 export interface Workspace {
@@ -35,30 +39,65 @@ export interface Workspace {
   slug: string;
   plan: PlanId;
   seats: number; // Pro: billed seats; Free: 1
+  timezone: string;
   createdAt: string; // ISO
+  /** The caller's role in this workspace. */
+  role: TeamRole;
+}
+
+export interface SessionState {
+  user: { id: string; email: string; emailVerified: boolean };
+  profile: UserProfile;
+  workspaces: Workspace[];
+  requiresOnboarding: boolean;
+  capabilities: {
+    supabaseConfigured: boolean;
+    linkedinConfigured: boolean;
+    analyticsScopeEnabled: boolean;
+  };
 }
 
 /* -------------------------------- LinkedIn -------------------------------- */
 
-export type LinkedInAccountStatus = "active" | "expired" | "revoked";
+export type LinkedInAccountStatus = "active" | "expired" | "revoked" | "reauth_required";
 
 export interface LinkedInAccount {
   id: string;
-  workspaceId: string;
-  /** Personal profile or organisation page. */
   kind: "member" | "organization";
-  displayName: string;
+  displayName: string | null;
   avatarUrl: string | null;
   /** LinkedIn URN, e.g. urn:li:person:xxx — used as publish target. */
   profileUrn: string;
   status: LinkedInAccountStatus;
+  scopes: string[]; // scopes LinkedIn actually granted
+  canPublish: boolean;
+  canReadAnalytics: boolean;
+  tokenExpiresAt: string | null;
+  lastVerifiedAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
   connectedAt: string; // ISO
-  scopes: string[]; // LinkedIn-approved scopes actually granted
+}
+
+export interface LinkedInCapabilities {
+  configured: boolean;
+  publishing: boolean;
+  /** False until Community Management API access is approved. */
+  analytics: boolean;
+  apiVersion: string;
+  scopes: string[];
 }
 
 /* ---------------------------------- posts --------------------------------- */
 
-export type PostStatus = "draft" | "scheduled" | "published" | "failed";
+/** Mirrors the database enum: `publishing` and `cancelled` are real states. */
+export type PostStatus =
+  | "draft"
+  | "scheduled"
+  | "publishing"
+  | "published"
+  | "failed"
+  | "cancelled";
 
 export interface MediaAssetRef {
   id: string;
@@ -66,7 +105,7 @@ export interface MediaAssetRef {
   name: string;
   mimeType: string;
   bytes: number;
-  /** Signed URL from storage — present once uploaded in Prompt 3. */
+  /** Short-lived signed URL from private storage; null if it expired. */
   url: string | null;
 }
 
@@ -82,11 +121,21 @@ export interface DashboardPost {
   /** IANA timezone the author scheduled in (display aid). */
   timezone: string | null;
   publishedAt: string | null; // ISO
-  /** Set after successful publish — links back to the LinkedIn object. */
   linkedinPostUrn: string | null;
+  /** Human-readable failure explanation; null unless status === "failed". */
   failureReason: string | null;
+  failureCode: string | null;
+  attempts: number;
+  permalink: string | null;
   createdAt: string; // ISO
   updatedAt: string; // ISO
+}
+
+export interface CalendarPost extends DashboardPost {
+  /** Local calendar day (yyyy-MM-dd) in the requested timezone. */
+  day: string;
+  /** Local wall-clock time (HH:mm) in the requested timezone. */
+  localTime: string | null;
 }
 
 /* -------------------------------- analytics ------------------------------- */
@@ -106,20 +155,30 @@ export interface PostMetrics {
   reactions: number;
   comments: number;
   reposts: number;
-  /** (reactions + comments + reposts) / impressions */
-  engagementRate: number;
+  /** (reactions + comments + reposts) / impressions; null without impressions. */
+  engagementRate: number | null;
 }
 
 export interface TopPostRow {
-  post: Pick<DashboardPost, "id" | "text" | "publishedAt">;
+  postId: string;
+  text: string;
+  publishedAt: string | null;
+  /** LinkedIn permalink; null until the post is published. */
+  permalink: string | null;
   metrics: PostMetrics;
 }
 
-/** Score in [0,1]; null = insufficient data for that cell. */
+/**
+ * A best-time cell. `score` is relative to this account's own best slot
+ * (1 = best observed), never an absolute promise, and `null` when the cell has
+ * too little evidence — the UI must render that as "no data", not as zero.
+ */
 export interface BestTimeCell {
   weekday: number; // 0 = Monday … 6 = Sunday
   hour: number; // 0–23, audience-local
   score: number | null;
+  sampleSize: number;
+  confidence: number;
 }
 
 export interface AnalyticsOverview {
@@ -129,46 +188,140 @@ export interface AnalyticsOverview {
   deltas: { impressions: number | null; engagement: number | null };
   series: MetricPoint[];
   topPosts: TopPostRow[];
-  bestTime: BestTimeCell[]; // Pro feature; [] on Free
+  bestTime: {
+    cells: BestTimeCell[];
+    insufficientData: { requiredPosts: number; observedPosts: number } | null;
+    meta: {
+      timeZone: string;
+      observations: number;
+      halfLifeDays: number;
+      priorStrength: number;
+      minObservations: number;
+      minCellSample: number;
+      computedAt: string;
+      topSlots: Array<{ weekday: number; hour: number; score: number }>;
+    } | null;
+  };
+  capabilities: {
+    analyticsPermission: boolean;
+    connectedAccounts: number;
+    bestTimeUnlocked: boolean;
+    historyDays: number;
+    /** Non-null when analytics are unavailable — shown verbatim in the UI. */
+    note: string | null;
+  };
 }
 
 /* ------------------------------ team & billing ---------------------------- */
 
-export type TeamRole = "owner" | "editor";
+export type TeamRole = "owner" | "admin" | "editor" | "viewer";
 
 export interface TeamMember {
   id: string;
-  workspaceId: string;
-  name: string;
+  userId: string | null;
+  name: string | null;
   email: string;
   role: TeamRole;
-  status: "active" | "invited";
+  status: "active" | "invited" | "removed";
+  joinedAt: string | null;
+  invitedAt: string | null;
+  inviteExpiresAt: string | null;
 }
+
+/** `/api/workspaces/current/members` payload. */
+export interface TeamRoster {
+  members: TeamMember[];
+  /** The caller's role — decides whether the management controls are enabled. */
+  role: TeamRole;
+  seats: number;
+}
+
+export type SubscriptionStatus =
+  | "free"
+  | "pending"
+  | "active"
+  | "on_hold"
+  | "paused"
+  | "past_due"
+  | "failed"
+  | "cancelled"
+  | "expired";
 
 export interface Subscription {
   plan: PlanId;
-  status: "active" | "trialing" | "past_due" | "canceled";
+  status: SubscriptionStatus;
   seats: number;
+  monthlyAmountCents: number;
   /** ISO; null on Free. */
   currentPeriodEnd: string | null;
-  /** null until billing exists — never fabricate. */
+  cancelAtPeriodEnd: boolean;
+  canceledAt: string | null;
+  /** null until a payment exists — never fabricated. */
   paymentMethodBrand: string | null;
   paymentMethodLast4: string | null;
+  /** False when Dodo Payments is not configured on this deployment. */
+  dodoConfigured: boolean;
+  invoices: InvoiceRef[];
+}
+
+/**
+ * `/api/billing` payload: the subscription row plus the entitlements derived
+ * from it and the caller's role in the workspace (needed to decide whether the
+ * management buttons are enabled at all).
+ */
+export interface BillingState extends Subscription {
+  entitlements: PlanEntitlements;
+  role: TeamRole;
 }
 
 export interface InvoiceRef {
   id: string;
   issuedAt: string; // ISO
   amountUsd: number;
-  status: "paid" | "open" | "void";
+  status: string;
   pdfUrl: string | null;
 }
 
+export interface UsageSummary {
+  plan: PlanId;
+  scheduledThisMonth: number;
+  monthlyLimit: number | null;
+  remaining: number | null;
+  connectedAccounts: number;
+  accountLimit: number;
+  period: string;
+}
+
+export type NotificationKind =
+  | "post_published"
+  | "post_failed"
+  | "post_reminder"
+  | "token_expiring"
+  | "token_revoked"
+  | "subscription_confirmed"
+  | "payment_failed"
+  | "subscription_cancelled"
+  | "member_invited"
+  | "system";
+
 export interface NotificationItem {
   id: string;
-  kind: "post_published" | "post_failed" | "token_expiring" | "system";
+  kind: NotificationKind;
   title: string;
   body: string;
+  severity: "info" | "warning" | "error" | "success";
+  actionUrl: string | null;
   createdAt: string; // ISO
   readAt: string | null;
+}
+
+export interface NotificationPreferences {
+  email_post_published: boolean;
+  email_post_failed: boolean;
+  email_post_reminder: boolean;
+  email_token_expiring: boolean;
+  email_billing: boolean;
+  email_product_updates: boolean;
+  quiet_hours_start: number | null;
+  quiet_hours_end: number | null;
 }

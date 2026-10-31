@@ -1,0 +1,50 @@
+name: E2E against staging
+
+# The full end-to-end suite needs a real backend, which means real secrets.
+# It runs on a schedule and on demand rather than on every push, because
+# handing pull requests access to project credentials would let any
+# contributor's branch read them.
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Base URL to test against
+        required: true
+        default: https://staging.zybble.app
+  schedule:
+    # Nightly at 03:17 UTC, after the analytics sync window.
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Full end-to-end suite
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run the suite against a configured deployment
+        run: npx playwright test
+        env:
+          E2E_BASE_URL: ${{ inputs.base_url || vars.E2E_BASE_URL }}
+          E2E_REAL_BACKEND: "1"
+          E2E_ANALYTICS_SCOPE: ${{ vars.E2E_ANALYTICS_SCOPE }}
+          # Publishing to a live member account is opt-in and off by default.
+          E2E_LINKEDIN_LIVE: "0"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-staging-report
+          path: .playwright/report
+          retention-days: 14

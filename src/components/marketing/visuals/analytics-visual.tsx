@@ -18,7 +18,7 @@ export function AnalyticsVisual() {
       <figcaption className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
         <span className="text-sm font-semibold text-slate-900">Engagement per post</span>
         <span className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Indexed to your average</span>
+          <span className="text-xs text-slate-600">Indexed to your average</span>
           <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 ring-1 ring-brand-100">
             Illustration
           </span>
@@ -41,7 +41,7 @@ export function AnalyticsVisual() {
         </div>
         <div className="mt-2 flex gap-2.5 sm:gap-3" aria-hidden>
           {barDays.map((d) => (
-            <p key={d} className="flex-1 text-center text-[11px] font-medium text-slate-400">
+            <p key={d} className="flex-1 text-center text-[11px] font-medium text-slate-600">
               {d}
             </p>
           ))}

@@ -16,7 +16,7 @@ export function StatCard({ label, value, icon: Icon, hint, delta }: StatCardProp
   return (
     <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-200 shadow-xs">
       <div className="flex items-center justify-between">
-        <p className="text-[13px] font-medium text-slate-500">{label}</p>
+        <p className="text-[13px] font-medium text-slate-600">{label}</p>
         <span className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
           <Icon className="size-4" aria-hidden />
         </span>
@@ -40,7 +40,7 @@ export function StatCard({ label, value, icon: Icon, hint, delta }: StatCardProp
             {Math.abs(delta).toFixed(0)}%
           </span>
         )}
-        <p className="text-xs leading-4 text-slate-400">{hint}</p>
+        <p className="text-xs leading-4 text-slate-500">{hint}</p>
       </div>
     </div>
   );

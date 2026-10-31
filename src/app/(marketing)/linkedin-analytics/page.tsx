@@ -89,7 +89,7 @@ export default function LinkedInAnalyticsPage() {
             {tracked.map((col, i) => (
               <Reveal key={col.group} delay={i * 100}>
                 <div className="h-full rounded-2xl bg-white p-7 ring-1 ring-slate-200 shadow-xs">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
                     {col.group}
                   </h3>
                   <ul className="mt-5 space-y-3.5">

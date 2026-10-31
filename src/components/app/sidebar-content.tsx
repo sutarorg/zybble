@@ -8,17 +8,17 @@ import { UserMenu } from "@/components/app/user-menu";
 import { WorkspaceSwitcher } from "@/components/app/workspace-switcher";
 import { Logo } from "@/components/logo";
 import { Separator } from "@/components/ui/separator";
-import { useClientMounted, useLocalPosts } from "@/lib/app/hooks";
-import { countScheduledThisMonth } from "@/lib/app/local-posts";
+import { useUsage } from "@/lib/app/hooks";
 import { cn } from "@/lib/utils";
 
 /** Shared sidebar body — used by the desktop rail and the mobile drawer. */
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const posts = useLocalPosts();
-  const mounted = useClientMounted();
-  const usedThisMonth = mounted ? countScheduledThisMonth(posts) : null;
-  const FREE_LIMIT = 10;
+  const usage = useUsage();
+  // Server-counted usage for the current billing period; null until loaded.
+  const usedThisMonth = usage.data?.scheduledThisMonth ?? null;
+  const limit = usage.data?.monthlyLimit ?? null;
+  const isPro = usage.data?.plan === "pro";
 
   return (
     <div className="flex h-full flex-col bg-slate-50/60">
@@ -57,7 +57,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   <item.icon
                     className={cn(
                       "size-[18px] transition-colors",
-                      active ? "text-brand-600" : "text-slate-400 group-hover:text-slate-500",
+                      active ? "text-brand-600" : "text-slate-500 group-hover:text-slate-500",
                     )}
                     aria-hidden
                   />
@@ -73,36 +73,44 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="px-4 pb-3">
         <div className="rounded-xl bg-white p-4 ring-1 ring-slate-200 shadow-xs">
           <div className="flex items-center justify-between">
-            <p className="text-[13px] font-semibold text-slate-900">Free plan</p>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-              $0/mo
+            <p className="text-[13px] font-semibold text-slate-900">
+              {isPro ? "Pro plan" : "Free plan"}
+            </p>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+              {isPro ? "$15/seat/mo" : "$0/mo"}
             </span>
           </div>
-          <p className="mt-2 text-xs leading-5 text-slate-500">
+          <p className="mt-2 text-xs leading-5 text-slate-600">
             {usedThisMonth === null
-              ? "Scheduled this month: …"
-              : `Scheduled this month: ${usedThisMonth} of ${FREE_LIMIT} (local preview)`}
+              ? "Usage: …"
+              : limit === null
+                ? `${usedThisMonth} scheduled this month · unlimited`
+                : `Scheduled this month: ${usedThisMonth} of ${limit}`}
           </p>
           <div
             className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100"
             role="progressbar"
             aria-valuemin={0}
-            aria-valuemax={FREE_LIMIT}
+            aria-valuemax={limit ?? 0}
             aria-valuenow={usedThisMonth ?? 0}
-            aria-label="Monthly scheduled post usage (local preview)"
+            aria-label="Monthly scheduled post usage"
           >
             <div
               className="h-full rounded-full bg-brand-500 transition-[width] duration-500"
-              style={{ width: `${((usedThisMonth ?? 0) / FREE_LIMIT) * 100}%` }}
+              style={{
+                width: `${limit === null ? 100 : Math.min(100, ((usedThisMonth ?? 0) / limit) * 100)}%`,
+              }}
             />
           </div>
-          <Link
-            href="/settings/billing"
-            className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-brand-700 transition-colors hover:text-brand-800"
-          >
-            Upgrade to Pro
-            <ArrowUpRight className="size-3.5" aria-hidden />
-          </Link>
+          {!isPro && (
+            <Link
+              href="/settings/billing"
+              className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-brand-700 transition-colors hover:text-brand-800"
+            >
+              Upgrade to Pro
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </Link>
+          )}
         </div>
       </div>
 

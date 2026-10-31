@@ -38,7 +38,7 @@ export function AccordionTrigger({
         {children}
         <ChevronDown
           aria-hidden
-          className="size-4 shrink-0 text-slate-400 transition-transform duration-300 group-data-[state=open]:rotate-180 group-data-[state=open]:text-brand-600"
+          className="size-4 shrink-0 text-slate-500 transition-transform duration-300 group-data-[state=open]:rotate-180 group-data-[state=open]:text-brand-600"
         />
       </AccordionPrimitive.Trigger>
     </AccordionPrimitive.Header>

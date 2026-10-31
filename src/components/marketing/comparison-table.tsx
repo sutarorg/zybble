@@ -45,7 +45,7 @@ function Cell({ value }: { value: string | boolean }) {
     );
   if (value === false)
     return (
-      <span className="inline-flex items-center gap-1.5 text-[15px] text-slate-400">
+      <span className="inline-flex items-center gap-1.5 text-[15px] text-slate-500">
         <Minus className="size-4" aria-hidden />
         Not included
       </span>
@@ -55,7 +55,15 @@ function Cell({ value }: { value: string | boolean }) {
 
 export function ComparisonTable() {
   return (
-    <div className="overflow-x-auto">
+    // A horizontally scrollable container is unreachable by keyboard unless it
+    // can take focus. Without this the table below can only be scrolled with a
+    // pointer or a trackpad, which fails WCAG 2.1.1 on narrow screens.
+    <div
+      className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+      tabIndex={0}
+      role="region"
+      aria-label="Plan comparison"
+    >
       <table className="w-full min-w-[640px] border-separate border-spacing-0 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-xs">
         <caption className="sr-only">
           Full feature comparison between the Free and Pro plans
@@ -90,7 +98,7 @@ export function ComparisonTable() {
                   scope="row"
                   colSpan={1}
                   className={cn(
-                    "border-b border-slate-200 px-6 pb-2 pt-6 text-left text-xs font-semibold uppercase tracking-wider text-slate-400",
+                    "border-b border-slate-200 px-6 pb-2 pt-6 text-left text-xs font-semibold uppercase tracking-wider text-slate-600",
                   )}
                 >
                   {group.label}

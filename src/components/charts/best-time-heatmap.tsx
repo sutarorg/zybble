@@ -49,13 +49,13 @@ export function BestTimeHeatmap({
         <div className="grid grid-cols-[2.5rem_repeat(8,1fr)] gap-1">
           <span aria-hidden />
           {HOURS.map((h) => (
-            <p key={h} className="text-center text-[10px] font-medium text-slate-400 tabular-nums">
+            <p key={h} className="text-center text-[10px] font-medium text-slate-500 tabular-nums">
               {h}:00
             </p>
           ))}
           {DAYS.map((day, weekday) => (
             <div key={day} className="contents">
-              <p className="flex items-center text-[10px] font-medium text-slate-400">{day}</p>
+              <p className="flex items-center text-[10px] font-medium text-slate-500">{day}</p>
               {HOURS.map((hour) => {
                 const score = scoreFor(weekday, hour);
                 return (
@@ -83,7 +83,7 @@ export function BestTimeHeatmap({
             </div>
           ))}
         </div>
-        <p className="mt-3 flex min-h-5 items-center gap-2 text-xs text-slate-500" aria-live="polite">
+        <p className="mt-3 flex min-h-5 items-center gap-2 text-xs text-slate-600" aria-live="polite">
           {focused ? (
             <>
               <span className="font-medium text-slate-700">
