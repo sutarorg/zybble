@@ -10,6 +10,9 @@ import type {
 import { LinkedInApiError } from "@/lib/linkedin/client";
 import { createPost, type PostContent } from "@/lib/linkedin/posts";
 import {
+  assetFailed,
+  assetReady,
+  checkAssetStatus,
   finalizeVideoUpload,
   initializeDocumentUpload,
   initializeImageUpload,
@@ -290,6 +293,70 @@ async function buildContent(
   return { kind: "image", assetUrns: imageUrns };
 }
 
+/**
+ * Wait for a video or document to finish processing before it is referenced.
+ *
+ * Images can be used as soon as the bytes are uploaded, but LinkedIn transcodes
+ * videos and renders documents asynchronously: referencing the URN too early
+ * makes the create-post call fail with an opaque error that looks like a
+ * publishing bug rather than an upload-timing bug.
+ *
+ * Three outcomes, deliberately:
+ *  * AVAILABLE            → publish immediately;
+ *  * PROCESSING_FAILED    → throw, so the post fails loudly and the user is
+ *                           told the file was rejected (never silently retried);
+ *  * still PROCESSING, or LinkedIn will not tell us (403/404 on a member token)
+ *                         → proceed and log. Waiting longer than the pipeline
+ *                           budget would hold a scheduled post hostage to a
+ *                           background job we cannot observe.
+ */
+async function waitForProcessing(input: {
+  accessToken: string;
+  assetUrn: string;
+  kind: "video" | "document";
+  assetId: string;
+}): Promise<void> {
+  const attempts = 6;
+  const delayMs = 2_000;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+    let status: string | null;
+
+    try {
+      status = (await checkAssetStatus(input.accessToken, input.assetUrn, input.kind))?.status ?? null;
+    } catch (error) {
+      logger.warn("publish.asset_status_unavailable", {
+        assetId: input.assetId,
+        kind: input.kind,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+      return;
+    }
+
+    if (status === null) return; // LinkedIn will not report it for this token.
+    if (assetReady(status)) return;
+
+    if (assetFailed(status)) {
+      throw new LinkedInApiError({
+        status: 422,
+        code: "MEDIA_PROCESSING_FAILED",
+        message:
+          `LinkedIn could not process this ${input.kind}. ` +
+          "Check the file plays or opens correctly, then upload it again.",
+        kind: "validation",
+      });
+    }
+  }
+
+  logger.warn("publish.asset_still_processing", {
+    assetId: input.assetId,
+    kind: input.kind,
+    attempts,
+  });
+}
+
 async function uploadAssetToLinkedIn(input: {
   accessToken: string;
   asset: MediaAssetRow;
@@ -308,6 +375,12 @@ async function uploadAssetToLinkedIn(input: {
     const registration = await initializeDocumentUpload(accessToken, owner);
     const bytes = await loadMediaBytes(asset);
     await uploadBinary(accessToken, registration.uploadUrl, bytes, asset.mime_type);
+    await waitForProcessing({
+      accessToken,
+      assetUrn: registration.assetUrn,
+      kind: "document",
+      assetId: asset.id,
+    });
     return registration.assetUrn;
   }
 
@@ -351,6 +424,13 @@ async function uploadAssetToLinkedIn(input: {
       uploadedPartIds: partIds,
     });
   }
+
+  await waitForProcessing({
+    accessToken,
+    assetUrn: registration.assetUrn,
+    kind: "video",
+    assetId: asset.id,
+  });
 
   return registration.assetUrn;
 }

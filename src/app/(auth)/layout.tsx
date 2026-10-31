@@ -1,6 +1,19 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/logo";
+
+/**
+ * Every page in this group is either a credential form or a post-signup step.
+ * None of them should ever appear in a search result, so the rule lives on the
+ * layout rather than on each page — it then covers `/onboarding`,
+ * `/forgot-password` and `/reset-password` too, which previously inherited the
+ * root layout's `index: true`.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+  title: { absolute: "Zybble" },
+};
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (

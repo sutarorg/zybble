@@ -19,6 +19,12 @@ next-env.d.ts
 coverage/
 .vitest/
 
+# Playwright
+.playwright/
+playwright-report/
+test-results/
+blob-report/
+
 # Editors & OS
 .DS_Store
 .vscode/*

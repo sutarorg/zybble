@@ -3,7 +3,14 @@ import { randomUUID } from "node:crypto";
 import type { ZodTypeAny } from "zod";
 import { AppError, RateLimitError, toAppError } from "@/lib/errors";
 import { requestLogger } from "@/lib/logger";
-import { memoryRateLimiter, rateLimitHeaders, type RateLimiter } from "@/lib/rate-limit";
+import {
+  fallbackRateLimiter,
+  memoryRateLimiter,
+  postgresRateLimiter,
+  rateLimitHeaders,
+  type RateLimiter,
+} from "@/lib/rate-limit";
+import { sql } from "@/lib/db/sql";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createSupabaseServerClient, type ServerSupabase } from "@/lib/supabase/server";
 import type { User } from "@supabase/supabase-js";
@@ -44,9 +51,34 @@ export function fail(error: AppError, headers: Record<string, string> = {}) {
   );
 }
 
-let limiter: RateLimiter = memoryRateLimiter();
+/**
+ * The limiter is resolved lazily on first use.
+ *
+ * With `DATABASE_URL` set, counters live in Postgres and are therefore shared
+ * across every serverless instance (the only correct behaviour on Vercel, where
+ * an in-memory map would reset per instance and give an attacker N× the
+ * intended budget). Without it — local development, CI, and a database outage —
+ * the in-memory limiter keeps the endpoints protected per instance.
+ */
+let limiter: RateLimiter | null = null;
 
-/** Production installs swap in the Postgres-backed limiter. */
+function currentLimiter(): RateLimiter {
+  if (limiter) return limiter;
+
+  limiter = process.env.DATABASE_URL
+    ? fallbackRateLimiter(
+        postgresRateLimiter(async (text, params) => {
+          const { rows } = await sql.query(text, params);
+          return { rows: rows as Record<string, unknown>[] };
+        }),
+        memoryRateLimiter(),
+      )
+    : memoryRateLimiter();
+
+  return limiter;
+}
+
+/** Overrides the limiter. Used by tests, and by operators who run Redis. */
 export function setApiRateLimiter(next: RateLimiter): void {
   limiter = next;
 }
@@ -118,7 +150,11 @@ export function defineRoute<
           clientKey(req),
         ].join(":");
 
-        const decision = await limiter.check(key, config.rateLimit.limit, config.rateLimit.windowMs);
+        const decision = await currentLimiter().check(
+          key,
+          config.rateLimit.limit,
+          config.rateLimit.windowMs,
+        );
         limitHeaders = rateLimitHeaders(decision);
 
         if (!decision.allowed) {

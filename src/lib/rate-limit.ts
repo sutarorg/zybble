@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { AppError, RateLimitError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 
 /**
  * Rate limiting.
@@ -122,3 +123,32 @@ export const RATE_LIMITS = {
   billing: { limit: 20, windowMs: 60_000 },
   api: { limit: 120, windowMs: 60_000 },
 } as const;
+
+/**
+ * Use `primary`, but fall back to `fallback` if it throws.
+ *
+ * Rate limiting is a protective control, not a feature: if the counters are
+ * unreachable the endpoint must keep serving requests with weaker protection,
+ * not return 500 to every user. Without this a brief database blip would take
+ * the whole product down — which is a worse outcome than a short window of
+ * per-instance limiting.
+ */
+export function fallbackRateLimiter(primary: RateLimiter, fallback: RateLimiter): RateLimiter {
+  let warned = false;
+
+  return {
+    async check(key, limit, windowMs) {
+      try {
+        return await primary.check(key, limit, windowMs);
+      } catch (error) {
+        if (!warned) {
+          warned = true;
+          logger.error("rate_limit.primary_unavailable", {
+            error: error instanceof Error ? error.message : "unknown",
+          });
+        }
+        return fallback.check(key, limit, windowMs);
+      }
+    },
+  };
+}

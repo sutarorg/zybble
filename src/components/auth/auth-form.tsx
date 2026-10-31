@@ -22,6 +22,12 @@ interface AuthFormProps {
   mode: "login" | "signup";
   /** Set when arriving from a Pro CTA — shown as context, never charged. */
   plan?: string;
+  /**
+   * A message the server already knows about, e.g. the proxy bounced the user
+   * here because auth is not configured. Shown in the same place as a submit
+   * failure so a redirect never lands on a silent form.
+   */
+  initialError?: string | null;
 }
 
 interface Errors {
@@ -41,12 +47,12 @@ type LoginResponse = { requiresOnboarding: boolean };
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_MIN = 12;
 
-export function AuthForm({ mode, plan }: AuthFormProps) {
+export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
   const router = useRouter();
   const timezone = useLocalTimezone();
 
   const [errors, setErrors] = useState<Errors>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(initialError);
   const [busy, setBusy] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
   const isSignup = mode === "signup";
