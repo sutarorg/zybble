@@ -1,4 +1,3 @@
-import { NonRetriableError } from "inngest";
 import { inngest } from "@/inngest/client";
 import { cron, event } from "@/inngest/functions/triggers";
 import { syncSeats } from "@/features/billing/seats";
@@ -45,9 +44,18 @@ export const syncWorkspaceSeats = inngest.createFunction(
  * Subscription reconciliation.
  *
  * Webhooks are the primary source of truth, but deliveries fail (DNS, downtime,
- * a misconfigured endpoint). This job pulls the current subscription from Dodo
+ * a misconfigured endpoint). This job pulls every subscription we know Dodo has
  * and re-applies it, so a missed `subscription.cancelled` cannot leave a
  * workspace with Pro access it stopped paying for.
+ *
+ * Retry semantics matter here, and they are not uniform:
+ *
+ *  - a provider outage or a database failure is *transient* — the run throws a
+ *    normal error so Inngest retries it with backoff;
+ *  - a subscription Dodo no longer knows about is *permanent* — it is applied
+ *    locally (stop granting Pro at period end) and never retried;
+ *  - a local row we cannot write is also recorded but does not abort the sweep:
+ *    one bad row must not stop the other workspaces from being reconciled.
  */
 export const reconcileSubscriptions = inngest.createFunction(
   {
@@ -72,59 +80,90 @@ export const reconcileSubscriptions = inngest.createFunction(
       return (data ?? []) as SubscriptionRow[];
     });
 
-    let reconciled = 0;
-    let failures = 0;
+    let applied = 0;
+    let missing = 0;
+    const transientFailures: string[] = [];
 
     for (const row of rows) {
       const outcome = await step.run(`reconcile-${row.id}`, async () => {
+        const admin = createSupabaseAdminClient();
+        const now = new Date().toISOString();
+
+        let remote: Awaited<ReturnType<typeof retrieveSubscription>>;
+
         try {
-          const remote = await retrieveSubscription(row.dodo_subscription_id as string);
-
-          if (!remote) return "missing" as const;
-
-          const admin = createSupabaseAdminClient();
-
-          const { error } = await admin
-            .from("subscriptions")
-            .update({
-              status: remote.status,
-              seats: remote.quantity ?? row.seats,
-              current_period_end: remote.next_billing_date ?? row.current_period_end,
-              current_period_start: remote.previous_billing_date ?? row.current_period_start,
-              cancel_at_period_end: remote.cancel_at_next_billing_date ?? false,
-              canceled_at: remote.cancelled_at ?? row.canceled_at,
-              last_event_at: new Date().toISOString(),
-              last_event_type: "reconcile",
-              raw: remote as never,
-            })
-            .eq("id", row.id);
-
-          if (error) return "error" as const;
-
-          await admin
-            .from("workspaces")
-            .update({ seats: remote.quantity ?? row.seats })
-            .eq("id", row.workspace_id);
-
-          return "ok" as const;
+          remote = await retrieveSubscription(row.dodo_subscription_id as string);
         } catch (error) {
-          logger.error("billing.reconcile_failed", {
+          logger.error("billing.reconcile_fetch_failed", {
             subscriptionId: row.id,
             error: error instanceof Error ? error.message : "unknown",
           });
-          return "error" as const;
+          return { status: "transient" as const };
         }
+
+        // Dodo no longer has this subscription. It was deleted or never
+        // completed, so the local row must stop granting Pro — otherwise a
+        // cancelled-and-purged customer keeps paid entitlements forever.
+        if (!remote) {
+          const { error } = await admin
+            .from("subscriptions")
+            .update({
+              status: "cancelled",
+              cancel_at_period_end: true,
+              canceled_at: row.canceled_at ?? now,
+              last_event_at: now,
+              last_event_type: "reconcile_missing",
+            })
+            .eq("id", row.id);
+
+          return error ? { status: "transient" as const } : { status: "missing" as const };
+        }
+
+        const { error } = await admin
+          .from("subscriptions")
+          .update({
+            status: remote.status as SubscriptionRow["status"],
+            seats: remote.quantity ?? row.seats,
+            current_period_end: remote.next_billing_date ?? row.current_period_end,
+            current_period_start: remote.previous_billing_date ?? row.current_period_start,
+            cancel_at_period_end: remote.cancel_at_next_billing_date ?? false,
+            canceled_at: remote.cancelled_at ?? row.canceled_at,
+            last_event_at: now,
+            last_event_type: "reconcile",
+            raw: remote as never,
+          })
+          .eq("id", row.id);
+
+        if (error) {
+          logger.error("billing.reconcile_write_failed", {
+            subscriptionId: row.id,
+            error: error.message,
+          });
+          return { status: "transient" as const };
+        }
+
+        await admin
+          .from("workspaces")
+          .update({ seats: remote.quantity ?? row.seats })
+          .eq("id", row.workspace_id);
+
+        return { status: "ok" as const };
       });
 
-      if (outcome === "ok" || outcome === "missing") reconciled += 1;
-      if (outcome === "error") failures += 1;
+      if (outcome.status === "ok") applied += 1;
+      if (outcome.status === "missing") missing += 1;
+      if (outcome.status === "transient") transientFailures.push(row.id);
     }
 
-    if (failures > 0) {
-      throw new NonRetriableError(`${failures} subscription(s) could not be reconciled.`);
+    // Retryable: a provider outage or a locked row. Inngest re-runs the whole
+    // sweep; each step is memoised, so completed rows are not re-fetched.
+    if (transientFailures.length > 0) {
+      throw new Error(
+        `${transientFailures.length} subscription(s) could not be reconciled: ${transientFailures.join(", ")}`,
+      );
     }
 
-    return { reconciled, failures };
+    return { applied, missing, failures: 0 };
   },
 );
 

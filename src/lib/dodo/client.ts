@@ -1,6 +1,8 @@
 import DodoPayments from "dodopayments";
+import { NotFoundError } from "dodopayments/core/error";
 import { env, isDodoConfigured } from "@/lib/env";
 import { IntegrationNotConfiguredError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 
 /**
  * Dodo Payments client.
@@ -119,6 +121,16 @@ export async function createCustomerPortalSession(input: {
   return session.link;
 }
 
+/** The subscription fields Zybble mirrors locally. */
+export type SubscriptionView = {
+  status: string;
+  quantity?: number | null;
+  next_billing_date?: string | null;
+  previous_billing_date?: string | null;
+  cancel_at_next_billing_date?: boolean | null;
+  cancelled_at?: string | null;
+};
+
 export type SeatChangeResult = {
   subscriptionId: string;
   quantity: number;
@@ -168,7 +180,23 @@ export async function cancelSubscription(input: {
   });
 }
 
-export async function retrieveSubscription(dodoSubscriptionId: string) {
+/**
+ * Fetch a subscription from Dodo.
+ *
+ * Returns `null` when Dodo no longer has it (404) instead of throwing, so the
+ * reconciler can tell "this subscription is gone" — a permanent state that must
+ * be applied locally — from a transient outage, which must be retried.
+ */
+export async function retrieveSubscription(dodoSubscriptionId: string): Promise<SubscriptionView | null> {
   const client = dodo();
-  return client.subscriptions.retrieve(dodoSubscriptionId);
+
+  try {
+    return await client.subscriptions.retrieve(dodoSubscriptionId);
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      logger.warn("dodo.subscription_missing", { dodoSubscriptionId });
+      return null;
+    }
+    throw error;
+  }
 }
