@@ -551,8 +551,12 @@ export async function deleteAccount(confirmation: { password: string }): Promise
 
 /**
  * Supabase error strings are stable but written for developers; these are the
- * ones users actually hit, rewritten as sentences. Anything unmatched is
- * returned as-is — it is already safe to display.
+ * ones users actually hit, rewritten as sentences.
+ *
+ * Anything unmatched is *logged* and replaced with a generic sentence rather
+ * than passed through: provider errors routinely carry host names, ports and
+ * driver detail, and echoing them would turn the login form into an information
+ * disclosure channel.
  */
 export function friendlyAuthError(message: string): string {
   const value = message.toLowerCase();
@@ -582,5 +586,8 @@ export function friendlyAuthError(message: string): string {
     return "Too many attempts. Wait a few minutes and try again.";
   }
 
-  return message;
+  // Unrecognised provider strings are logged, never echoed: they routinely
+  // carry host names, ports and driver detail that must not reach a browser.
+  logger.warn("auth.unmapped_error", { error: message });
+  return "That did not work. Please try again.";
 }

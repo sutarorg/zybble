@@ -17,6 +17,13 @@ export type TablePlan = {
   rows?: Row[];
   /** Row returned by a terminal `.maybeSingle()` / `.single()`. */
   single?: Row | null;
+  /**
+   * Rows returned one per terminal call, in order.
+   *
+   * Lets a test drive several members (different preferences, different
+   * profiles) through the same table. Falls back to `single` when exhausted.
+   */
+  singleQueue?: Array<Row | null>;
   /** Error returned by the next terminal call, if any. */
   error?: { message: string; code?: string } | null;
 };
@@ -51,6 +58,12 @@ export type FakeQuery = {
 export function createFakeSupabase(plans: Record<string, TablePlan> = {}): FakeSupabase {
   const calls: FakeSupabase["calls"] = [];
 
+  function nextSingle(table: string): Row | null {
+    const queue = plans[table]?.singleQueue;
+    if (queue && queue.length > 0) return queue.shift() ?? null;
+    return plans[table]?.single ?? null;
+  }
+
   function query(table: string): FakeQuery {
     const filters: Row = {};
     let op = "select";
@@ -64,24 +77,26 @@ export function createFakeSupabase(plans: Record<string, TablePlan> = {}): FakeS
       insert(next) {
         op = "insert";
         values = next;
-        calls.push({ table, op, values, filters: { ...filters } });
+        // `filters` is recorded by reference: PostgREST applies `.eq()` after
+        // `.update()`/`.insert()`, so the snapshot has to see those too.
+        calls.push({ table, op, values, filters });
         return builder;
       },
       upsert(next) {
         op = "upsert";
         values = next;
-        calls.push({ table, op, values, filters: { ...filters } });
+        calls.push({ table, op, values, filters });
         return builder;
       },
       update(next) {
         op = "update";
         values = next;
-        calls.push({ table, op, values, filters: { ...filters } });
+        calls.push({ table, op, values, filters });
         return builder;
       },
       delete() {
         op = "delete";
-        calls.push({ table, op, filters: { ...filters } });
+        calls.push({ table, op, filters });
         return builder;
       },
       eq(column, value) {
@@ -121,10 +136,10 @@ export function createFakeSupabase(plans: Record<string, TablePlan> = {}): FakeS
         return builder;
       },
       async maybeSingle() {
-        return { data: plans[table]?.single ?? null, error: null };
+        return { data: nextSingle(table), error: null };
       },
       async single() {
-        return { data: plans[table]?.single ?? null, error: null };
+        return { data: nextSingle(table), error: null };
       },
       async then<T>(resolve: (value: { data: Row[]; error: null }) => T): Promise<T> {
         return resolve({ data: plans[table]?.rows ?? [], error: null });

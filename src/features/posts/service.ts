@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { ServerSupabase } from "@/lib/supabase/server";
 import type { PostRow, SubscriptionRow } from "@/lib/supabase/database.types";
-import { usagePeriod, zonedWallTimeToUtc } from "@/lib/time";
+import { InvalidWallTimeError, usagePeriod, zonedWallTimeToUtc } from "@/lib/time";
 import type { WorkspaceContext } from "@/features/workspaces/access";
 import type { CreatePostInput, UpdatePostInput } from "@/lib/validation/posts";
 
@@ -73,11 +73,25 @@ export function resolveScheduledAt(input: {
     throw new AppError("validation_failed", "A date and time are required to schedule a post.");
   }
 
-  const instant = zonedWallTimeToUtc({
-    date: input.date,
-    time: input.time,
-    timeZone: timezone,
-  });
+  let instant: Date;
+
+  try {
+    instant = zonedWallTimeToUtc({
+      date: input.date!,
+      time: input.time!,
+      timeZone: timezone,
+      // A slot inside a spring-forward gap does not exist, and quietly shifting
+      // it an hour would publish at a time the author never chose.
+      onNonexistent: "error",
+    });
+  } catch (error) {
+    if (error instanceof InvalidWallTimeError) {
+      // The message names only the date, time and IANA zone the user picked.
+      throw new AppError("validation_failed", error.message);
+    }
+
+    throw error;
+  }
 
   if (instant.getTime() <= Date.now()) {
     throw new AppError("validation_failed", "Pick a time in the future.");

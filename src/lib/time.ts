@@ -19,6 +19,17 @@ export type WallTime = {
   /** `HH:mm` (24-hour) */
   time: string;
   timeZone: string;
+  /**
+   * What to do when the requested wall time falls in a spring-forward gap
+   * (02:30 on the day the clock jumps 02:00→03:00).
+   *
+   *  * `"roll-forward"` (default) — return the first instant that does exist.
+   *    Right for background jobs reconciling an existing schedule.
+   *  * `"error"` — throw `InvalidWallTimeError`. Right for an interactive
+   *    schedule picker: silently publishing an hour later than the author
+   *    asked for is worse than asking them to pick another slot.
+   */
+  onNonexistent?: "roll-forward" | "error";
 };
 
 export class InvalidTimeZoneError extends Error {
@@ -114,11 +125,17 @@ export function zoneOffsetMinutes(instant: Date, timeZone: string): number {
  *
  * DST behaviour:
  *  * spring-forward gap (e.g. 02:30 does not exist) → rolls forward to the
- *    first existing instant after the gap;
+ *    first existing instant after the gap, or throws when the caller asks with
+ *    `onNonexistent: "error"`;
  *  * fall-back overlap (e.g. 01:30 happens twice) → resolves to the earlier
  *    occurrence.
  */
-export function zonedWallTimeToUtc({ date, time, timeZone }: WallTime): Date {
+export function zonedWallTimeToUtc({
+  date,
+  time,
+  timeZone,
+  onNonexistent = "roll-forward",
+}: WallTime): Date {
   assertTimeZone(timeZone);
 
   const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
@@ -160,6 +177,13 @@ export function zonedWallTimeToUtc({ date, time, timeZone }: WallTime): Date {
   const renderedMs = Date.UTC(rendered.year, rendered.month - 1, rendered.day, rendered.hour, rendered.minute, 0);
 
   if (renderedMs !== naive) {
+    if (onNonexistent === "error") {
+      throw new InvalidWallTimeError(
+        `${time} does not exist on ${date} in ${timeZone}: daylight saving moves the clock ` +
+          `${pad(hour)}:${pad(minute)} past that time. Choose a different slot.`,
+      );
+    }
+
     const driftMinutes = Math.round((renderedMs - naive) / 60_000);
     candidate -= driftMinutes * 60_000;
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   InvalidTimeZoneError,
+  InvalidWallTimeError,
   addDays,
   formatInZone,
   isValidTimeZone,
@@ -73,6 +74,42 @@ describe("zonedWallTimeToUtc", () => {
     // still returns a concrete instant rather than throwing.
     const utc = zonedWallTimeToUtc({ date: "2026-03-08", time: "02:30", timeZone: "America/New_York" });
     expect(Number.isNaN(utc.getTime())).toBe(false);
+    // Rolled forward onto the first instant that does exist (03:30 EDT).
+    expect(formatInZone(utc, "America/New_York").time).toBe("03:30");
+  });
+
+  it("can refuse a non-existent local time instead of rolling it forward", () => {
+    // Scheduling is the one place where silence is dangerous: publishing an
+    // hour later than the author asked for is worse than rejecting the slot.
+    expect(() =>
+      zonedWallTimeToUtc({
+        date: "2026-03-08",
+        time: "02:30",
+        timeZone: "America/New_York",
+        onNonexistent: "error",
+      }),
+    ).toThrow(InvalidWallTimeError);
+
+    // A neighbouring slot that does exist is unaffected.
+    expect(
+      zonedWallTimeToUtc({
+        date: "2026-03-08",
+        time: "09:30",
+        timeZone: "America/New_York",
+        onNonexistent: "error",
+      }).toISOString(),
+    ).toBe("2026-03-08T13:30:00.000Z");
+  });
+
+  it("resolves an ambiguous fall-back time to the first occurrence", () => {
+    // 2026-11-01 01:30 happens twice in New York; the earlier (EDT) one wins.
+    const utc = zonedWallTimeToUtc({
+      date: "2026-11-01",
+      time: "01:30",
+      timeZone: "America/New_York",
+      onNonexistent: "error",
+    });
+    expect(utc.toISOString()).toBe("2026-11-01T05:30:00.000Z");
   });
 
   it("rejects impossible calendar dates", () => {
