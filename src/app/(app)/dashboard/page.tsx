@@ -129,11 +129,7 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Engagement trend"
-          value={
-            analytics.data?.deltas.engagement === null
-              ? null
-              : `${(analytics.data!.deltas.engagement ?? 0) >= 0 ? "+" : ""}${analytics.data?.deltas.engagement ?? 0}%`
-          }
+          value={formatDelta(analytics.data?.deltas.engagement ?? null)}
           icon={TrendingUp}
           hint="vs. the previous 7 days"
           delta={analytics.data?.deltas.engagement ?? null}
@@ -359,6 +355,12 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+/** Signed percentage for the trend card; null when there is nothing to compare. */
+function formatDelta(value: number | null): string | null {
+  if (value === null) return null;
+  return `${value >= 0 ? "+" : ""}${value}%`;
 }
 
 /** Published posts in the window, counted from the analytics top-post rows. */
