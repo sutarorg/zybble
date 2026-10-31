@@ -250,10 +250,16 @@ variable; a filled copy must never be committed.
 
 * `postgresRateLimiter` (production) — fixed-window counters in
   `public.rate_limit_counters`, bumped by a SECURITY DEFINER function, so every
-  Vercel instance shares counters without Redis.
-* `memoryRateLimiter` — tests, and the fallback when Postgres is unavailable, so
-  a database outage degrades to per-instance limiting instead of taking the
-  endpoint down.
+  Vercel instance shares counters without Redis. This is what runs when
+  `DATABASE_URL` is set, which it is in every real deployment.
+* `memoryRateLimiter` — local development, CI, and the fallback when the
+  counters are unreachable.
+
+**The limiter must never be the reason an endpoint fails.** When
+`DATABASE_URL` is present the limiter is wrapped in `fallbackRateLimiter`, which
+logs once and degrades to per-instance protection if the counters cannot be
+reached. A brief database blip weakens the control; it does not take the product
+down. Covered by `tests/lib/rate-limit.test.ts`.
 
 **Keys are SHA-256 hashes** — raw emails and IP addresses never sit in the
 counter table.
@@ -304,9 +310,10 @@ Two properties worth stating explicitly:
 
 Honest gaps, most of which are operational rather than code:
 
-1. **Rate-limit deployment** — the Postgres limiter must be wired up in
-   production (`setApiRateLimiter`); the default in-memory limiter only protects
-   a single instance.
+1. **No Content-Security-Policy is deployed.** A CSP that does not match Next's
+   own inline-script output fails open in report-only browsers, so shipping a
+   half-configured one would be worse than shipping none. Every other baseline
+   header is set for all responses in `next.config.ts`.
 2. **Token-encryption key rotation** — supported by the code, but the rotation
    runbook (write with the new key, re-encrypt, retire the old one) is an
    operator procedure.
