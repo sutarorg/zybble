@@ -101,8 +101,11 @@ team collaboration, $15 per active member per month.
 - **`.github/workflows/e2e-staging.yml`** — the full authenticated E2E suite,
   nightly and on demand, scoped to a protected `staging` GitHub Environment so
   project credentials are never exposed to pull requests.
-- **`vercel.json`** — framework settings, region, and a `/api/cron/run` cron that
-  acts as a safety net when Inngest is unavailable.
+- **`vercel.json`** — framework settings and git integration. Deliberately ships
+  **without** a `crons` block: Vercel limits Hobby projects to daily cron jobs
+  and fails the deployment on anything more frequent, and config should never be
+  the reason a deploy fails. `DEPLOYMENT.md` §H.6 documents how to add the
+  `/api/cron/run` safety net back once the project is on Pro.
 
 ### Documentation
 

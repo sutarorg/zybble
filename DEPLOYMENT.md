@@ -751,12 +751,48 @@ vercel --prod
 vercel rollback            # revert to the previous deployment
 ```
 
-### H.6 Cron
+### H.6 The `/api/cron/run` safety net (optional, Pro and above)
 
-`vercel.json` registers `/api/cron/run` every 5 minutes. Vercel sends
-`Authorization: Bearer $CRON_SECRET`, which the route verifies in constant
-time — and **fails closed** when `CRON_SECRET` is unset, so an unconfigured
-deployment does not expose an unauthenticated job runner.
+Inngest is the scheduler of record — it runs `dispatch-due-posts` every minute,
+reconciles stuck publishes every 15 minutes, and drives the daily sweeps. If
+Inngest is ever unavailable, `GET /api/cron/run` performs the same sweep on
+demand. It verifies `Authorization: Bearer $CRON_SECRET` in constant time and
+**fails closed** when `CRON_SECRET` is unset, so an unconfigured deployment
+never exposes an unauthenticated job runner.
+
+**Scheduling it with Vercel Cron requires a Pro or Enterprise plan.** Vercel's
+own limits:
+
+| Plan | Minimum interval | Precision |
+| --- | --- | --- |
+| Hobby | **Once per day** | Within the scheduled hour |
+| Pro | Once per minute | Within the minute |
+| Enterprise | Once per minute | Within the minute |
+
+A cron expression more frequent than daily **fails the deployment** on Hobby
+with *"Hobby accounts are limited to daily cron jobs"*. For that reason
+`vercel.json` intentionally ships **without** a `crons` block — the config must
+never be the reason a deployment fails.
+
+Once the project is on Pro (which it must be — see the plan note at the top of
+this document), add it back:
+
+```json
+{
+  "crons": [{ "path": "/api/cron/run", "schedule": "*/5 * * * *" }]
+}
+```
+
+Then redeploy and confirm under **Settings → Cron Jobs**.
+
+Until then, invoke the sweep manually when you need it:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://zybble.app/api/cron/run
+```
+
+Note also that Vercel Cron runs against **production deployments only** — never
+previews — and does not retry a failed invocation.
 
 ---
 

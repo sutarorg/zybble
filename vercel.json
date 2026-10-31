@@ -3,14 +3,7 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "regions": ["iad1"],
   "git": {
     "deploymentEnabled": true
-  },
-  "crons": [
-    {
-      "path": "/api/cron/run",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  }
 }
