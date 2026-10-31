@@ -33,9 +33,9 @@ preparation
 | Database migrations and RLS isolation | **PASS** |
 | Dependency security (production tree) | **PASS** (0 critical, 0 high) |
 | Application security review (static, OWASP-mapped) | **PASS with follow-ups** |
-| Playwright end-to-end suite | **NOT TESTED** — suite written, browsers unavailable here |
-| Lighthouse / Core Web Vitals | **NOT TESTED** — no Chromium available here |
-| Accessibility audit | **PARTIAL** — axe assertions written and typechecked, not executed |
+| Playwright end-to-end suite | **PASS** — 135 passed, 0 failed, in CI against a production build (public surface; authenticated suites skip without credentials) |
+| Lighthouse / Core Web Vitals | **NOT TESTED** — no Lighthouse run has been performed |
+| Accessibility audit | **PASS for public pages** — axe (WCAG 2.0/2.1/2.2 A + AA) reports zero violations on `/`, `/pricing`, `/blog` and `/privacy` across three viewports. Authenticated pages are not covered. |
 | Live external integrations (LinkedIn, Dodo, Resend, Inngest, Supabase) | **NOT TESTED** |
 | Production deployment | **BLOCKED** |
 
@@ -94,7 +94,39 @@ Test Files  16 passed (16)
 
 No network access is used by any of these.
 
-### 4.2 End-to-end — NOT TESTED
+### 4.2 End-to-end — PASS (public surface)
+
+**Result of the first real run** (GitHub Actions, `ubuntu-latest`, Chromium
+installed with `npx playwright install --with-deps chromium`, executed against
+`next build && next start`, not the dev server):
+
+```
+135 passed   234 skipped   0 failed   0 flaky   (1.4m)
+```
+
+Those 369 cases are 123 unique tests replayed across three device profiles
+(desktop 1440px, mobile Pixel 7, tablet Galaxy Tab S4). The 234 skips are the
+authenticated suites — auth, posts, analytics, billing, LinkedIn, emails and
+workspace isolation — which call `needsBackend()` and skip with a stated reason
+because `E2E_REAL_BACKEND` is not set. **A green run here proves the public
+surface only.** That split is deliberate: a test that silently exercises nothing
+is worse than an honest skip.
+
+**The suite earned its keep immediately.** Its first execution failed 96 of 369
+cases, and every one was a real defect or a real test bug. Nothing was skipped,
+quarantined or weakened to get to green:
+
+| Root cause | Cases | Nature |
+| --- | --- | --- |
+| The `tablet` project used `devices["iPad (gen 7)"]`, which defaults to WebKit; CI installs Chromium only, so all 85 tablet cases failed with "browser not found" | 85 | Test-harness bug |
+| Labels are rendered as "Work email" and "Account email"; selectors asserted `/^email$/` | 4 | Test-harness bug |
+| `aria-labelledby` on three marketing sections pointed at ids that did not exist, leaving those sections with no accessible name | 6 | **Product defect** |
+| 70 uses of `text-slate-400` on light backgrounds measured 2.6:1, plus four more elements between 3.41:1 and 4.48:1 — all below the WCAG AA minimum of 4.5:1 | 8 | **Product defect** |
+| `how-it-works` rendered `<li>` inside `<li>`, so three items sat outside any list | 3 | **Product defect** |
+| The horizontally scrollable comparison table could not be scrolled by keyboard | 1 | **Product defect** |
+| The mobile menu is a modal; the test queried the page `<nav>`, which Radix `aria-hidden`s while the dialog is open | 1 | Test-harness bug |
+| A missing Supabase credential threw a plain `Error`, so an unconfigured deployment answered `500 internal_error` | 2 | **Product defect** |
+| The responsive test measured a handle captured before hydration, which React then detached | 1 | Test-harness bug (flaky) |
 
 **Written:** 123 unique Playwright tests (369 cases across 3 device profiles) in
 9 spec files:
@@ -111,11 +143,13 @@ No network access is used by any of these.
 | `e2e/workspace-isolation.spec.ts` | 4 | Supabase |
 | `e2e/emails.spec.ts` | 5 | Supabase + Resend |
 
-**Why not executed:** this environment has no Chromium and cannot reach
-`cdn.playwright.dev` to download browsers (outbound access is limited to the npm
-registry, GitHub and PyPI). `npx playwright test --list` parses the config and
-enumerates all 369 cases successfully, and the suite typechecks and lints
-cleanly — but **no test has been run.**
+**Where it does and does not run.** The authoring environment has no Chromium
+and cannot reach `cdn.playwright.dev` to download browsers (outbound access is
+limited to the npm registry, GitHub and PyPI), so no test could be executed
+locally while the suite was being written. CI can install Chromium, so the suite
+is executed there on every push and pull request. This is worth knowing when
+reading the history: the first green run followed four CI cycles of fixing what
+the browser actually reported.
 
 **What is verified vs assumed.** Tests that need a backend call
 `needsBackend()`, which skips with an explicit reason when `E2E_REAL_BACKEND` is
@@ -256,12 +290,31 @@ npx lighthouse http://localhost:3000/pricing --form-factor=mobile --view
 
 ## 8. Accessibility findings
 
-**Status: PARTIAL.** Axe-core assertions are written into
-`e2e/public-site.spec.ts` covering `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`
-and `wcag22aa` on four public pages, plus keyboard-reachability and
-focus-visibility checks. **They have not been executed.**
+**Status: PASS for public pages, PARTIAL overall.**
 
-Static evidence that the codebase takes accessibility seriously:
+Axe-core assertions run in `e2e/public-site.spec.ts` covering `wcag2a`,
+`wcag2aa`, `wcag21a`, `wcag21aa` and `wcag22aa` on `/`, `/pricing`, `/blog` and
+`/privacy`, at three viewports, plus keyboard-reachability and focus-visibility
+checks. **They now pass with zero violations** — and they did not pass on the
+first run. The browser found, and this release fixes:
+
+- Three marketing sections whose `aria-labelledby` pointed at ids that did not
+  exist, leaving the sections with no accessible name.
+- Every element axe flagged for contrast (74 across the two failing pages, the
+  worst at 2.6:1), plus 14 more elsewhere with the same pattern. All now exceed
+  5:1.
+- `<li>` nested directly inside `<li>` in "How Zybble works", which put three
+  items outside any list.
+- A horizontally scrollable comparison table with no keyboard access.
+
+A static guard (`tests/a11y/aria-references.test.ts`) now fails the build if any
+`aria-labelledby`, `aria-describedby` or `aria-controls` reference is ever left
+dangling again.
+
+**Not covered:** authenticated pages (dashboard, composer, calendar, analytics,
+settings), which axe has never seen, and screen-reader behaviour.
+
+Evidence that the codebase takes accessibility seriously:
 
 - Landmarks (`header`, `nav` with `aria-label="Main navigation"`, `main`,
   `footer`), `aria-current` on nav items, labelled icon-only buttons,
@@ -271,8 +324,8 @@ Static evidence that the codebase takes accessibility seriously:
 - Playwright is configured with `reducedMotion: "reduce"` so animations cannot
   cause flaky tests or hide content.
 
-Unverified: contrast ratios in practice, screen-reader behaviour, focus order in
-dialogs.
+Unverified: contrast and semantics on authenticated pages, screen-reader
+behaviour, focus order inside dialogs.
 
 ---
 
@@ -287,7 +340,7 @@ dialogs.
 | 5 | No Dodo live-mode product or webhook | High | **Yes** |
 | 6 | Resend sending domain not verified | High | **Yes** |
 | 7 | No Inngest production app | Medium — `/api/cron/run` is the stopgap | No |
-| 8 | E2E suite never executed | Medium | No, but reduces assurance |
+| 8 | Authenticated E2E suites (auth, posts, analytics, billing, LinkedIn, emails, isolation) have never run — they skip without a real Supabase project | Medium | No, but reduces assurance |
 | 9 | No Content-Security-Policy | Medium | No |
 | 10 | Seven moderate dependency advisories | Low | No |
 | 11 | No penetration test | Low | No (recommended) |
@@ -394,6 +447,9 @@ are in place, and four real correctness bugs were found and fixed by auditing th
 code rather than trusting it.
 
 **It is not live, and it has not been proven against a single external API.**
-Until steps 1–4 above are complete and the smoke tests in `DEPLOYMENT.md` §K
-pass against a real deployment, the honest status of every external integration
-in this document remains `NOT TESTED`.
+The public surface is now genuinely tested — 135 Playwright cases pass against a
+production build, including a clean axe run — but none of that touches
+authentication, LinkedIn, payments or email. Until steps 1–4 above are complete
+and the smoke tests in `DEPLOYMENT.md` §K pass against a real deployment, the
+honest status of every external integration in this document remains
+`NOT TESTED`.

@@ -93,11 +93,49 @@ team collaboration, $15 per active member per month.
   disclosure), LinkedIn capability gating, post lifecycle and DST scheduling,
   notification preference gating, rate-limiter degradation.
 
+### Testing
+
+The Playwright suite has now **actually executed** for the first time, in CI,
+against a production build (`next build && next start`, not the dev server):
+
+```
+135 passed   234 skipped   0 failed   0 flaky
+```
+
+The 234 skips are the authenticated suites, which skip with a stated reason
+until `E2E_REAL_BACKEND=1` and a real Supabase project exist. A green run proves
+the public surface only.
+
+Its first execution failed 96 of 369 cases. Every one was fixed; nothing was
+skipped, quarantined or weakened to reach green.
+
+### Defects the browser found
+
+- **Missing credentials answered `500 internal_error`.** A missing Supabase,
+  LinkedIn or Resend key threw a plain `Error`. A misconfiguration is not a
+  crash, and a 500 tells clients to retry something that will never succeed.
+  These now raise `IntegrationNotConfiguredError` and answer **503**.
+- **Three marketing sections had no accessible name.** `aria-labelledby` on the
+  features, how-it-works and pricing sections pointed at ids that did not exist.
+  `SectionHeading` now takes a `headingId`.
+- **74 elements below the WCAG AA contrast minimum**, the worst at 2.6:1 (70
+  uses of `text-slate-400` on light backgrounds, then four more between 3.41:1
+  and 4.48:1). A further 14 elements with the same pattern elsewhere were fixed
+  at the same time. All now exceed 5:1.
+- **`<li>` nested directly inside `<li>`** in "How Zybble works", which put three
+  items outside any list.
+- **The comparison table could not be scrolled by keyboard** on narrow screens.
+  It is now a labelled, focusable region.
+
+A static guard, `tests/a11y/aria-references.test.ts`, fails the build if any
+`aria-labelledby`, `aria-describedby` or `aria-controls` reference is left
+dangling.
+
 ### CI/CD
 
-- **`.github/workflows/ci.yml`** — install, lint, typecheck, unit/integration
-  tests, production build, dependency audit gated at `high`, and the E2E public
-  surface on every push and pull request.
+- **`.github/workflows/ci.yml`** — on every push and pull request: install, lint,
+  type check, unit and integration tests, production build, a dependency audit
+  gated at `high`, and the Playwright public-surface suite.
 - **`.github/workflows/e2e-staging.yml`** — the full authenticated E2E suite,
   nightly and on demand, scoped to a protected `staging` GitHub Environment so
   project credentials are never exposed to pull requests.
