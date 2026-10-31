@@ -56,7 +56,7 @@ export function NotificationsMenu() {
               ? `Notifications — ${unread.length} unread`
               : "Notifications — none unread"
           }
-          className="relative flex size-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-brand-600"
+          className="relative flex size-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-brand-600"
         >
           <Bell className="size-[18px]" aria-hidden />
           {unread.length > 0 && (

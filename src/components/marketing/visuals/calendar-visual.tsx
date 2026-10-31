@@ -32,7 +32,7 @@ export function CalendarVisual() {
       <figcaption className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
         <span className="text-sm font-semibold text-slate-900">Week view</span>
         <span className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Audience time · GMT+1</span>
+          <span className="text-xs text-slate-600">Audience time · GMT+1</span>
           <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 ring-1 ring-brand-100">
             Illustration
           </span>
@@ -47,7 +47,7 @@ export function CalendarVisual() {
               day.best ? "bg-brand-50/60 ring-1 ring-brand-100" : "",
             )}
           >
-            <p className="mb-2 text-center text-[11px] font-semibold text-slate-500">
+            <p className="mb-2 text-center text-[11px] font-semibold text-slate-600">
               {day.label}
             </p>
             <div className="space-y-2">
@@ -58,7 +58,7 @@ export function CalendarVisual() {
                     className="rounded-lg bg-brand-600 px-2 py-2 text-white shadow-xs"
                   >
                     <p className="text-[10px] font-semibold tabular-nums">{slot.time}</p>
-                    <p className="mt-0.5 text-[10px] text-brand-100">Post</p>
+                    <p className="mt-0.5 text-[10px] text-white">Post</p>
                   </div>
                 ) : slot.type === "best" ? (
                   <div

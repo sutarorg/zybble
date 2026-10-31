@@ -11,7 +11,7 @@ export function TabsList({ className, ...props }: ComponentProps<typeof TabsPrim
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "inline-flex h-10 items-center gap-1 rounded-lg bg-slate-100 p-1 text-slate-500",
+        "inline-flex h-10 items-center gap-1 rounded-lg bg-slate-100 p-1 text-slate-600",
         className,
       )}
       {...props}

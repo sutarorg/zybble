@@ -55,12 +55,12 @@ import { cn } from "@/lib/utils";
  */
 
 const STATUS_TONE: Record<DashboardPost["status"], string> = {
-  draft: "bg-slate-100 text-slate-500 ring-slate-200",
+  draft: "bg-slate-100 text-slate-600 ring-slate-200",
   scheduled: "bg-brand-50 text-brand-600 ring-brand-100",
   publishing: "bg-blue-50 text-blue-600 ring-blue-100",
   published: "bg-emerald-50 text-emerald-600 ring-emerald-100",
   failed: "bg-red-50 text-red-600 ring-red-100",
-  cancelled: "bg-slate-100 text-slate-500 ring-slate-200",
+  cancelled: "bg-slate-100 text-slate-600 ring-slate-200",
 };
 
 const STATUS_LABEL: Record<DashboardPost["status"], string> = {
@@ -152,7 +152,7 @@ function PostRow({
           target="_blank"
           rel="noreferrer noopener"
           aria-label="Open on LinkedIn"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-600"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-600"
         >
           <ExternalLink className="size-4" aria-hidden />
         </a>
@@ -163,7 +163,7 @@ function PostRow({
           <button
             type="button"
             aria-label={`Actions for "${post.text.slice(0, 40) || "untitled post"}"`}
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-600"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-600"
           >
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <MoreHorizontal className="size-4" aria-hidden />}
           </button>

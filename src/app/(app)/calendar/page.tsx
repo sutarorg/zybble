@@ -299,7 +299,7 @@ export default function CalendarPage() {
                 <button
                   type="button"
                   onClick={() => setPickedDay(day)}
-                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-slate-500 transition hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
+                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-slate-600 transition hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
                 >
                   <CalendarPlus className="size-3.5" aria-hidden />
                   Schedule

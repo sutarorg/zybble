@@ -304,13 +304,13 @@ function TopPostRowItem({ post }: { post: TopPostRow }) {
             target="_blank"
             rel="noreferrer noopener"
             aria-label="Open on LinkedIn"
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600"
+            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-600"
           >
             <ExternalLink className="size-3.5" aria-hidden />
           </a>
         )}
       </div>
-      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-slate-500">
+      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-slate-600">
         <div className="flex gap-1">
           <dt className="sr-only">Impressions</dt>
           <dd className="tabular-nums">{metrics.impressions.toLocaleString()} impressions</dd>

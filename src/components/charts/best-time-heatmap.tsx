@@ -83,7 +83,7 @@ export function BestTimeHeatmap({
             </div>
           ))}
         </div>
-        <p className="mt-3 flex min-h-5 items-center gap-2 text-xs text-slate-500" aria-live="polite">
+        <p className="mt-3 flex min-h-5 items-center gap-2 text-xs text-slate-600" aria-live="polite">
           {focused ? (
             <>
               <span className="font-medium text-slate-700">

@@ -283,7 +283,7 @@ export default function DashboardPage() {
                 ))}
                 {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
                   <span key={d} className="contents">
-                    <span className="text-[10px] text-slate-500">{d}</span>
+                    <span className="text-[10px] text-slate-600">{d}</span>
                     {Array.from({ length: 8 }).map((_, i) => (
                       <span key={i} className="h-6 rounded-[5px] bg-slate-100" />
                     ))}

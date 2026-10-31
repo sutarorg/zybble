@@ -158,7 +158,7 @@ export default function TeamSettingsPage() {
             <ul className="mt-4 divide-y divide-slate-100">
               {members.map((member) => (
                 <li key={member.id} className="flex flex-wrap items-center gap-3.5 py-3.5">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-500">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
                     {(member.name ?? member.email).trim().slice(0, 1).toUpperCase()}
                   </span>
                   <div className="min-w-0 flex-1">

@@ -76,11 +76,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <p className="text-[13px] font-semibold text-slate-900">
               {isPro ? "Pro plan" : "Free plan"}
             </p>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
               {isPro ? "$15/seat/mo" : "$0/mo"}
             </span>
           </div>
-          <p className="mt-2 text-xs leading-5 text-slate-500">
+          <p className="mt-2 text-xs leading-5 text-slate-600">
             {usedThisMonth === null
               ? "Usage: …"
               : limit === null

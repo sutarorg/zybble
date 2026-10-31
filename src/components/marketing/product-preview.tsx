@@ -40,7 +40,7 @@ export function ProductPreview() {
             <span className="size-2.5 rounded-full bg-slate-200" />
             <span className="size-2.5 rounded-full bg-slate-200" />
           </div>
-          <div className="ml-2 flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500 ring-1 ring-slate-200/70">
+          <div className="ml-2 flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
             <Lock className="size-3" aria-hidden />
             app.zybble.app/composer
           </div>
@@ -66,7 +66,7 @@ export function ProductPreview() {
                 className={
                   i === 0
                     ? "flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600"
-                    : "flex size-8 items-center justify-center rounded-lg text-slate-500"
+                    : "flex size-8 items-center justify-center rounded-lg text-slate-600"
                 }
               >
                 <Icon className="size-4" />
@@ -78,7 +78,7 @@ export function ProductPreview() {
           <div className="space-y-4 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-slate-900">New post</p>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
                 Draft autosaved
               </span>
             </div>
@@ -90,7 +90,7 @@ export function ProductPreview() {
                 <div className="h-2.5 w-3/5 rounded-full bg-slate-100" />
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                <div className="flex gap-1 text-slate-500" aria-hidden>
+                <div className="flex gap-1 text-slate-600" aria-hidden>
                   <span className="flex size-7 items-center justify-center rounded-md hover:bg-slate-50">
                     <ImageIcon className="size-4" />
                   </span>
@@ -117,7 +117,7 @@ export function ProductPreview() {
               <CalendarClock className="size-4 shrink-0 text-brand-600" aria-hidden />
               <p className="text-xs font-medium text-brand-900">
                 Tuesday · 9:30 AM
-                <span className="ml-1.5 font-normal text-brand-700/70">your audience time</span>
+                <span className="ml-1.5 font-normal text-brand-700">your audience time</span>
               </p>
               <Sparkles className="ml-auto size-3.5 text-brand-500" aria-hidden />
             </div>

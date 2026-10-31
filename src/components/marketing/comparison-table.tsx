@@ -98,7 +98,7 @@ export function ComparisonTable() {
                   scope="row"
                   colSpan={1}
                   className={cn(
-                    "border-b border-slate-200 px-6 pb-2 pt-6 text-left text-xs font-semibold uppercase tracking-wider text-slate-500",
+                    "border-b border-slate-200 px-6 pb-2 pt-6 text-left text-xs font-semibold uppercase tracking-wider text-slate-600",
                   )}
                 >
                   {group.label}
