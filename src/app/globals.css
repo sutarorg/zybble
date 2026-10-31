@@ -1,0 +1,100 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Zybble electric blue — tuned to the supplied logo gradient */
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dfeaff;
+  --color-brand-200: #c6d9fe;
+  --color-brand-300: #a3c1fc;
+  --color-brand-400: #7a9ff9;
+  --color-brand-500: #3e7cf4;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* Soft, layered elevation — single consistent shadow language */
+  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-soft: 0 1px 2px rgb(16 24 40 / 0.05), 0 4px 12px -2px rgb(16 24 40 / 0.08);
+  --shadow-panel:
+    0 1px 2px rgb(16 24 40 / 0.04), 0 12px 32px -8px rgb(16 24 40 / 0.12),
+    0 32px 64px -16px rgb(37 99 235 / 0.12);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--color-brand-100);
+    color: var(--color-brand-950);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Scroll-reveal primitives, driven by <Reveal /> */
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 0.7s var(--ease-out-expo),
+      transform 0.7s var(--ease-out-expo);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+  /* Never hide content when JavaScript is unavailable */
+  @media (scripting: none) {
+    .reveal {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Subtle blueprint grid used in hero / CTA panels */
+  .bg-grid-blue {
+    background-image:
+      linear-gradient(to right, rgb(37 99 235 / 0.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(37 99 235 / 0.07) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+}
