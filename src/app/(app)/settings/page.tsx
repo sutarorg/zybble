@@ -203,7 +203,7 @@ export default function WorkspaceSettingsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="mt-1.5 text-xs text-slate-400">
+              <p className="mt-1.5 text-xs text-slate-500">
                 Used as the scheduling default and to group analytics days.
               </p>
             </div>

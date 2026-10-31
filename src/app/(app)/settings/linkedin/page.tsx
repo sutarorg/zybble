@@ -190,7 +190,7 @@ export default function LinkedInSettingsPage() {
                         )}
                       </div>
 
-                      <p className="mt-1 break-all font-mono text-[11px] text-slate-400">
+                      <p className="mt-1 break-all font-mono text-[11px] text-slate-500">
                         {account.profileUrn}
                       </p>
 

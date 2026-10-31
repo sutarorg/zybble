@@ -212,7 +212,7 @@ export function TrendChart({
             {s.label}
           </li>
         ))}
-        <li className="ml-auto text-[11px] text-slate-400">{yAxisLabel}</li>
+        <li className="ml-auto text-[11px] text-slate-500">{yAxisLabel}</li>
       </ul>
     </ChartFrame>
   );

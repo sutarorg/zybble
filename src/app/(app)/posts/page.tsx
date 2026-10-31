@@ -60,7 +60,7 @@ const STATUS_TONE: Record<DashboardPost["status"], string> = {
   publishing: "bg-blue-50 text-blue-600 ring-blue-100",
   published: "bg-emerald-50 text-emerald-600 ring-emerald-100",
   failed: "bg-red-50 text-red-600 ring-red-100",
-  cancelled: "bg-slate-100 text-slate-400 ring-slate-200",
+  cancelled: "bg-slate-100 text-slate-500 ring-slate-200",
 };
 
 const STATUS_LABEL: Record<DashboardPost["status"], string> = {
@@ -133,7 +133,7 @@ function PostRow({
               <span>Draft · edited {format(new Date(post.updatedAt), "d MMM HH:mm")}</span>
             )}
             {post.media.length > 0 && (
-              <span className="inline-flex items-center gap-1 text-slate-400">
+              <span className="inline-flex items-center gap-1 text-slate-500">
                 <ImageIcon className="size-3.5" aria-hidden />
                 {post.media.length}
               </span>
@@ -152,7 +152,7 @@ function PostRow({
           target="_blank"
           rel="noreferrer noopener"
           aria-label="Open on LinkedIn"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-600"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-600"
         >
           <ExternalLink className="size-4" aria-hidden />
         </a>
@@ -163,7 +163,7 @@ function PostRow({
           <button
             type="button"
             aria-label={`Actions for "${post.text.slice(0, 40) || "untitled post"}"`}
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-600"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-600"
           >
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <MoreHorizontal className="size-4" aria-hidden />}
           </button>
@@ -273,23 +273,23 @@ export default function PostsPage() {
         <TabsList>
           <TabsTrigger value="scheduled">
             Scheduled
-            <span className="ml-1 text-xs tabular-nums text-slate-400">
+            <span className="ml-1 text-xs tabular-nums text-slate-500">
               {scheduledPosts.length}
             </span>
           </TabsTrigger>
           <TabsTrigger value="drafts">
             Drafts
-            <span className="ml-1 text-xs tabular-nums text-slate-400">{draftPosts.length}</span>
+            <span className="ml-1 text-xs tabular-nums text-slate-500">{draftPosts.length}</span>
           </TabsTrigger>
           <TabsTrigger value="published">
             Published
-            <span className="ml-1 text-xs tabular-nums text-slate-400">
+            <span className="ml-1 text-xs tabular-nums text-slate-500">
               {publishedPosts.length}
             </span>
           </TabsTrigger>
           <TabsTrigger value="failed">
             Failed
-            <span className="ml-1 text-xs tabular-nums text-slate-400">{failedPosts.length}</span>
+            <span className="ml-1 text-xs tabular-nums text-slate-500">{failedPosts.length}</span>
           </TabsTrigger>
         </TabsList>
 

@@ -143,7 +143,7 @@ export default function AccountSettingsPage() {
                 <div>
                   <Label htmlFor="acct-email">Email</Label>
                   <Input id="acct-email" type="email" value={email} disabled autoComplete="email" />
-                  <p className="mt-1.5 text-xs text-slate-400">
+                  <p className="mt-1.5 text-xs text-slate-500">
                     Email changes require re-verification, which is handled by Supabase Auth&rsquo;s
                     own flow — it is not editable here.
                   </p>
@@ -167,7 +167,7 @@ export default function AccountSettingsPage() {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1.5 text-xs text-slate-400">
+                <p className="mt-1.5 text-xs text-slate-500">
                   Used as the default for new posts and for grouping analytics days.
                 </p>
               </div>
@@ -226,7 +226,7 @@ export default function AccountSettingsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
               <div>
                 <p className="flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <MonitorSmartphone className="size-4 text-slate-400" aria-hidden />
+                  <MonitorSmartphone className="size-4 text-slate-500" aria-hidden />
                   Session
                 </p>
                 <p className="mt-0.5 text-[13px] text-slate-500">

@@ -262,7 +262,7 @@ export default function DashboardPage() {
                 emptyDescription="Keep publishing to build a sample."
               />
               {bestTime!.meta && (
-                <p className="mt-3 text-[12px] leading-5 text-slate-400">
+                <p className="mt-3 text-[12px] leading-5 text-slate-500">
                   Estimate from {bestTime!.meta.observations} published posts in{" "}
                   {bestTime!.meta.timeZone}, weighted towards the last{" "}
                   {bestTime!.meta.halfLifeDays} days. Not a prediction.
@@ -277,13 +277,13 @@ export default function DashboardPage() {
               >
                 <span />
                 {["6", "8", "10", "12", "14", "16", "18", "20"].map((h) => (
-                  <span key={h} className="text-center text-[10px] text-slate-400">
+                  <span key={h} className="text-center text-[10px] text-slate-500">
                     {h}:00
                   </span>
                 ))}
                 {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
                   <span key={d} className="contents">
-                    <span className="text-[10px] text-slate-400">{d}</span>
+                    <span className="text-[10px] text-slate-500">{d}</span>
                     {Array.from({ length: 8 }).map((_, i) => (
                       <span key={i} className="h-6 rounded-[5px] bg-slate-100" />
                     ))}

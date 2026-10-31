@@ -171,7 +171,7 @@ export default function CalendarPage() {
           {headingLabel}
         </h2>
         <div className="ml-auto flex items-center gap-3">
-          <p className="hidden items-center gap-1.5 text-[13px] text-slate-400 md:flex">
+          <p className="hidden items-center gap-1.5 text-[13px] text-slate-500 md:flex">
             <Globe2 className="size-3.5" aria-hidden />
             {tz}
           </p>
@@ -190,7 +190,7 @@ export default function CalendarPage() {
         <div className="mt-5 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-xs">
           <div className="grid grid-cols-7 border-b border-slate-100">
             {WEEK_LABELS.map((d) => (
-              <p key={d} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <p key={d} className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 {d}
               </p>
             ))}
@@ -216,7 +216,7 @@ export default function CalendarPage() {
                           ? "bg-brand-600 font-semibold text-white"
                           : inMonth
                             ? "font-medium text-slate-700"
-                            : "text-slate-400",
+                            : "text-slate-500",
                       )}
                     >
                       {format(day, "d")}
@@ -241,7 +241,7 @@ export default function CalendarPage() {
                       />
                     ))}
                     {dayPosts.length > 2 && (
-                      <p className="px-1 text-[10px] font-medium text-slate-400">
+                      <p className="px-1 text-[10px] font-medium text-slate-500">
                         +{dayPosts.length - 2} more
                       </p>
                     )}
@@ -269,7 +269,7 @@ export default function CalendarPage() {
                 )}
               >
                 <header className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                     {format(day, "EEE")}
                   </p>
                   <span
@@ -299,7 +299,7 @@ export default function CalendarPage() {
                 <button
                   type="button"
                   onClick={() => setPickedDay(day)}
-                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-slate-400 transition hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
+                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-slate-500 transition hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
                 >
                   <CalendarPlus className="size-3.5" aria-hidden />
                   Schedule
@@ -315,7 +315,7 @@ export default function CalendarPage() {
         <section aria-labelledby="unscheduled-heading" className="mt-8">
           <h2 id="unscheduled-heading" className="text-sm font-semibold text-slate-900">
             Unscheduled drafts
-            <span className="ml-2 text-xs font-normal text-slate-400">
+            <span className="ml-2 text-xs font-normal text-slate-500">
               {drafts.data?.length} waiting for a slot
             </span>
           </h2>
@@ -326,7 +326,7 @@ export default function CalendarPage() {
                   href={`/posts/${draft.id}/edit`}
                   className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-[13px] font-medium text-slate-600 ring-1 ring-slate-200 transition hover:ring-slate-300 focus-visible:outline-2 focus-visible:outline-brand-600"
                 >
-                  <Save className="size-3.5 text-slate-400" aria-hidden />
+                  <Save className="size-3.5 text-slate-500" aria-hidden />
                   {draft.text.slice(0, 32) || "Untitled draft"}
                   {draft.text.length > 32 ? "…" : ""}
                 </Link>

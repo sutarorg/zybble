@@ -184,6 +184,19 @@ test.describe("accessibility of public pages", () => {
         impact: violation.impact,
         nodes: violation.nodes.length,
         help: violation.help,
+        // Where and why. For colour contrast axe's failure summary names the
+        // measured ratio, both colours and the required threshold, so a CI log
+        // is enough to fix the styling — nobody has to re-run axe by hand.
+        where: violation.nodes.slice(0, 8).map(
+          (node) =>
+            `${node.target.join(" ")} — ${(node.failureSummary ?? "")
+              .split("\n")
+              .map((line) => line.trim())
+              .filter(Boolean)
+              .slice(1, 3)
+              .join(" ")
+              .slice(0, 220)}`,
+        ),
       }));
 
       expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);

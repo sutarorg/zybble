@@ -418,7 +418,7 @@ export function PostComposer({
             <span
               className={cn(
                 "text-xs tabular-nums",
-                charCount > LINKEDIN_MAX_CHARS ? "font-semibold text-red-600" : "text-slate-400",
+                charCount > LINKEDIN_MAX_CHARS ? "font-semibold text-red-600" : "text-slate-500",
               )}
               aria-live="polite"
             >
@@ -504,7 +504,7 @@ export function PostComposer({
                 event.target.value = "";
               }}
             />
-            <span className="ml-auto text-xs text-slate-400">
+            <span className="ml-auto text-xs text-slate-500">
               JPG/PNG/GIF ≤ 5 MB · MP4 ≤ 200 MB · PDF ≤ 100 MB
             </span>
           </div>
@@ -545,7 +545,7 @@ export function PostComposer({
                       </>
                     )}
                     {asset.uploading && (
-                      <p className="mt-2 text-[10px] text-slate-400">Uploading…</p>
+                      <p className="mt-2 text-[10px] text-slate-500">Uploading…</p>
                     )}
                   </div>
                   {!asset.uploading && (
@@ -714,7 +714,7 @@ export function PostComposer({
               </Button>
             )}
 
-            <p className="text-xs leading-5 text-slate-400 sm:ml-auto sm:max-w-56">
+            <p className="text-xs leading-5 text-slate-500 sm:ml-auto sm:max-w-56">
               The server converts this wall time to a UTC instant, so daylight saving is handled
               correctly.
             </p>
@@ -741,7 +741,7 @@ export function PostComposer({
                   "Your LinkedIn name"}
               </p>
               <p className="truncate text-xs text-slate-500">Your headline on LinkedIn</p>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-400">
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                 {intent === "schedule" && scheduledInstant
                   ? format(scheduledInstant, "d MMM · HH:mm")
                   : "Now"}{" "}
@@ -757,7 +757,7 @@ export function PostComposer({
             ) : (
               <p className="text-sm italic text-slate-300">Your post text appears here as you type…</p>
             )}
-            {charCount > 240 && <span className="text-sm font-medium text-slate-400">…more</span>}
+            {charCount > 240 && <span className="text-sm font-medium text-slate-500">…more</span>}
           </div>
           {media.length > 0 && (
             <div className={cn("grid gap-0.5", media.length > 1 ? "grid-cols-2" : "grid-cols-1")}>

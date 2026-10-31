@@ -221,12 +221,12 @@ export default function BillingSettingsPage() {
                   Upgrade to Pro
                 </Button>
               )}
-              <p className="mt-2.5 text-center text-xs leading-5 text-slate-400">
+              <p className="mt-2.5 text-center text-xs leading-5 text-slate-500">
                 One seat = one active workspace member · cancel anytime · cards handled by Dodo
                 Payments, never stored by Zybble
               </p>
               {!canManage && state && (
-                <p className="mt-2 text-center text-xs text-slate-400">
+                <p className="mt-2 text-center text-xs text-slate-500">
                   Only owners and admins can change billing.
                 </p>
               )}
@@ -341,7 +341,7 @@ export default function BillingSettingsPage() {
                         <p className="text-[13px] font-medium text-slate-800">
                           ${invoice.amountUsd.toFixed(2)}
                         </p>
-                        <p className="text-[12px] text-slate-400">
+                        <p className="text-[12px] text-slate-500">
                           {format(new Date(invoice.issuedAt), "d MMM yyyy")} · {invoice.status}
                         </p>
                       </div>

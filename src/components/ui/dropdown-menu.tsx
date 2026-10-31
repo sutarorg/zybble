@@ -46,7 +46,7 @@ export function DropdownMenuItem({
       className={cn(
         "relative flex cursor-default select-none items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-slate-700 outline-none transition-colors",
         "focus:bg-slate-100 focus:text-slate-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "[&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-slate-400",
+        "[&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-slate-500",
         variant === "destructive" && "text-red-600 focus:bg-red-50 focus:text-red-700 [&_svg]:text-red-500",
         inset && "pl-8",
         className,
@@ -115,7 +115,7 @@ export function DropdownMenuLabel({
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
       className={cn(
-        "px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400",
+        "px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500",
         inset && "pl-8",
         className,
       )}

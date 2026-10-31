@@ -71,7 +71,7 @@ export function NotificationsMenu() {
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <p className="text-sm font-semibold text-slate-900">Notifications</p>
           <div className="flex items-center gap-2">
-            {notifications.loading && <Loader2 className="size-3.5 animate-spin text-slate-400" aria-hidden />}
+            {notifications.loading && <Loader2 className="size-3.5 animate-spin text-slate-500" aria-hidden />}
             {unread.length > 0 && (
               <button
                 type="button"
@@ -129,7 +129,7 @@ function NotificationRow({ item }: { item: NotificationItem }) {
       <div className="min-w-0">
         <p className="text-[13px] font-medium text-slate-800">{item.title}</p>
         <p className="mt-0.5 text-[13px] leading-5 text-slate-500">{item.body}</p>
-        <p className="mt-1 text-[11px] text-slate-400">
+        <p className="mt-1 text-[11px] text-slate-500">
           {formatDistanceToNowStrict(new Date(item.createdAt), { addSuffix: true })}
         </p>
       </div>

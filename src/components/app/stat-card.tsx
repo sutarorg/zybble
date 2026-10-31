@@ -40,7 +40,7 @@ export function StatCard({ label, value, icon: Icon, hint, delta }: StatCardProp
             {Math.abs(delta).toFixed(0)}%
           </span>
         )}
-        <p className="text-xs leading-4 text-slate-400">{hint}</p>
+        <p className="text-xs leading-4 text-slate-500">{hint}</p>
       </div>
     </div>
   );

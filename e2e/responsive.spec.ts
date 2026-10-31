@@ -47,14 +47,25 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
 
       test(`${path} renders its primary heading in the viewport`, async ({ page }) => {
         await page.goto(path);
+        await page.waitForLoadState("networkidle");
+
         const heading = page.locator("h1").first();
         await expect(heading).toBeVisible();
 
-        const box = await heading.boundingBox();
-        expect(box).not.toBeNull();
-        expect(box!.width).toBeGreaterThan(0);
-        expect(box!.x, "heading starts off-screen to the left").toBeGreaterThanOrEqual(0);
-        expect(box!.x + box!.width, "heading spills past the right edge").toBeLessThanOrEqual(
+        // Measure the settled layout, not the animation on the way to it. The
+        // hero fades and translates in, and a handle captured before hydration
+        // finishes can be detached by React re-rendering the node — boundingBox
+        // then returns null and the measurement is meaningless.
+        await expect
+          .poll(async () => (await heading.boundingBox())?.width ?? 0, {
+            message: `${path}: h1 never reached a measurable size at ${viewport.width}px`,
+            timeout: 15_000,
+          })
+          .toBeGreaterThan(0);
+
+        const box = (await heading.boundingBox())!;
+        expect(box.x, "heading starts off-screen to the left").toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, "heading spills past the right edge").toBeLessThanOrEqual(
           viewport.width + 1,
         );
       });

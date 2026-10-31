@@ -84,7 +84,7 @@ export default function AnalyticsPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <p className="ml-auto max-w-xs text-right text-[13px] leading-5 text-slate-400">
+        <p className="ml-auto max-w-xs text-right text-[13px] leading-5 text-slate-500">
           Zybble charts only what LinkedIn&rsquo;s API reports — never estimates or synthetic
           numbers.
         </p>
@@ -229,7 +229,7 @@ export default function AnalyticsPage() {
                   emptyDescription="Keep publishing to build a sample."
                 />
                 {bestTime!.meta && (
-                  <p className="mt-3 text-[12px] leading-5 text-slate-400">
+                  <p className="mt-3 text-[12px] leading-5 text-slate-500">
                     Estimated from {bestTime!.meta.observations} published posts in{" "}
                     {bestTime!.meta.timeZone}, weighted towards the last{" "}
                     {bestTime!.meta.halfLifeDays} days (half-life). Sample minimum{" "}
@@ -294,7 +294,7 @@ function TopPostRowItem({ post }: { post: TopPostRow }) {
           >
             {post.text.slice(0, 80) || "Untitled post"}
           </Link>
-          <p className="mt-1 text-[12px] text-slate-400">
+          <p className="mt-1 text-[12px] text-slate-500">
             {post.publishedAt ? format(new Date(post.publishedAt), "d MMM yyyy") : "Unpublished"}
           </p>
         </div>
@@ -304,7 +304,7 @@ function TopPostRowItem({ post }: { post: TopPostRow }) {
             target="_blank"
             rel="noreferrer noopener"
             aria-label="Open on LinkedIn"
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600"
           >
             <ExternalLink className="size-3.5" aria-hidden />
           </a>

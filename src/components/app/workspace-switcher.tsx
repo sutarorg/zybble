@@ -84,7 +84,7 @@ export function WorkspaceSwitcher() {
                 {workspaces.length > 1 ? ` · ${workspaces.length} workspaces` : ""}
               </span>
             </span>
-            <ChevronsUpDown className="size-4 shrink-0 text-slate-400" aria-hidden />
+            <ChevronsUpDown className="size-4 shrink-0 text-slate-500" aria-hidden />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">

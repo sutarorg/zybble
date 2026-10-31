@@ -66,7 +66,7 @@ export function ProductPreview() {
                 className={
                   i === 0
                     ? "flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600"
-                    : "flex size-8 items-center justify-center rounded-lg text-slate-400"
+                    : "flex size-8 items-center justify-center rounded-lg text-slate-500"
                 }
               >
                 <Icon className="size-4" />
@@ -90,7 +90,7 @@ export function ProductPreview() {
                 <div className="h-2.5 w-3/5 rounded-full bg-slate-100" />
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                <div className="flex gap-1 text-slate-400" aria-hidden>
+                <div className="flex gap-1 text-slate-500" aria-hidden>
                   <span className="flex size-7 items-center justify-center rounded-md hover:bg-slate-50">
                     <ImageIcon className="size-4" />
                   </span>
@@ -124,7 +124,7 @@ export function ProductPreview() {
 
             {/* Queue */}
             <div className="rounded-xl ring-1 ring-slate-200">
-              <p className="border-b border-slate-100 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="border-b border-slate-100 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 Upcoming this week
               </p>
               <ul className="divide-y divide-slate-100">
@@ -132,7 +132,7 @@ export function ProductPreview() {
                   <li key={item.kind} className="flex items-center gap-3 px-3.5 py-2.5">
                     <span className={`size-2 rounded-full ${item.tone}`} aria-hidden />
                     <span className="text-xs font-medium text-slate-700">{item.kind}</span>
-                    <span className="ml-auto text-[11px] font-medium text-slate-400">
+                    <span className="ml-auto text-[11px] font-medium text-slate-500">
                       {item.day}
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-100">

@@ -57,7 +57,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   <item.icon
                     className={cn(
                       "size-[18px] transition-colors",
-                      active ? "text-brand-600" : "text-slate-400 group-hover:text-slate-500",
+                      active ? "text-brand-600" : "text-slate-500 group-hover:text-slate-500",
                     )}
                     aria-hidden
                   />

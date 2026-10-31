@@ -214,7 +214,7 @@ function ScheduleForm({
       </div>
 
       <DialogFooter className="items-center">
-        <p className="mr-auto text-xs text-slate-400">
+        <p className="mr-auto text-xs text-slate-500">
           {remainingScheduleSlots === null
             ? "Zybble publishes this through the LinkedIn API."
             : `${remainingScheduleSlots} Free-plan scheduled posts left this month.`}

@@ -15,15 +15,15 @@ export function SelectTrigger({ className, children, ...props }: ComponentProps<
       data-slot="select-trigger"
       className={cn(
         "flex h-10 w-full items-center justify-between gap-2 rounded-lg bg-white px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-slate-200 transition",
-        "placeholder:text-slate-400 hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-600",
-        "disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-slate-400",
+        "placeholder:text-slate-500 hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-600",
+        "disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-slate-500",
         className,
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronsUpDown className="size-4 text-slate-400" aria-hidden />
+        <ChevronsUpDown className="size-4 text-slate-500" aria-hidden />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -41,11 +41,11 @@ export function SelectContent({ className, children, ...props }: ComponentProps<
         )}
         {...props}
       >
-        <SelectPrimitive.ScrollUpButton className="flex items-center justify-center py-1 text-slate-400">
+        <SelectPrimitive.ScrollUpButton className="flex items-center justify-center py-1 text-slate-500">
           <ChevronUp className="size-4" />
         </SelectPrimitive.ScrollUpButton>
         <SelectPrimitive.Viewport className="p-1.5">{children}</SelectPrimitive.Viewport>
-        <SelectPrimitive.ScrollDownButton className="flex items-center justify-center py-1 text-slate-400">
+        <SelectPrimitive.ScrollDownButton className="flex items-center justify-center py-1 text-slate-500">
           <ChevronDown className="size-4" />
         </SelectPrimitive.ScrollDownButton>
       </SelectPrimitive.Content>
@@ -78,7 +78,7 @@ export function SelectLabel({ className, ...props }: ComponentProps<typeof Selec
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn("px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400", className)}
+      className={cn("px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500", className)}
       {...props}
     />
   );

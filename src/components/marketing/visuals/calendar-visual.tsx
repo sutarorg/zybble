@@ -32,7 +32,7 @@ export function CalendarVisual() {
       <figcaption className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
         <span className="text-sm font-semibold text-slate-900">Week view</span>
         <span className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Audience time · GMT+1</span>
+          <span className="text-xs text-slate-500">Audience time · GMT+1</span>
           <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 ring-1 ring-brand-100">
             Illustration
           </span>
@@ -79,7 +79,7 @@ export function CalendarVisual() {
                     <p className="text-[10px] font-semibold tabular-nums text-slate-500">
                       {slot.time}
                     </p>
-                    <p className="mt-0.5 text-[10px] text-slate-400">Draft</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">Draft</p>
                   </div>
                 ) : (
                   <div key={i} className="h-[52px] rounded-lg bg-slate-50/70" aria-hidden />
