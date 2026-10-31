@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { env, isResendConfigured } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { IntegrationNotConfiguredError } from "@/lib/errors";
 
 /**
  * Resend transport.
@@ -16,7 +17,7 @@ let client: Resend | null = null;
 
 function resend(): Resend {
   if (!isResendConfigured()) {
-    throw new Error("RESEND_API_KEY is not configured.");
+    throw new IntegrationNotConfiguredError("Resend");
   }
 
   client ??= new Resend(env().RESEND_API_KEY);

@@ -61,7 +61,11 @@ export default defineConfig({
     },
     {
       name: "tablet",
-      use: { ...devices["iPad (gen 7)"] },
+      // Galaxy Tab S4 is one of the few tablet descriptors that runs on
+      // Chromium. The iPad descriptors default to WebKit, which CI does not
+      // install — using one here made every tablet test fail with "browser not
+      // found" rather than testing anything.
+      use: { ...devices["Galaxy Tab S4"] },
     },
   ],
 

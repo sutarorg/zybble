@@ -34,6 +34,7 @@ export function HowItWorks() {
         <Reveal>
           <SectionHeading
             eyebrow="How Zybble works"
+            headingId="how-heading"
             title="From idea to insight in three steps"
             description="A setup you finish in minutes, then a weekly rhythm that keeps your LinkedIn presence consistent."
           />

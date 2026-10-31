@@ -95,13 +95,21 @@ test.describe("mobile navigation", () => {
 
     const openButton = page.getByRole("button", { name: /open menu/i });
     await expect(openButton).toBeVisible();
-    await openButton.click();
 
-    // The panel is a real element, not a hover-only affordance.
-    await expect(page.getByRole("navigation", { name: /main navigation/i }).first()).toBeVisible();
+    // Opening it with the keyboard, not just a pointer.
+    await openButton.focus();
+    await page.keyboard.press("Enter");
+
+    // While a modal is open Radix marks the rest of the page aria-hidden, so
+    // the panel must be addressed as a dialog. Querying the page's own
+    // <nav aria-label="Main navigation"> here would find nothing and time out.
+    const panel = page.getByRole("dialog", { name: /^menu$/i });
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("link", { name: /pricing/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /close menu/i })).toBeVisible();
 
     await page.getByRole("button", { name: /close menu/i }).click();
+    await expect(panel).toBeHidden();
     await expect(page.getByRole("button", { name: /open menu/i })).toBeVisible();
   });
 });

@@ -10,6 +10,12 @@ interface SectionHeadingProps {
   className?: string;
   /** Render as h1 for landing-page heroes on subpages. */
   as?: "h1" | "h2";
+  /**
+   * Anchor for a parent `aria-labelledby`. Sections that point at this heading
+   * must give it an id — otherwise the reference dangles, the section has no
+   * accessible name and axe fails `aria-valid-attr-value`.
+   */
+  headingId?: string;
 }
 
 export function SectionHeading({
@@ -19,6 +25,7 @@ export function SectionHeading({
   align = "center",
   className,
   as: Heading = "h2",
+  headingId,
 }: SectionHeadingProps) {
   return (
     <div
@@ -31,7 +38,10 @@ export function SectionHeading({
       <Badge size="md" className={align === "center" ? "mx-auto" : undefined}>
         {eyebrow}
       </Badge>
-      <Heading className="mt-5 text-balance text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl lg:text-[40px] lg:leading-[1.15]">
+      <Heading
+        id={headingId}
+        className="mt-5 text-balance text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl lg:text-[40px] lg:leading-[1.15]"
+      >
         {title}
       </Heading>
       {description ? (

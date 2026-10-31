@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { IntegrationNotConfiguredError } from "@/lib/errors";
 import {
   requireUser,
   resolveWorkspace,
@@ -37,7 +38,7 @@ export async function workspaceContext(input: {
   minimumRole?: WorkspaceRole;
 }): Promise<WorkspaceContext> {
   if (!input.supabase) {
-    throw new Error("Supabase is not configured.");
+    throw new IntegrationNotConfiguredError("Supabase");
   }
 
   const user = await requireUser(input.supabase);

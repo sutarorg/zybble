@@ -1,4 +1,4 @@
-import { test, type Page } from "@playwright/test";
+import { test, type Page, type TestInfo } from "@playwright/test";
 
 /**
  * Shared helpers for the E2E suite.
@@ -21,6 +21,22 @@ export function needsBackend(): void {
   test.skip(
     !realBackend,
     "Requires E2E_REAL_BACKEND=1 and a configured Supabase project (see DEPLOYMENT.md).",
+  );
+}
+
+/**
+ * Skip unless this is the project chosen to run "once per run" assertions.
+ *
+ * API contracts do not vary by viewport, but they do consume a shared
+ * server-side budget: the auth endpoints allow 5 requests per 15 minutes per
+ * IP, and rate limiting runs *before* authentication. Running those assertions
+ * three times — once per project — would spend the whole budget and make the
+ * suite fail itself rather than the app.
+ */
+export function runsOnce(testInfo: TestInfo): void {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "Runs in one project only: the assertion does not vary by viewport and consumes a shared rate-limit budget.",
   );
 }
 
@@ -53,7 +69,7 @@ export async function integrations(page: Page): Promise<Record<string, boolean>>
 /** Sign in through the real login form. Assumes the account already exists. */
 export async function signIn(page: Page, email: string, password: string): Promise<void> {
   await page.goto("/login");
-  await page.getByLabel(/^email$/i).fill(email);
+  await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /log in|sign in/i }).click();
   await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 30_000 });
@@ -63,7 +79,7 @@ export async function signIn(page: Page, email: string, password: string): Promi
 export async function signUp(page: Page, name: string, email: string, password: string): Promise<void> {
   await page.goto("/signup");
   await page.getByLabel(/full name/i).fill(name);
-  await page.getByLabel(/^email$/i).fill(email);
+  await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/^password$/i).fill(password);
   await page.getByRole("button", { name: /create|sign up|get started/i }).click();
   await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 30_000 });

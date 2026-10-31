@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { env } from "@/lib/env";
 import { randomToken } from "@/lib/crypto";
 import { logger } from "@/lib/logger";
+import { IntegrationNotConfiguredError } from "@/lib/errors";
 import { capabilities, LINKEDIN_ENDPOINTS, redirectUri } from "./config";
 
 /**
@@ -38,7 +39,7 @@ export function buildAuthorizationUrl(input: {
   const clientId = env().LINKEDIN_CLIENT_ID;
 
   if (!clientId) {
-    throw new Error("LINKEDIN_CLIENT_ID is not configured");
+    throw new IntegrationNotConfiguredError("LinkedIn");
   }
 
   const params = new URLSearchParams({
@@ -80,7 +81,7 @@ export async function exchangeAuthorizationCode(code: string): Promise<TokenExch
   const configuration = env();
 
   if (!configuration.LINKEDIN_CLIENT_ID || !configuration.LINKEDIN_CLIENT_SECRET) {
-    throw new Error("LinkedIn OAuth credentials are not configured");
+    throw new IntegrationNotConfiguredError("LinkedIn");
   }
 
   const body = new URLSearchParams({

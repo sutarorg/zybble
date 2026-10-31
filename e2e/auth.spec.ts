@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboardingIfNeeded, needsBackend, signIn, signUp, testEmail } from "./support/backend";
+import {
+  completeOnboardingIfNeeded,
+  needsBackend,
+  runsOnce,
+  signIn,
+  signUp,
+  testEmail,
+} from "./support/backend";
 
 /**
  * Authentication end-to-end.
@@ -29,7 +36,7 @@ test.describe("signup", () => {
   test("rejects a password under 12 characters before calling the server", async ({ page }) => {
     await page.goto("/signup");
     await page.getByLabel(/full name/i).fill("Short Password");
-    await page.getByLabel(/^email$/i).fill(testEmail("short"));
+    await page.getByLabel(/email/i).fill(testEmail("short"));
     await page.getByLabel(/^password$/i).fill("short");
     await page.getByRole("button", { name: /create|sign up|get started/i }).click();
 
@@ -46,7 +53,7 @@ test.describe("signup", () => {
     await page.request.post("/api/auth/logout");
     await page.goto("/signup");
     await page.getByLabel(/full name/i).fill("Second User");
-    await page.getByLabel(/^email$/i).fill(email);
+    await page.getByLabel(/email/i).fill(email);
     await page.getByLabel(/^password$/i).fill(PASSWORD);
     await page.getByRole("button", { name: /create|sign up|get started/i }).click();
 
@@ -62,7 +69,7 @@ test.describe("login and session", () => {
   test("rejects wrong credentials with a safe message", async ({ page }) => {
     needsBackend();
     await page.goto("/login");
-    await page.getByLabel(/^email$/i).fill("nobody@example.com");
+    await page.getByLabel(/email/i).fill("nobody@example.com");
     await page.getByLabel(/^password$/i).fill("definitely-wrong-password");
     await page.getByRole("button", { name: /log in|sign in/i }).click();
 
@@ -115,7 +122,8 @@ test.describe("login and session", () => {
 });
 
 test.describe("password reset", () => {
-  test("the request is non-enumerable and always reports success", async ({ page }) => {
+  test("the request is non-enumerable and always reports success", async ({ page }, testInfo) => {
+    runsOnce(testInfo);
     await page.goto("/forgot-password");
 
     const known = await page.request.post("/api/auth/password", {
@@ -125,21 +133,28 @@ test.describe("password reset", () => {
       data: { email: testEmail("ghost") },
     });
 
-    expect(known.status()).toBe(202);
-    expect(unknown.status()).toBe(202);
-    // Identical bodies: an attacker must not be able to tell the two apart.
-    expect(await known.text()).toBe(await unknown.text());
+    // With Supabase configured the endpoint accepts every address (202) — it
+    // must never reveal which ones exist. With it missing there is nothing to
+    // ask, and the app says so with 503 rather than pretending to have sent
+    // mail. Both outcomes are non-enumerable; a 500 would not be, because it
+    // would be indistinguishable from a crash.
+    expect([202, 503]).toContain(known.status());
+    // Identical status and body: an attacker must not be able to tell the two
+    // addresses apart.
+    expect(unknown.status()).toBe(known.status());
+    expect(await unknown.text()).toBe(await known.text());
   });
 
   test("rejects a malformed address before sending anything", async ({ page }) => {
     await page.goto("/forgot-password");
-    await page.getByLabel(/^email$/i).fill("not-an-email");
+    await page.getByLabel(/email/i).fill("not-an-email");
     await page.getByRole("button", { name: /send|reset|email/i }).click();
 
     await expect(page.getByRole("alert").first()).toBeVisible();
   });
 
-  test("reset links cannot point at another origin", async ({ page }) => {
+  test("reset links cannot point at another origin", async ({ page }, testInfo) => {
+    runsOnce(testInfo);
     // The redirect target is the classic open-redirect vector in a reset flow.
     const response = await page.request.post("/api/auth/password", {
       data: {
@@ -165,7 +180,7 @@ test.describe("email verification", () => {
     expect(body).toHaveProperty("checks.supabase");
 
     await page.goto("/login");
-    await page.getByLabel(/^email$/i).fill(testEmail("unconfirmed"));
+    await page.getByLabel(/email/i).fill(testEmail("unconfirmed"));
     await page.getByLabel(/^password$/i).fill(PASSWORD);
     await page.getByRole("button", { name: /log in|sign in/i }).click();
 
@@ -174,7 +189,8 @@ test.describe("email verification", () => {
     expect(text).not.toMatch(/AuthApiError/);
   });
 
-  test("resending the confirmation email is rate limited, not open", async ({ page }) => {
+  test("resending the confirmation email is rate limited, not open", async ({ page }, testInfo) => {
+    runsOnce(testInfo);
     let limited = false;
 
     for (let i = 0; i < 8; i += 1) {

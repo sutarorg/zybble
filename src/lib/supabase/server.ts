@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { IntegrationNotConfiguredError } from "@/lib/errors";
 import { env, isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/env";
 import type { Database } from "./database.types";
 
@@ -16,9 +17,10 @@ export async function createSupabaseServerClient(): Promise<
   SupabaseClient<Database, "public">
 > {
   if (!isSupabaseConfigured()) {
-    throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
-    );
+    // A missing credential is a deployment fault, not a crash: answer 503 so
+    // monitoring can separate "misconfigured" from "broken", and so clients
+    // never receive a 500 that looks retryable.
+    throw new IntegrationNotConfiguredError("Supabase");
   }
 
   const cookieStore = await cookies();
