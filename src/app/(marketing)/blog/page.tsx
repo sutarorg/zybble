@@ -7,6 +7,7 @@ import { FinalCta } from "@/components/marketing/final-cta";
 import { SectionHeading } from "@/components/marketing/section-heading";
 import { Reveal } from "@/components/motion/reveal";
 import { Badge } from "@/components/ui/badge";
+import { CategoryNav } from "@/components/blog/category-nav";
 import { posts } from "@/lib/blog";
 
 export const metadata: Metadata = {
@@ -45,11 +46,15 @@ export default function BlogIndexPage() {
             />
           </Reveal>
 
+          <Reveal delay={80} className="mt-10">
+            <CategoryNav />
+          </Reveal>
+
           {/* Featured article */}
           <Reveal delay={120}>
             <Link
               href={`/blog/${featured.slug}`}
-              className="group mt-16 grid overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-xs transition-shadow duration-300 hover:shadow-soft lg:grid-cols-2"
+              className="group mt-12 grid overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-xs transition-shadow duration-300 hover:shadow-soft lg:grid-cols-2"
             >
               <div className="relative aspect-[16/9] overflow-hidden lg:aspect-auto lg:min-h-[320px]">
                 <Image

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { posts } from "@/lib/blog";
+import { categorySlug, getCategories, posts } from "@/lib/blog";
 import { siteConfig } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -24,10 +24,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const blogRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${siteConfig.url}/blog/${post.slug}`,
-    lastModified: new Date(post.publishedAt),
+    lastModified: new Date(post.updatedAt ?? post.publishedAt),
     changeFrequency: "yearly" as const,
     priority: 0.7,
   }));
 
-  return [...staticRoutes, ...blogRoutes];
+  const categoryRoutes: MetadataRoute.Sitemap = getCategories().map((category) => ({
+    url: `${siteConfig.url}/blog/category/${categorySlug(category)}`,
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: 0.5,
+  }));
+
+  return [...staticRoutes, ...blogRoutes, ...categoryRoutes];
 }
