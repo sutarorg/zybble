@@ -136,9 +136,17 @@ test.describe("free tools, trust pages and personas", () => {
     await page.getByLabel("Message").fill("This is an automated end-to-end test message.");
     await page.getByRole("button", { name: /send message/i }).click();
 
-    await expect(
-      page.getByRole("status").or(page.getByRole("alert")),
-    ).toBeVisible({ timeout: 15_000 });
+    // Scoped to <main> on purpose. Next.js appends its route announcer — a
+    // role="alert" node inside a shadow root on <body> — to every page, so an
+    // unscoped getByRole("alert") matches two elements whenever the form
+    // reports an error, which is every run without an email provider
+    // configured. The announcer is on <body>, so <main> excludes it.
+    const feedback = page
+      .getByRole("main")
+      .getByRole("status")
+      .or(page.getByRole("main").getByRole("alert"));
+
+    await expect(feedback).toBeVisible({ timeout: 15_000 });
   });
 
   test("the reusable CSV template downloads", async ({ page }) => {
@@ -249,10 +257,15 @@ test.describe("SEO and indexing", () => {
 
     // Every entry must be an absolute HTTPS URL on the canonical host. A
     // mistyped site URL once emitted http:// links; guard against a repeat.
-    const locs = body.match(/<loc>([^<]+)<\/loc>/g) ?? [];
-    expect(locs.length).toBeGreaterThan(20);
-    for (const loc of locs) {
-      expect(loc, loc).toMatch(/^<loc>https:\/\/zybble\.com(\/|$)/);
+    //
+    // Assert on the extracted URL, not the whole <loc> tag. The tag is followed
+    // by "</loc>", so a pattern ending in "$" can never match the bare root
+    // entry — the check silently covered only child routes and failed on the
+    // one entry where a wrong host would matter most.
+    const urls = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]!);
+    expect(urls.length).toBeGreaterThan(20);
+    for (const url of urls) {
+      expect(url, url).toMatch(/^https:\/\/zybble\.com(\/|$)/);
     }
 
     // Every published article must be present.

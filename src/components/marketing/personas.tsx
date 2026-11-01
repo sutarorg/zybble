@@ -136,7 +136,10 @@ export function PersonaWall() {
                 </div>
                 <p className="mt-4 flex-1 text-[15px] leading-7 text-slate-600">{persona.useCase}</p>
                 <p className="mt-4">
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 ring-1 ring-slate-200">
+                  {/* slate-600, not slate-500: slate-500 on slate-100 measures
+                      4.34:1, under the 4.5:1 WCAG AA floor. slate-600 on the
+                      same background is 6.9:1. */}
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
                     Illustrative persona
                   </span>
                 </p>
