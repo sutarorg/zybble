@@ -19,7 +19,14 @@ env:
   # The build must never depend on a real secret. Every integration reports
   # itself unconfigured and the UI degrades to a capability-gated state, which
   # is exactly what a CI build should prove.
-  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  #
+  # The site URL is the canonical production domain, not the host the CI server
+  # happens to bind to. robots.txt, the sitemap, every canonical tag and
+  # tests/lib/site.test.ts all assert the domain a crawler would see in
+  # production; pointing this at localhost made all of them fail, because they
+  # are checking exactly the thing a crawler is served. site.ts normalises the
+  # scheme to HTTPS itself.
+  NEXT_PUBLIC_SITE_URL: https://zybble.com
   TOKEN_ENCRYPTION_KEY: ci-only-not-a-real-key-0000000000000000=
 
 jobs:

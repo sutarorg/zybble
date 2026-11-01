@@ -20,6 +20,24 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const limit = usage.data?.monthlyLimit ?? null;
   const isPro = usage.data?.plan === "pro";
 
+  // Index of the nav entry with the longest matching prefix, or -1 when none
+  // match. Longest wins so /settings/billing highlights Billing, not Settings.
+  const activeIndex = (() => {
+    let best = -1;
+    let bestLength = -1;
+
+    appNavItems.forEach((item, index) => {
+      const matches =
+        pathname === item.href || pathname.startsWith(`${item.match}/`);
+      if (matches && item.match.length > bestLength) {
+        best = index;
+        bestLength = item.match.length;
+      }
+    });
+
+    return best;
+  })();
+
   return (
     <div className="flex h-full flex-col bg-slate-50/60">
       <div className="flex h-16 items-center border-b border-slate-200/70 px-5">
@@ -38,9 +56,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <nav aria-label="Workspace" className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-0.5">
-          {appNavItems.map((item) => {
-            const active =
-              pathname === item.href || pathname.startsWith(item.match + "/");
+          {appNavItems.map((item, index) => {
+            // Several entries can match at once — /settings/billing matches
+            // both Settings and Billing. Highlight only the most specific one,
+            // otherwise two items claim to be the current page.
+            const active = index === activeIndex;
             return (
               <li key={item.href}>
                 <Link

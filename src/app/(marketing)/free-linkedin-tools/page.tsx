@@ -6,7 +6,6 @@ import { Container } from "@/components/layout/container";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { PageHero } from "@/components/marketing/page-hero";
 import { Reveal } from "@/components/motion/reveal";
-import { SectionHeading } from "@/components/marketing/section-heading";
 import { FREE_TOOLS, type FreeTool } from "@/lib/free-tools";
 import { siteConfig } from "@/lib/site";
 
@@ -132,67 +131,6 @@ export default function FreeToolsPage() {
               <ToolCard key={tool.href} tool={tool} index={index} />
             ))}
           </div>
-        </Container>
-      </section>
-
-      <section aria-labelledby="tools-why" className="py-16 lg:py-20">
-        <Container className="max-w-3xl">
-          <Reveal>
-            <SectionHeading
-              as="h2"
-              eyebrow="Why free"
-              title={<span id="tools-why">Good tools are the honest advertisement</span>}
-              description="Every tool here does real work with no string attached. If it also happens to show you why Zybble exists, that is the point — shown, not claimed."
-            />
-          </Reveal>
-          <div className="mt-8 space-y-6 text-[15px] leading-8 text-slate-700">
-            <Reveal delay={60}>
-              <p>
-                Zybble is a scheduler and analytics workspace for people who publish on LinkedIn
-                seriously. The tools on this page cover the moments before that: checking a rate,
-                planning a month, fitting the character limits, sharpening a draft. They run in your
-                browser, and the numbers you enter stay on your machine.
-              </p>
-            </Reveal>
-            <Reveal delay={80}>
-              <p>
-                You will notice a consistent rule across all four: they compute only what can
-                genuinely be computed. No invented benchmarks on the calculator, no fake search
-                volumes on the analyzer. If a number would be a guess, the tool says so. That is the
-                same principle the product is built on —{" "}
-                <Link
-                  href="/linkedin-analytics"
-                  className="font-medium text-brand-700 underline decoration-brand-200 underline-offset-4 hover:text-brand-800"
-                >
-                  analytics that show what LinkedIn actually returned
-                </Link>
-                , never estimates dressed up as data.
-              </p>
-            </Reveal>
-          </div>
-
-          <Reveal delay={100}>
-            <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              <Link
-                href="/blog/linkedin-engagement-rate-calculate-improve"
-                className="rounded-xl bg-slate-50 p-4 text-sm font-medium text-slate-700 ring-1 ring-slate-100 transition hover:bg-brand-50 hover:text-brand-800"
-              >
-                Read: engagement rate, calculated properly →
-              </Link>
-              <Link
-                href="/blog/how-to-build-linkedin-content-calendar"
-                className="rounded-xl bg-slate-50 p-4 text-sm font-medium text-slate-700 ring-1 ring-slate-100 transition hover:bg-brand-50 hover:text-brand-800"
-              >
-                Read: build a content calendar →
-              </Link>
-              <Link
-                href="/blog/linkedin-hooks-that-capture-attention"
-                className="rounded-xl bg-slate-50 p-4 text-sm font-medium text-slate-700 ring-1 ring-slate-100 transition hover:bg-brand-50 hover:text-brand-800"
-              >
-                Read: hooks that earn the read →
-              </Link>
-            </div>
-          </Reveal>
         </Container>
       </section>
 

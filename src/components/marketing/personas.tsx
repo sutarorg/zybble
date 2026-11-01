@@ -112,7 +112,12 @@ export function PersonaWall() {
           />
         </Reveal>
 
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* grid-cols-1 is load-bearing. Tailwind's grid-cols-* compiles to
+            repeat(N, minmax(0, 1fr)), which has no content-based minimum. With
+            only sm:/lg: variants, the base breakpoint falls through to a single
+            implicit *auto* track, which is floored at the cards' min-content
+            contribution (424px) and overflows a 390px viewport by ~82px. */}
+        <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {personas.map((persona, i) => (
             <Reveal key={persona.name} delay={(i % 3) * 80}>
               <article className="flex h-full flex-col rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-xs">
@@ -136,7 +141,10 @@ export function PersonaWall() {
                 </div>
                 <p className="mt-4 flex-1 text-[15px] leading-7 text-slate-600">{persona.useCase}</p>
                 <p className="mt-4">
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 ring-1 ring-slate-200">
+                  {/* slate-600, not slate-500: slate-500 on slate-100 measures
+                      4.34:1, under the 4.5:1 WCAG AA floor. slate-600 on the
+                      same background is 6.9:1. */}
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
                     Illustrative persona
                   </span>
                 </p>

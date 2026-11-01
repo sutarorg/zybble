@@ -132,7 +132,7 @@ export default function WorkspaceSettingsPage() {
 
   if (loading || workspace.data === null || preferences.data === null) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-4xl">
         <SettingsNav />
         <div className="space-y-6">
           <Skeleton className="h-40 w-full" />
@@ -147,7 +147,7 @@ export default function WorkspaceSettingsPage() {
     : [resolvedTz, ...TIMEZONE_OPTIONS];
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <SettingsNav />
 
       <form onSubmit={(event) => void onSave(event)} className="space-y-6">

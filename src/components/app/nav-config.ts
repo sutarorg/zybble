@@ -1,6 +1,7 @@
 import {
   BarChart3,
   CalendarDays,
+  CreditCard,
   LayoutDashboard,
   PenSquare,
   Settings,
@@ -21,6 +22,15 @@ export const appNavItems: AppNavItem[] = [
   { href: "/posts", label: "Posts", icon: PenSquare, match: "/posts" },
   { href: "/analytics", label: "Analytics", icon: BarChart3, match: "/analytics" },
   { href: "/settings", label: "Settings", icon: Settings, match: "/settings" },
+  // Billing gets its own entry rather than living one click inside Settings:
+  // upgrading is the action the plan indicator at the bottom of the sidebar
+  // pushes people towards, so it should be reachable directly.
+  {
+    href: "/settings/billing",
+    label: "Billing",
+    icon: CreditCard,
+    match: "/settings/billing",
+  },
 ];
 
 export interface TopbarConfig {

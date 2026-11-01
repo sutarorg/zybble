@@ -94,13 +94,37 @@ test.describe("free tools, trust pages and personas", () => {
 
     // First textarea is the keyword list, second is the post draft.
     await page.locator("textarea").nth(0).fill("linkedin analytics");
+
+    // A draft written the way a person would write one: "linkedin analytics"
+    // appears twice in ~110 words, i.e. 1.8% density, comfortably under the
+    // 3% flag. The previous fixture repeated the phrase 12 times in 48 words
+    // (25% density), which analysePost() correctly reports as "Overused" — so
+    // it could never have matched "Present". The fixture was wrong, not the
+    // tool.
+    const realisticDraft =
+      "Most founders treat LinkedIn analytics like a scoreboard. It isn't. " +
+      "Analytics is a decision tool: when a post outperforms your median, the " +
+      "useful question is not how do I repeat this exact post, but what did it " +
+      "change about who saw my work. Last quarter I reviewed six months of " +
+      "LinkedIn analytics in one sitting. The pattern was uncomfortable - my " +
+      "highest-reach posts were not the ones that started conversations. Reach " +
+      "flattered the topics I enjoyed writing; engagement rate told the truth " +
+      "about what my audience actually needed. So I changed the mix: fewer hot " +
+      "takes, more working notes. Nothing about my posting frequency changed - " +
+      "only what each post was for.";
+    await page.locator("textarea").nth(1).fill(realisticDraft);
+
+    await expect(page.getByText("Keyword report")).toBeVisible();
+    await expect(page.getByText("Present", { exact: true }).first()).toBeVisible();
+
+    // Over-optimisation must still be flagged. This is the behaviour the old
+    // fixture was actually exercising, so assert it explicitly rather than
+    // leaving it covered by accident.
     await page
       .locator("textarea")
       .nth(1)
       .fill("linkedin analytics helps founders. ".repeat(12));
-
-    await expect(page.getByText("Keyword report")).toBeVisible();
-    await expect(page.getByText("Present", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Overused", { exact: true }).first()).toBeVisible();
   });
 
   test("the calendar planner stores entries and offers the CSV download", async ({ page }) => {
@@ -136,9 +160,17 @@ test.describe("free tools, trust pages and personas", () => {
     await page.getByLabel("Message").fill("This is an automated end-to-end test message.");
     await page.getByRole("button", { name: /send message/i }).click();
 
-    await expect(
-      page.getByRole("status").or(page.getByRole("alert")),
-    ).toBeVisible({ timeout: 15_000 });
+    // Scoped to <main> on purpose. Next.js appends its route announcer — a
+    // role="alert" node inside a shadow root on <body> — to every page, so an
+    // unscoped getByRole("alert") matches two elements whenever the form
+    // reports an error, which is every run without an email provider
+    // configured. The announcer is on <body>, so <main> excludes it.
+    const feedback = page
+      .getByRole("main")
+      .getByRole("status")
+      .or(page.getByRole("main").getByRole("alert"));
+
+    await expect(feedback).toBeVisible({ timeout: 15_000 });
   });
 
   test("the reusable CSV template downloads", async ({ page }) => {
@@ -249,10 +281,15 @@ test.describe("SEO and indexing", () => {
 
     // Every entry must be an absolute HTTPS URL on the canonical host. A
     // mistyped site URL once emitted http:// links; guard against a repeat.
-    const locs = body.match(/<loc>([^<]+)<\/loc>/g) ?? [];
-    expect(locs.length).toBeGreaterThan(20);
-    for (const loc of locs) {
-      expect(loc, loc).toMatch(/^<loc>https:\/\/zybble\.com(\/|$)/);
+    //
+    // Assert on the extracted URL, not the whole <loc> tag. The tag is followed
+    // by "</loc>", so a pattern ending in "$" can never match the bare root
+    // entry — the check silently covered only child routes and failed on the
+    // one entry where a wrong host would matter most.
+    const urls = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]!);
+    expect(urls.length).toBeGreaterThan(20);
+    for (const url of urls) {
+      expect(url, url).toMatch(/^https:\/\/zybble\.com(\/|$)/);
     }
 
     // Every published article must be present.

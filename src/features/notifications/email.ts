@@ -2,6 +2,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { sendEmail } from "@/lib/resend/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { siteConfig } from "@/lib/site";
 
 /**
  * Branded transactional email.
@@ -60,12 +61,21 @@ export type TemplatePayload = {
   [key: string]: string | number | boolean | null | undefined;
 };
 
+/**
+ * Mirrors the brand tokens in `src/app/globals.css`. Email clients cannot read
+ * the app stylesheet, so the palette is repeated here — if the brand colours
+ * change, change both.
+ */
 const BRAND = {
   name: "Zybble",
-  accent: "#6366f1",
-  ink: "#111827",
-  muted: "#6b7280",
-  background: "#f9fafb",
+  accent: "#2563eb", // brand-600
+  accentDeep: "#1d4ed8", // brand-700
+  ink: "#0f172a", // slate-950
+  body: "#334155", // slate-700
+  muted: "#64748b", // slate-500
+  background: "#eef4ff", // brand-50
+  surface: "#ffffff",
+  hairline: "#e2e8f0", // slate-200
 };
 
 function siteUrl(): string {
@@ -96,6 +106,10 @@ function layout(input: { title: string; preheader: string; body: string; ctaUrl?
          </table>`
       : "";
 
+  // Absolute so the image resolves from a mail client; the logo is the same
+  // file the site header uses.
+  const logoUrl = `${siteUrl()}${siteConfig.logoPath}`;
+
   return {
     subject: input.title,
     html: `<!doctype html>
@@ -105,20 +119,29 @@ function layout(input: { title: string; preheader: string; body: string; ctaUrl?
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${escape(input.preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px">
 <tr><td align="center">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${BRAND.surface};border-radius:16px;overflow:hidden;border:1px solid ${BRAND.hairline}">
 <tr><td style="padding:26px 32px 0">
-  <span style="font-size:18px;font-weight:700;letter-spacing:-0.02em">${BRAND.name}</span>
+  <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+    <tr>
+      <td style="vertical-align:middle">
+        <img src="${escape(logoUrl)}" width="28" height="28" alt="${BRAND.name}" style="display:block;border:0;border-radius:7px;outline:none;text-decoration:none" />
+      </td>
+      <td style="vertical-align:middle;padding-left:9px;font-size:18px;font-weight:700;letter-spacing:-0.02em;color:${BRAND.ink}">
+        ${BRAND.name}
+      </td>
+    </tr>
+  </table>
 </td></tr>
 <tr><td style="padding:18px 32px 8px">
-  <h1 style="margin:0;font-size:20px;line-height:1.3;font-weight:650">${escape(input.title)}</h1>
+  <h1 style="margin:0;font-size:20px;line-height:1.3;font-weight:650;color:${BRAND.ink}">${escape(input.title)}</h1>
 </td></tr>
-<tr><td style="padding:0 32px 8px;font-size:15px;line-height:1.6;color:#374151">
+<tr><td style="padding:0 32px 8px;font-size:15px;line-height:1.6;color:${BRAND.body}">
   ${input.body}
 </td></tr>
 <tr><td style="padding:0 32px 8px">${cta}</td></tr>
-<tr><td style="padding:24px 32px 28px;font-size:12px;line-height:1.6;color:${BRAND.muted}">
+<tr><td style="padding:24px 32px 28px;font-size:12px;line-height:1.6;color:${BRAND.muted};border-top:1px solid ${BRAND.hairline}">
   You are receiving this because you have a ${BRAND.name} account.
-  Manage email preferences in <a href="${siteUrl()}/settings/notifications" style="color:${BRAND.muted}">Settings → Notifications</a>.
+  Manage email preferences in <a href="${siteUrl()}/settings#ws-notifications" style="color:${BRAND.accentDeep}">Settings → Email notifications</a>.
 </td></tr>
 </table>
 </td></tr></table>
@@ -182,7 +205,7 @@ export function renderTemplate(template: EmailTemplate, payload: TemplatePayload
           "Start with three steps: connect your LinkedIn account, write your first post, and pick a time.",
         ],
         ctaLabel: "Connect LinkedIn",
-        ctaUrl: `${siteUrl()}/settings/accounts`,
+        ctaUrl: `${siteUrl()}/settings/linkedin`,
       });
 
     case "linkedin_connected":
@@ -199,7 +222,7 @@ export function renderTemplate(template: EmailTemplate, payload: TemplatePayload
           `${payload.accountName ?? "Your LinkedIn account"} is connected to ${workspace}. Scheduled posts will publish there once you set a time.`,
         ],
         ctaLabel: "Create a post",
-        ctaUrl: `${siteUrl()}/composer`,
+        ctaUrl: `${siteUrl()}/posts/new`,
       });
 
     case "linkedin_reauth_required":
@@ -218,7 +241,7 @@ export function renderTemplate(template: EmailTemplate, payload: TemplatePayload
           "Nothing was lost — drafts and scheduled posts stay exactly where they are.",
         ],
         ctaLabel: "Reconnect LinkedIn",
-        ctaUrl: `${siteUrl()}/settings/accounts`,
+        ctaUrl: `${siteUrl()}/settings/linkedin`,
       });
 
     case "post_published":

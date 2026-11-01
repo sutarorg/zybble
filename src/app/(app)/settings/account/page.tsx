@@ -108,7 +108,7 @@ export default function AccountSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <SettingsNav />
       <div className="space-y-6">
         {/* Profile */}

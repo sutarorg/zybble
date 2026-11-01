@@ -51,17 +51,13 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-slate-200 bg-slate-50">
       <Container className="py-16">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-8">
+        {/* Brand block spans 2 columns; the remaining 5 are one per nav group. */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-7">
           <div className="col-span-2">
             <Logo />
             <p className="mt-4 max-w-xs text-sm leading-6 text-slate-600">
               The focused LinkedIn scheduler and analytics workspace for B2B
               founders, consultants and creators.
-            </p>
-            <p className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-              <span className="size-1.5 rounded-full bg-brand-500" aria-hidden />
-              LinkedIn™ is a trademark of LinkedIn Corporation. Zybble is not
-              affiliated with LinkedIn.
             </p>
           </div>
 
@@ -82,14 +78,6 @@ export function SiteFooter() {
               </ul>
             </nav>
           ))}
-
-          <div className="col-span-2 md:col-span-1">
-            <h2 className="text-sm font-semibold text-slate-900">Plans</h2>
-            <ul className="mt-4 space-y-3 text-sm text-slate-600">
-              <li>Free — $0/month</li>
-              <li>Pro — $15/seat/month</li>
-            </ul>
-          </div>
         </div>
 
         <div className="mt-14 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row sm:items-center sm:justify-between">

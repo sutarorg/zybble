@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { LineChart, ShieldCheck, Target } from "lucide-react";
 import { JsonLd } from "@/components/json-ld";
@@ -250,17 +251,21 @@ export default function AboutPage() {
             <div className="grid items-start gap-10 md:grid-cols-[auto_1fr]">
               <Reveal>
                 <div className="flex flex-col items-center text-center">
-                  {/* Founder portrait placeholder: an original monogram tile.
-                      Intentionally NOT a photo — no stock image or AI face is
-                      substituted for a real person. Replace with the founder's
-                      photograph at public/images/tejas-sutar.jpg when supplied. */}
-                  <div
-                    aria-hidden
-                    className="flex size-40 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 shadow-soft ring-1 ring-brand-700/50"
-                  >
-                    <span className="text-5xl font-semibold tracking-tight text-white">TS</span>
-                  </div>
-                  <p className="sr-only" role="img" aria-label="Monogram placeholder for Tejas Sutar's portrait" />
+                  {/* Founder portrait, hosted off-site.
+                      `unoptimized` is deliberate: it makes the browser fetch the
+                      file straight from the host, so the image renders without
+                      the Next image optimiser needing to proxy it. To serve it
+                      from this repo instead, save it as
+                      public/images/tejas-sutar.jpg, point `src` at
+                      "/images/tejas-sutar.jpg" and drop `unoptimized`. */}
+                  <Image
+                    src="https://i.ibb.co/tMywK0cN/Untitled-design-9.png"
+                    alt="Tejas Sutar, founder of Zybble"
+                    width={160}
+                    height={160}
+                    unoptimized
+                    className="size-40 rounded-3xl object-cover shadow-soft ring-1 ring-brand-700/50"
+                  />
                 </div>
               </Reveal>
               <Reveal delay={80}>
