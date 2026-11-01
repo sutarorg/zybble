@@ -50,6 +50,46 @@ const nextConfig: NextConfig = {
   // external image host needs to be whitelisted.
   reactStrictMode: true,
 
+  async redirects() {
+    /**
+     * Canonical-domain enforcement.
+     *
+     * `zybble.com` (apex, HTTPS) is the single canonical host. The retired
+     * `zybble.app` identity and the `www` variant are permanently redirected
+     * so link equity accumulated under the old names consolidates onto the
+     * canonical domain instead of splitting across hosts.
+     *
+     * These rules work wherever the app runs (Vercel, any Node host), provided
+     * DNS for the retired hosts still points at the deployment — see
+     * SEO_AUDIT.md "Domain consolidation".
+     *
+     * The retired blog-category slugs were consolidated into four topical
+     * archives; the old archive URLs are 301'd so any indexed links keep
+     * resolving instead of 404ing.
+     */
+    const retiredHosts = ["www.zybble.com", "zybble.app", "www.zybble.app"];
+    const retiredCategories: Array<[from: string, to: string]> = [
+      ["/blog/category/scheduling", "/blog/category/strategy"],
+      ["/blog/category/how-to", "/blog/category/tools"],
+      ["/blog/category/resources", "/blog/category/tools"],
+      ["/blog/category/formats", "/blog/category/writing"],
+    ];
+
+    return [
+      ...retiredHosts.map((host) => ({
+        source: "/:path*",
+        has: [{ type: "host" as const, value: host }],
+        destination: "https://zybble.com/:path*",
+        permanent: true,
+      })),
+      ...retiredCategories.map(([from, to]) => ({
+        source: from,
+        destination: to,
+        permanent: true,
+      })),
+    ];
+  },
+
   async headers() {
     // HSTS is only sent on a real deployment. Emitting it on localhost makes
     // the browser pin `http://localhost:3000` to HTTPS for two years, which

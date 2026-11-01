@@ -8,7 +8,7 @@ import { SectionHeading } from "@/components/marketing/section-heading";
 import { Reveal } from "@/components/motion/reveal";
 import { Badge } from "@/components/ui/badge";
 import { CategoryNav } from "@/components/blog/category-nav";
-import { posts } from "@/lib/blog";
+import { posts, readingTimeFor } from "@/lib/blog";
 
 export const metadata: Metadata = {
   title: "Blog — LinkedIn growth, scheduling and analytics",
@@ -71,7 +71,7 @@ export default function BlogIndexPage() {
                   <Badge>{featured.category}</Badge>
                   <span className="inline-flex items-center gap-1.5 text-[13px] text-slate-500">
                     <Clock className="size-3.5" aria-hidden />
-                    {featured.readingTime}
+                    {readingTimeFor(featured)}
                   </span>
                 </div>
                 <h2 className="mt-4 text-balance text-2xl font-semibold tracking-tight text-slate-950 transition-colors group-hover:text-brand-700 lg:text-3xl">
@@ -107,7 +107,7 @@ export default function BlogIndexPage() {
                     <div className="flex flex-1 flex-col p-6">
                       <div className="flex items-center gap-3">
                         <Badge>{post.category}</Badge>
-                        <span className="text-[13px] text-slate-500">{post.readingTime}</span>
+                        <span className="text-[13px] text-slate-500">{readingTimeFor(post)}</span>
                       </div>
                       <h2 className="mt-4 text-balance text-lg font-semibold tracking-tight text-slate-950 transition-colors group-hover:text-brand-700">
                         {post.title}

@@ -47,7 +47,7 @@ const features: Feature[] = [
   {
     icon: CalendarDays,
     title: "A calendar you can actually read",
-    copy: "See drafts, scheduled slots and published posts on one clean calendar. Drag a draft onto a day and it becomes a plan.",
+    copy: "See drafts, scheduled slots and published posts on one clean calendar. Tap any day to start a post right there — a plan in two clicks.",
   },
   {
     icon: FileText,
@@ -57,7 +57,7 @@ const features: Feature[] = [
   {
     icon: BarChart3,
     title: "Analytics that respect your time",
-    copy: "Impressions, engagement and follower movement per post — read at a glance, export when you need the numbers elsewhere.",
+    copy: "Impressions, engagement and follower movement per post — read at a glance, no spreadsheet required.",
     wide: true,
     visual: (
       <div className="mt-6 flex h-16 items-end gap-1.5" aria-hidden>

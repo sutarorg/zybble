@@ -1,11 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import { siteConfig } from "@/lib/site";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
+/**
+ * Inter, self-hosted as a variable font instead of fetched from Google Fonts
+ * at build time.
+ *
+ * `next/font/google` already served fonts from our own origin in production,
+ * but the build itself depended on reaching fonts.googleapis.com — a network
+ * dependency that fails builds behind restrictive egress and adds a
+ * third-party request to every deploy. Committing the woff2 files (latin and
+ * latin-ext subsets, weight axis 100–900, normal style) keeps the rendering
+ * identical while making builds hermetic and shaving a blocking request off
+ * first load.
+ */
+const inter = localFont({
+  src: [
+    { path: "./fonts/inter-latin-wght-normal.woff2", weight: "100 900", style: "normal" },
+    { path: "./fonts/inter-latin-ext-wght-normal.woff2", weight: "100 900", style: "normal" },
+  ],
   variable: "--font-inter",
   display: "swap",
 });
@@ -19,6 +34,15 @@ export const metadata: Metadata = {
   description: siteConfig.description,
   applicationName: siteConfig.name,
   alternates: { canonical: "/" },
+  /**
+   * Google Search Console / Bing Webmaster verification. Set
+   * NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION (the `content` value of the
+   * verification meta tag) in the deployment environment and it is rendered
+   * here; unset it renders nothing, so verification is opt-in per environment.
+   */
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } }
+    : {}),
   openGraph: {
     type: "website",
     siteName: siteConfig.name,

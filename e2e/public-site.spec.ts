@@ -106,7 +106,10 @@ test.describe("SEO and indexing", () => {
 
     const body = await response.text();
     expect(body).toContain("Sitemap:");
-    for (const path of ["/dashboard", "/settings", "/api/"]) {
+    // The sitemap pointer must be the canonical HTTPS origin — an http:// or
+    // www URL here leaks a non-canonical host into crawler configuration.
+    expect(body).toMatch(/Sitemap: https:\/\/zybble\.com\/sitemap\.xml/);
+    for (const path of ["/dashboard", "/settings", "/api/", "/login", "/signup"]) {
       expect(body, `${path} should be disallowed`).toContain(`Disallow: ${path}`);
     }
   });
@@ -118,8 +121,45 @@ test.describe("SEO and indexing", () => {
 
     const body = await response.text();
     expect(body).toContain("<urlset");
-    expect(body).not.toContain("/dashboard");
-    expect(body).not.toContain("/settings/billing");
+
+    // Never list private or authenticated surfaces — not the app shell, and
+    // not the auth pages either, which are robots-disallowed and noindexed.
+    for (const path of ["/dashboard", "/settings/billing", "/login", "/signup", "/onboarding"]) {
+      expect(body, `${path} must not appear in the sitemap`).not.toContain(path);
+    }
+
+    // Every entry must be an absolute HTTPS URL on the canonical host. A
+    // mistyped site URL once emitted http:// links; guard against a repeat.
+    const locs = body.match(/<loc>([^<]+)<\/loc>/g) ?? [];
+    expect(locs.length).toBeGreaterThan(20);
+    for (const loc of locs) {
+      expect(loc, loc).toMatch(/^<loc>https:\/\/zybble\.com(\/|$)/);
+    }
+
+    // Every published article must be present.
+    for (const slug of ["how-to-find-your-best-time-to-post-on-linkedin", "linkedin-content-roi-b2b"]) {
+      expect(body).toContain(`/blog/${slug}</loc>`);
+    }
+  });
+
+  test("retired category archives permanently redirect to their consolidated archive", async ({ page }) => {
+    for (const [from, to] of [
+      ["/blog/category/scheduling", "/blog/category/strategy"],
+      ["/blog/category/how-to", "/blog/category/tools"],
+      ["/blog/category/resources", "/blog/category/tools"],
+      ["/blog/category/formats", "/blog/category/writing"],
+    ]) {
+      const response = await page.request.get(from, { maxRedirects: 0 });
+      // Next.js emits 308 for `permanent: true` redirects; 308 is the
+      // method-preserving permanent-redirect twin of 301 for crawlers.
+      expect([301, 308], from).toContain(response.status());
+      expect(response.headers()["location"], from).toContain(to);
+    }
+  });
+
+  test("unknown routes return a real 404 status", async ({ page }) => {
+    const response = await page.request.get("/blog/this-post-does-not-exist");
+    expect(response.status()).toBe(404);
   });
 });
 

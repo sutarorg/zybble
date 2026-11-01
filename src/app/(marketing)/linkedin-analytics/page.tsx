@@ -41,9 +41,9 @@ const analyticsFaq: FaqItem[] = [
       "A Pro feature that analyses when your own posts have historically earned the strongest engagement and surfaces those windows in the scheduler. It is your data about your audience — never generic industry averages dressed up as advice.",
   },
   {
-    question: "Can I export my analytics?",
+    question: "Where does my analytics data come from?",
     answer:
-      "Yes. Your metrics belong to you: export the numbers behind any chart to take into a deck, a spreadsheet or a client report.",
+      "Directly from LinkedIn's official API for the account you connected — the same numbers LinkedIn shows you, gathered per post and laid out side by side. Nothing is estimated or inferred: if LinkedIn has not returned a figure yet, Zybble says so rather than inventing one.",
   },
 ];
 

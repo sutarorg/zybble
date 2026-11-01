@@ -47,7 +47,7 @@ const sections = [
   {
     heading: "5. Your rights",
     body: [
-      "Export your data — drafts, schedule history and analytics — from workspace settings at any time.",
+      "Your drafts, schedule history and analytics are visible in your workspace at any time. For a copy of your data in a portable format, contact us and we will provide it.",
       "Disconnect LinkedIn from Zybble or from LinkedIn's own settings; either action revokes our access.",
       "Delete your account and all associated data. Deletion is immediate from live systems and completes in backups within 30 days. [owner to confirm: deletion SLA]",
       "Residents of the EEA, UK and California have additional statutory rights; contact us to exercise them. [owner to confirm: privacy contact address]",
