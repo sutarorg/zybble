@@ -27,7 +27,7 @@ export function TableOfContents({ entries }: { entries: TocEntry[] }) {
           <li key={entry.id} className="flex gap-3 text-[15px] leading-6">
             <span
               aria-hidden
-              className="mt-px shrink-0 tabular-nums text-xs font-semibold text-brand-400"
+              className="mt-px shrink-0 tabular-nums text-xs font-semibold text-brand-600"
             >
               {String(index + 1).padStart(2, "0")}
             </span>
