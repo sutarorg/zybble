@@ -42,7 +42,7 @@ export function ProductPreview() {
           </div>
           <div className="ml-2 flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
             <Lock className="size-3" aria-hidden />
-            zybble.com/posts/new
+            app.zybble.com/composer
           </div>
           <span className="ml-auto hidden rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 ring-1 ring-brand-100 sm:block">
             Preview illustration

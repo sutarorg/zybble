@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Container } from "@/components/layout/container";
-import { LegalNotice } from "@/components/marketing/legal-notice";
 import { Reveal } from "@/components/motion/reveal";
+import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -16,7 +16,7 @@ const sections = [
     heading: "1. The service",
     body: [
       "Zybble provides a web application for scheduling LinkedIn posts and viewing LinkedIn post analytics. The service is offered in two plans: Free ($0/month) and Pro ($15 per seat/month), with the entitlements described on the pricing page at the time of purchase.",
-      "Zybble is an independent product and is not affiliated with, endorsed by or sponsored by LinkedIn Corporation.",
+      "Zybble is an independent product and is not affiliated with, endorsed by or sponsored by LinkedIn Corporation. LinkedIn is a trademark of LinkedIn Corporation.",
     ],
   },
   {
@@ -31,34 +31,40 @@ const sections = [
     body: [
       "You agree to use Zybble in compliance with LinkedIn's terms and community policies. Content scheduled through Zybble is your responsibility.",
       "You may not use Zybble to distribute spam, deceptive content or material you have no right to publish, and you may not attempt to circumvent plan limits or the LinkedIn API's rules.",
-      "We may suspend accounts that violate these rules, with notice where practical. [owner to confirm: enforcement process]",
+      "We may suspend accounts that violate these rules, with notice where practical.",
     ],
   },
   {
     heading: "4. Billing and cancellation",
     body: [
-      "Pro is billed monthly per seat in US dollars. There are no long-term contracts.",
-      "You can cancel at any time from workspace settings. Cancellation takes effect at the end of the current billing period; you retain Pro access until then. We do not offer partial-period refunds except where required by law. [owner to confirm: refund policy]",
+      "Pro is billed monthly per seat in US dollars through a third-party payment processor. There are no long-term contracts.",
+      "You can cancel at any time from workspace settings. Cancellation takes effect at the end of the current billing period; you retain Pro access until then. We do not offer partial-period refunds except where required by law.",
       "Plan limits are enforced server-side. If your usage exceeds a plan's limits after a downgrade, existing scheduled posts still publish, but new scheduling pauses until you are within the plan's limits.",
     ],
   },
   {
     heading: "5. Availability and changes",
     body: [
-      "We aim for high availability but do not warrant uninterrupted service. Scheduled publishing depends on LinkedIn's API being available; if LinkedIn is unreachable, Zybble will retry and notify you of failures. [owner to confirm: SLA wording]",
+      "We aim for high availability but do not warrant uninterrupted service. Scheduled publishing depends on LinkedIn's API being available; if LinkedIn is unreachable, Zybble will retry and notify you of failures.",
       "We may update these terms with reasonable advance notice for material changes. Continued use after the effective date constitutes acceptance.",
     ],
   },
   {
     heading: "6. Liability",
     body: [
-      "The service is provided “as is” within the limits of applicable law. Nothing in these terms limits liability that cannot be limited by law. [owner to confirm: governing law and jurisdiction]",
+      "The service is provided \u201cas is\u201d within the limits of applicable law. Nothing in these terms limits liability that cannot be limited by law.",
     ],
   },
   {
-    heading: "7. Contact",
+    heading: "7. Governing law",
     body: [
-      "Questions about these terms: [owner to confirm: legal contact email].",
+      "Zybble is operated from Pune, Maharashtra, India. These terms and any dispute arising out of them are governed by the laws of India.",
+    ],
+  },
+  {
+    heading: "8. Contact",
+    body: [
+      `Questions about these terms: ${siteConfig.email.support} — or through the contact form.`,
     ],
   },
 ] as const;
@@ -74,7 +80,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="mt-4 text-sm text-slate-500">
-          Last updated: <time dateTime="2026-01-19">January 19, 2026</time>
+          Last updated: <time dateTime="2026-11-01">November 1, 2026</time>
         </p>
         <p className="mt-4 text-[15px] leading-7 text-slate-600">
           These terms sit alongside our{" "}
@@ -83,9 +89,6 @@ export default function TermsPage() {
           </Link>
           , which explains how we handle your data.
         </p>
-        <div className="mt-8">
-          <LegalNotice />
-        </div>
       </Reveal>
 
       <div className="mt-8">

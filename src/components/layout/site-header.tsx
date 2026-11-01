@@ -14,6 +14,7 @@ const navItems = [
   { label: "Product", href: siteConfig.links.product },
   { label: "Features", href: siteConfig.links.analytics },
   { label: "Pricing", href: siteConfig.links.pricing },
+  { label: "Free tools", href: siteConfig.links.freeTools },
   { label: "Blog", href: siteConfig.links.blog },
 ] as const;
 

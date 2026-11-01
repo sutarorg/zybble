@@ -1198,6 +1198,10 @@ export const posts: BlogPost[] = [
         text: "Most content calendars fail because they are designed for a version of you that writes daily and never has a bad week. This one is designed for the other version: the one running a company, who can give LinkedIn one focused hour and would like thirty days of publishing to come out of it.",
       },
       {
+        type: "paragraph",
+        text: "Prefer to plan interactively? The [[free LinkedIn content calendar planner]](/resources/linkedin-content-calendar-template) turns this template into a working weekly and monthly grid in your browser — with the same fields and a CSV download, no signup required.",
+      },
+      {
         type: "heading",
         text: "What the template is",
       },
@@ -2095,6 +2099,10 @@ export const posts: BlogPost[] = [
         text: "Your post has one job before it has any other: earn the tap. Everything past the first couple of lines is read only by people who already decided to read it, which means the opening is not an introduction to your post — it is the whole of your distribution. That is not a stylistic claim, it is a mechanical one. The feed shows a truncated preview; the reader decides in under a second whether to expand; nothing you wrote in paragraph four can rescue a first line that did not earn it. This piece covers what those lines have to do, eight patterns that reliably do it, examples of each, the formulas that have stopped working, and an honest way to tell whether a hook is actually any good.",
       },
       {
+        type: "paragraph",
+        text: "As you draft, the [[free LinkedIn character counter]](/tools/linkedin-character-counter) shows a live count against the 3,000-character limit — and against the first 210 characters your hook has to survive in.",
+      },
+      {
         type: "heading",
         text: "What the first two lines have to do",
       },
@@ -2530,6 +2538,10 @@ export const posts: BlogPost[] = [
       {
         type: "paragraph",
         text: "If you are still unclear on what counts as an impression or how reach differs, read [[LinkedIn impressions vs reach vs engagement explained]](/blog/linkedin-impressions-vs-reach-vs-engagement) first — this article assumes those definitions.",
+      },
+      {
+        type: "paragraph",
+        text: "If you want the arithmetic done for you, the [[free LinkedIn engagement rate calculator]](/tools/linkedin-engagement-rate-calculator) applies these formulas to your own numbers and shows the working — including what changes when you switch denominators.",
       },
       {
         type: "heading",

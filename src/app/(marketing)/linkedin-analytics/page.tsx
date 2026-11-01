@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Check } from "lucide-react";
+import Link from "next/link";
 import { JsonLd } from "@/components/json-ld";
 import { Container } from "@/components/layout/container";
 import { AnalyticsShowcase } from "@/components/marketing/analytics-showcase";
@@ -110,6 +111,26 @@ export default function LinkedInAnalyticsPage() {
       </section>
 
       <AnalyticsShowcase />
+            <section aria-labelledby="calc-crosslink" className="border-t border-slate-100 py-14">
+        <Container className="max-w-3xl text-center">
+          <Reveal>
+            <h2 id="calc-crosslink" className="text-xl font-semibold tracking-tight text-slate-950">
+              Do the maths yourself first
+            </h2>
+            <p className="mt-3 text-[15px] leading-7 text-slate-600">
+              The{" "}
+              <Link
+                href="/tools/linkedin-engagement-rate-calculator"
+                className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800"
+              >
+                free LinkedIn engagement rate calculator
+              </Link>{" "}
+              runs the formulas on any post&rsquo;s numbers, with the denominator choice explained.
+              When you would rather have every post measured automatically, that is this product.
+            </p>
+          </Reveal>
+        </Container>
+      </section>
       <FaqSection
         eyebrow="Analytics FAQ"
         title="Straight answers about the numbers"

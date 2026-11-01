@@ -108,6 +108,25 @@ export default function LinkedInSchedulerPage() {
                 <ArrowRight className="size-4" aria-hidden />
               </Link>
             </p>
+          <Reveal delay={200}>
+            <p className="mt-6 text-center text-sm text-slate-500">
+              Planning before publishing? The{" "}
+              <Link
+                href="/resources/linkedin-content-calendar-template"
+                className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800"
+              >
+                free LinkedIn content calendar template
+              </Link>{" "}
+              and the{" "}
+              <Link
+                href="/tools/linkedin-character-counter"
+                className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800"
+              >
+                LinkedIn character counter
+              </Link>{" "}
+              are free on this site — no signup.
+            </p>
+          </Reveal>
           </Reveal>
         </Container>
       </section>

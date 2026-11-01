@@ -7,7 +7,6 @@ import { FinalCta } from "@/components/marketing/final-cta";
 import { SectionHeading } from "@/components/marketing/section-heading";
 import { Reveal } from "@/components/motion/reveal";
 import { Badge } from "@/components/ui/badge";
-import { CategoryNav } from "@/components/blog/category-nav";
 import { posts, readingTimeFor } from "@/lib/blog";
 
 export const metadata: Metadata = {
@@ -44,10 +43,6 @@ export default function BlogIndexPage() {
               title="Write less often. Mean it more."
               description="Practical notes on LinkedIn consistency, scheduling systems and analytics that respect your time. No growth hacks, no recycled threads."
             />
-          </Reveal>
-
-          <Reveal delay={80} className="mt-10">
-            <CategoryNav />
           </Reveal>
 
           {/* Featured article */}

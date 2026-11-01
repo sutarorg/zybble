@@ -57,6 +57,17 @@ export function normaliseSiteUrl(raw: string | undefined | null): string {
   return url.origin;
 }
 
+/**
+ * Support inboxes.
+ *
+ * `NEXT_PUBLIC_SUPPORT_EMAIL` is the public address shown on /contact and in
+ * the legal pages (public config, safe to inline in the client bundle).
+ * `CONTACT_FORM_TO` is server-only: the inbox the contact form actually
+ * delivers to, which need not be published. Both default to the founder's
+ * business address.
+ */
+const supportEmail = (process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "tejassutar.business@gmail.com").trim() || "tejassutar.business@gmail.com";
+
 export const siteConfig = {
   name: "Zybble",
   tagline: "LinkedIn Post Scheduler & Analytics",
@@ -65,6 +76,10 @@ export const siteConfig = {
   url: normaliseSiteUrl(process.env.NEXT_PUBLIC_SITE_URL ?? fallbackUrl),
   logoPath: "/brand/logo.png",
   ogImage: "/og/og-image.png",
+  email: {
+    /** Public support address shown on the site. */
+    support: supportEmail,
+  },
   links: {
     product: "/linkedin-scheduler",
     analytics: "/linkedin-analytics",
@@ -74,6 +89,10 @@ export const siteConfig = {
     signup: "/signup",
     privacy: "/privacy",
     terms: "/terms",
+    about: "/about",
+    contact: "/contact",
+    security: "/security",
+    freeTools: "/free-linkedin-tools",
   },
   plans: {
     free: { name: "Free", price: 0 },

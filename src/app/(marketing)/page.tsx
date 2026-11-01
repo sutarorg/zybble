@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight, Calculator, CalendarDays, Search, Type } from "lucide-react";
 import { JsonLd } from "@/components/json-ld";
+import { Container } from "@/components/layout/container";
 import { AnalyticsShowcase } from "@/components/marketing/analytics-showcase";
 import { FaqSection, type FaqItem } from "@/components/marketing/faq";
 import { FeatureBento } from "@/components/marketing/feature-bento";
@@ -7,8 +10,77 @@ import { FinalCta } from "@/components/marketing/final-cta";
 import { Hero } from "@/components/marketing/hero";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { PricingSection } from "@/components/marketing/pricing-cards";
+import { PersonaWall } from "@/components/marketing/personas";
+import { Reveal } from "@/components/motion/reveal";
+import { SectionHeading } from "@/components/marketing/section-heading";
 import { SchedulingShowcase } from "@/components/marketing/scheduling-showcase";
+import { FREE_TOOLS } from "@/lib/free-tools";
 import { siteConfig } from "@/lib/site";
+
+const TOOL_ICONS = {
+  calculator: Calculator,
+  calendar: CalendarDays,
+  type: Type,
+  search: Search,
+} as const;
+
+/**
+ * Compact strip surfacing the four free tools from the homepage. The full
+ * editorial treatment lives on /free-linkedin-tools; this section is the
+ * natural entry point for visitors scanning the homepage.
+ */
+function FreeToolsStrip() {
+  return (
+    <section aria-labelledby="home-tools-heading" className="border-t border-slate-200 bg-slate-50/70 py-20 lg:py-24">
+      <Container>
+        <Reveal>
+          <SectionHeading
+            as="h2"
+            eyebrow="Free LinkedIn tools"
+            title={<span id="home-tools-heading">Useful before you sign up for anything</span>}
+            description="Four working tools with no account and no email gate — real calculations, real templates, everything in your browser."
+          />
+        </Reveal>
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {FREE_TOOLS.map((tool, i) => {
+            const Icon = TOOL_ICONS[tool.icon];
+            return (
+              <Reveal key={tool.href} delay={i * 60}>
+                <Link
+                  href={tool.href}
+                  className="group flex h-full flex-col rounded-2xl bg-white p-5 ring-1 ring-slate-200 shadow-xs transition-shadow duration-300 hover:shadow-soft"
+                >
+                  <span aria-hidden className="flex size-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-brand-100">
+                    <Icon className="size-4" />
+                  </span>
+                  <h3 className="mt-3.5 text-[15px] font-semibold text-slate-900">
+                    {tool.name}
+                    <ArrowRight
+                      className="ml-1 inline size-3.5 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-brand-600"
+                      aria-hidden
+                    />
+                  </h3>
+                  <p className="mt-1.5 flex-1 text-sm leading-6 text-slate-500">{tool.blurb}</p>
+                </Link>
+              </Reveal>
+            );
+          })}
+        </div>
+        <Reveal delay={140}>
+          <p className="mt-8 text-center">
+            <Link
+              href={siteConfig.links.freeTools}
+              className="inline-flex items-center gap-1.5 text-[15px] font-medium text-brand-700 transition-colors hover:text-brand-800"
+            >
+              Browse all free LinkedIn tools
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </p>
+        </Reveal>
+      </Container>
+    </section>
+  );
+}
 
 export const metadata: Metadata = {
   title: "Schedule LinkedIn Posts. Track Performance. Grow Smarter.",
@@ -110,8 +182,10 @@ export default function HomePage() {
       <Hero />
       <FeatureBento />
       <HowItWorks />
+      <PersonaWall />
       <SchedulingShowcase />
       <AnalyticsShowcase />
+      <FreeToolsStrip />
       <PricingSection />
       <FaqSection
         items={homeFaq}

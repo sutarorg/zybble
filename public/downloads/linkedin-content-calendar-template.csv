@@ -1,31 +1,13 @@
-Day,Date,Theme,Format,Hook (one sentence),Account,Status
-1,2026-11-02,Proof,Text,,,Idea
-2,2026-11-04,Process,Carousel,,,Idea
-3,2026-11-06,Position,Text,,,Idea
-4,2026-11-09,People,Poll,,,Idea
-5,2026-11-11,Proof,Text,,,Idea
-6,2026-11-13,Process,Carousel,,,Idea
-7,2026-11-16,Position,Text,,,Idea
-8,2026-11-18,People,Poll,,,Idea
-9,2026-11-20,Proof,Text,,,Idea
-10,2026-11-23,Process,Carousel,,,Idea
-11,2026-11-25,Position,Text,,,Idea
-12,2026-11-27,People,Poll,,,Idea
-13,2026-11-30,Proof,Text,,,Idea
-14,2026-12-02,Process,Carousel,,,Idea
-15,2026-12-04,Position,Text,,,Idea
-16,2026-12-07,People,Poll,,,Idea
-17,2026-12-09,Proof,Text,,,Idea
-18,2026-12-11,Process,Carousel,,,Idea
-19,2026-12-14,Position,Text,,,Idea
-20,2026-12-16,People,Poll,,,Idea
-21,2026-12-18,Proof,Text,,,Idea
-22,2026-12-21,Process,Carousel,,,Idea
-23,2026-12-23,Position,Text,,,Idea
-24,2026-12-25,People,Poll,,,Idea
-25,2026-12-28,Proof,Text,,,Idea
-26,2026-12-30,Process,Carousel,,,Idea
-27,2027-01-01,Position,Text,,,Idea
-28,2027-01-04,People,Poll,,,Idea
-29,2027-01-06,Proof,Text,,,Idea
-30,2027-01-08,Process,Carousel,,,Idea
+Publishing date,Content topic,Post format,Status,Notes
+2026-11-02,Lesson: what this week's work taught us about onboarding,Text post,Ready to schedule,"Hook: the mistake, not the win. Link the follow-up in the first comment."
+2026-11-04,Perspective: where the industry is heading (my take),Document carousel,Drafting,Six slides, one idea per slide. No slide over 25 words.
+2026-11-06,Story: a customer moment worth retelling,Text post,Idea,Ask permission before naming anyone.
+2026-11-09,Question: what would you have done in this situation?,Poll,Idea,Four options. Follow up on the results in next week's post.
+2026-11-11,Lesson: the metric we stopped tracking — and why,Text post,Drafting,Ties back to the 4 Nov perspective post.
+2026-11-13,Announcement: what's shipping this month,Event / announcement,Ready to schedule,Keep the body short — link in first comment.
+2026-11-16,Process: how we run a content week in 45 minutes,Document carousel,Idea,Screenshots of the actual calendar.
+2026-11-18,Take: the advice I hear most and disagree with,Text post,Idea,One contrarian point. Respectful tone. Invite counter-arguments.
+2026-11-20,Story: the hire that almost didn't happen,Text post,Drafting,Personal register. No company names.
+2026-11-23,Lesson: a number that moved this quarter and what it changed,Text post,Idea,"Round numbers, honest context, no vanity framing."
+2026-11-25,Perspective: what junior people understand that seniors forgot,Text post,Idea,Invite stories in the comments.
+2026-11-27,Recap: the month's best-performing post and why it worked,Article share,Scheduled,"Short intro, link to the post, one honest lesson."
