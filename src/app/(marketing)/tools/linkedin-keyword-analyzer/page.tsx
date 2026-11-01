@@ -95,8 +95,8 @@ export default function KeywordAnalyzerPage() {
         eyebrow="Free tool · no signup"
         title={
           <>
-            Is your post about what{" "}
-            <span className="text-brand-600">you think it&rsquo;s about?</span>
+            Is your post about the{" "}
+            <span className="text-brand-600">keywords you think it&rsquo;s about?</span>
           </>
         }
         description="Paste a draft, add the keywords you want to be found for, and see the frequency, density and placement of every one — plus what your text actually emphasises. Computed in your browser, with zero invented search data."

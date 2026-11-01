@@ -94,13 +94,37 @@ test.describe("free tools, trust pages and personas", () => {
 
     // First textarea is the keyword list, second is the post draft.
     await page.locator("textarea").nth(0).fill("linkedin analytics");
+
+    // A draft written the way a person would write one: "linkedin analytics"
+    // appears twice in ~110 words, i.e. 1.8% density, comfortably under the
+    // 3% flag. The previous fixture repeated the phrase 12 times in 48 words
+    // (25% density), which analysePost() correctly reports as "Overused" — so
+    // it could never have matched "Present". The fixture was wrong, not the
+    // tool.
+    const realisticDraft =
+      "Most founders treat LinkedIn analytics like a scoreboard. It isn't. " +
+      "Analytics is a decision tool: when a post outperforms your median, the " +
+      "useful question is not how do I repeat this exact post, but what did it " +
+      "change about who saw my work. Last quarter I reviewed six months of " +
+      "LinkedIn analytics in one sitting. The pattern was uncomfortable - my " +
+      "highest-reach posts were not the ones that started conversations. Reach " +
+      "flattered the topics I enjoyed writing; engagement rate told the truth " +
+      "about what my audience actually needed. So I changed the mix: fewer hot " +
+      "takes, more working notes. Nothing about my posting frequency changed - " +
+      "only what each post was for.";
+    await page.locator("textarea").nth(1).fill(realisticDraft);
+
+    await expect(page.getByText("Keyword report")).toBeVisible();
+    await expect(page.getByText("Present", { exact: true }).first()).toBeVisible();
+
+    // Over-optimisation must still be flagged. This is the behaviour the old
+    // fixture was actually exercising, so assert it explicitly rather than
+    // leaving it covered by accident.
     await page
       .locator("textarea")
       .nth(1)
       .fill("linkedin analytics helps founders. ".repeat(12));
-
-    await expect(page.getByText("Keyword report")).toBeVisible();
-    await expect(page.getByText("Present", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Overused", { exact: true }).first()).toBeVisible();
   });
 
   test("the calendar planner stores entries and offers the CSV download", async ({ page }) => {
