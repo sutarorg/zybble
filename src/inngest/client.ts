@@ -105,21 +105,80 @@ export type Events = {
 
 function inngestOptions() {
   const configuration = env();
-  const dev =
-    configuration.INNGEST_DEV ??
-    (configuration.NODE_ENV !== "production" ? true : undefined);
+
+  // Three-state decision: an explicit INNGEST_DEV override wins, otherwise
+  // anything that is not production talks to a local dev server, and
+  // production talks to Inngest Cloud.
+  const isDev = configuration.INNGEST_DEV ?? configuration.NODE_ENV !== "production";
 
   return {
     id: "zybble",
-    ...(dev !== undefined ? { isDev: dev } : {}),
+    isDev,
+    /**
+     * The signing key is what lets this endpoint prove a request really came
+     * from Inngest. Without it the SDK will not serve at all: it answers 500
+     * to GET, PUT and POST alike, which the dashboard reports as "the URL is
+     * unreachable". It is read from the environment explicitly rather than
+     * left to the SDK's own `process.env` lookup, so that the configuration
+     * the app believes it has and the configuration the SDK uses cannot
+     * drift apart.
+     */
+    ...(configuration.INNGEST_SIGNING_KEY
+      ? { signingKey: configuration.INNGEST_SIGNING_KEY }
+      : {}),
     ...(configuration.INNGEST_EVENT_KEY ? { eventKey: configuration.INNGEST_EVENT_KEY } : {}),
   };
 }
 
 export const inngest = new Inngest(inngestOptions());
 
-export function isInngestConfigured(): boolean {
-  return Boolean(env().INNGEST_EVENT_KEY) || env().NODE_ENV !== "production";
+/** True when this deployment is talking to Inngest Cloud rather than a dev server. */
+function inCloudMode(): boolean {
+  const configuration = env();
+  return !(configuration.INNGEST_DEV ?? configuration.NODE_ENV !== "production");
+}
+
+/**
+ * Can this deployment *receive* work from Inngest?
+ *
+ * This is the condition `/api/inngest` needs. Cloud mode verifies a signature
+ * on every request, so it needs the signing key; a dev server does not.
+ */
+export function isInngestServeConfigured(): boolean {
+  if (!inCloudMode()) return true;
+  return Boolean(env().INNGEST_SIGNING_KEY);
+}
+
+/**
+ * Can this deployment *send* events?
+ *
+ * A different credential from serving: the event key authorises outbound
+ * events, the signing key authorises inbound requests. Reporting one as the
+ * other is how a deployment looks healthy while its endpoint returns 500.
+ */
+export function canSendInngestEvents(): boolean {
+  if (!inCloudMode()) return true;
+  return Boolean(env().INNGEST_EVENT_KEY);
+}
+
+/**
+ * Why the endpoint cannot serve, or `null` when it can.
+ *
+ * Returned to a caller that probes `/api/inngest` and logged on every
+ * rejected request, so "unreachable" in the Inngest dashboard is immediately
+ * traceable to the exact missing variable.
+ */
+export function inngestServeProblem(): { variable: string; message: string } | null {
+  if (isInngestServeConfigured()) return null;
+  return {
+    variable: "INNGEST_SIGNING_KEY",
+    message:
+      "Inngest is in cloud mode but has no signing key, so /api/inngest cannot verify " +
+      "that a request came from Inngest and refuses every request. Set INNGEST_SIGNING_KEY " +
+      "to the signing key from the Inngest dashboard, redeploy, then sync with " +
+      "curl -X PUT https://<your-domain>/api/inngest. Alternatively set INNGEST_DEV=true " +
+      "to serve against a local dev server.",
+  };
 }
 
 /**

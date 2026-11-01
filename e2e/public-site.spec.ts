@@ -203,3 +203,59 @@ test.describe("accessibility of public pages", () => {
     });
   }
 });
+
+/**
+ * The Inngest endpoint.
+ *
+ * `/api/inngest` is the only endpoint an external service calls into, which
+ * makes it the one endpoint that can be broken by configuration alone rather
+ * than by a code change — and therefore the one a normal CI run would never
+ * notice. It broke exactly that way: the SDK was pinned to cloud mode without a
+ * signing key, answered `500 {"code":"internal_server_error"}` to every method,
+ * and the Inngest dashboard reported only "the URL is unreachable".
+ *
+ * The assertion is deliberately about the *shape* of the answer rather than a
+ * status code, because two different configurations are legitimate here: a dev
+ * server answers 200, and a correctly configured production endpoint answers
+ * 401 to an unsigned probe. What is never acceptable is an opaque 500.
+ */
+test.describe("Inngest endpoint reachability", () => {
+  test("answers Inngest's methods instead of failing opaquely", async ({ page }) => {
+    for (const method of ["GET", "PUT"] as const) {
+      const response = await page.request.fetch("/api/inngest", { method });
+      const status = response.status();
+
+      // 200  dev mode (no signing key required)
+      // 401  cloud mode, signing key present, this unsigned probe is rejected
+      // 503  cloud mode, signing key missing — the endpoint says so by name
+      expect([200, 401, 503], `${method} /api/inngest returned ${status}`).toContain(status);
+
+      // Never the SDK's opaque failure, which is what Inngest reports as an
+      // unreachable URL with no usable cause.
+      expect(status, `${method} /api/inngest failed opaquely`).not.toBe(500);
+    }
+  });
+
+  test("says which variable is missing when it cannot serve", async ({ page }) => {
+    const response = await page.request.get("/api/inngest");
+
+    if (response.status() !== 503) {
+      // Configured (or in dev mode). Nothing to assert about the message.
+      return;
+    }
+
+    const body = await response.json();
+    expect(body.error.details.variable).toBe("INNGEST_SIGNING_KEY");
+    expect(body.error.message).toContain("INNGEST_SIGNING_KEY");
+  });
+
+  test("health separates sending events from serving requests", async ({ page }) => {
+    const body = await (await page.request.get("/api/health")).json();
+
+    // A deployment can send events while its serve endpoint is broken, or the
+    // reverse. Reporting them as one flag is how a broken endpoint passed a
+    // health check.
+    expect(typeof body.checks.inngestEvents).toBe("boolean");
+    expect(typeof body.checks.inngestServe).toBe("boolean");
+  });
+});

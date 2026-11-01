@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { env, isDodoConfigured, isSupabaseAdminConfigured, isSupabaseConfigured } from "@/lib/env";
 import { capabilities as linkedinCapabilities } from "@/lib/linkedin/config";
+import { canSendInngestEvents, isInngestServeConfigured } from "@/inngest/client";
 
 /**
  * GET /api/health — deployment probe.
@@ -22,7 +23,15 @@ export async function GET() {
     linkedin: linkedinCapabilities().configured,
     dodoPayments: isDodoConfigured(),
     resend: Boolean(configuration.RESEND_API_KEY),
-    inngest: Boolean(configuration.INNGEST_EVENT_KEY),
+    /**
+     * Two separate capabilities, because they use two separate credentials.
+     * The event key authorises outbound events; the signing key authorises
+     * inbound requests to `/api/inngest`. Reporting only the event key let a
+     * deployment look healthy while its serve endpoint answered 503 and
+     * Inngest reported the URL as unreachable.
+     */
+    inngestEvents: canSendInngestEvents(),
+    inngestServe: isInngestServeConfigured(),
     databaseUrl: Boolean(configuration.DATABASE_URL),
     tokenEncryption: Boolean(configuration.TOKEN_ENCRYPTION_KEY),
   };

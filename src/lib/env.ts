@@ -46,10 +46,19 @@ const schema = z.object({
   // Inngest -----------------------------------------------------------------
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
+  /**
+   * Force dev or cloud mode regardless of `NODE_ENV`.
+   *
+   * `.optional()` must come *after* `.transform()`. Written the other way
+   * round, the transform still runs on an absent value and turns `undefined`
+   * into `false`, which silently pins the SDK to cloud mode — where it refuses
+   * every request unless a signing key is present. That is the difference
+   * between a working dev server and an endpoint that answers 500.
+   */
   INNGEST_DEV: z
     .enum(["true", "false"])
-    .optional()
-    .transform((value) => value === "true"),
+    .transform((value) => value === "true")
+    .optional(),
 
   // Dodo Payments -----------------------------------------------------------
   DODO_PAYMENTS_API_KEY: z.string().optional(),

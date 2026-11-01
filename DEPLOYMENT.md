@@ -446,8 +446,23 @@ re-test after changing it.
 
 Grab them from **Production → Manage → Signing key** and **… → Event keys**.
 
-> **Never set `INNGEST_DEV` in production.** It disables signature
-> verification.
+**The signing key is not optional, and it is the one that decides whether the
+endpoint is reachable at all.** In production the SDK runs in cloud mode, where
+it verifies a signature on every incoming request. With no signing key it does
+not serve at all: `/api/inngest` refuses `GET`, `PUT` and `POST` alike, and the
+Inngest dashboard reports nothing more specific than *"The URL is unreachable."*
+
+So if Inngest tells you the URL is unreachable, check `INNGEST_SIGNING_KEY`
+first. Set it, **redeploy** (Vercel only reads env vars at build and boot, so
+adding a variable never affects a running deployment), then re-sync.
+
+The two keys do different jobs, and setting one does not cover for the other:
+the event key authorises events you *send*, the signing key authorises requests
+Inngest *sends to you*. `/api/health` reports them separately as
+`inngestEvents` and `inngestServe` precisely because a deployment can look
+healthy on one while the other is broken.
+
+> **Never set `INNGEST_DEV` in production.** It disables signature verification.
 
 The easiest path is Inngest's **Vercel integration**, which sets both variables
 and re-syncs your functions on every deploy. If you configure it manually you
@@ -459,16 +474,53 @@ curl -X PUT https://zybble.app/api/inngest
 
 ### E.3 Deploy and verify
 
-After the first production deploy:
+After the first production deploy, probe the endpoint yourself before trusting
+the dashboard. Substitute your real production domain for `<your-domain>`.
 
 ```bash
-# 1. The serve handler reports its own configuration.
-curl -s https://zybble.app/api/inngest
-# Expect hasSigningKey: true, hasEventKey: true, mode: "cloud"
-
-# 2. Inngest Cloud → Apps shows your app with a green status and a recent sync.
-# 3. Inngest Cloud → Functions lists all 17 functions.
+curl -si https://<your-domain>/api/inngest | head -20
 ```
+
+Read the answer as a ladder — the status code tells you which of four states
+the deployment is in:
+
+| Response | What it means | What to do |
+| --- | --- | --- |
+| `200` with `"mode":"dev"` | Serving against a local dev server | Fine locally. In production this means `INNGEST_DEV` is set — remove it |
+| **`401` `{"message":"Unauthorized"}`** | **Healthy.** Cloud mode, signing key present, signature verification working. Your unsigned `curl` is correctly rejected; Inngest's own signed requests are accepted | Nothing — this is the expected production answer to an unsigned probe |
+| `503` naming `INNGEST_SIGNING_KEY` | Cloud mode with no signing key, so the endpoint cannot verify anything and refuses every request | Set `INNGEST_SIGNING_KEY`, redeploy, re-sync |
+| `500` `{"code":"internal_server_error"}` | Something other than configuration | Check `vercel logs` for the accompanying `inngest.*` error |
+
+Two healthy states are worth calling out because they look like failures:
+
+- **`401` is success.** In cloud mode the SDK verifies a signature on every
+  request, including `GET`. A plain `curl` has no signature, so `401` is
+  exactly what a correctly configured endpoint should answer. Do not "fix" it
+  by disabling verification.
+- **Vercel Deployment Protection also answers `401`,** before your code runs.
+  If you have Standard Protection or Vercel Authentication enabled, Inngest
+  cannot reach the endpoint no matter how correct the app is — Vercel's
+  interstitial is not something Inngest can pass. Check the response body:
+  our handler answers JSON, Vercel answers an HTML login page. Either turn
+  protection off for production, or allow Inngest through with
+  `x-vercel-protection-bypass`.
+
+Then confirm from Inngest's side:
+
+```bash
+# Trigger a sync by hand. Inngest signs this request, so it is accepted
+# where an unsigned curl was not.
+curl -X PUT https://<your-domain>/api/inngest
+```
+
+- **Inngest Cloud → Apps** shows your app with a green status and a recent sync.
+- **Inngest Cloud → Functions** lists all 17 functions.
+
+If the app still will not sync, the remaining causes are all in front of your
+code: the domain is not attached to the Vercel project, the URL redirects
+(a `308` from `www` to the apex or the reverse will stop a sync), DNS has not
+propagated, or the deployment failed. `curl -sI https://<your-domain>/api/inngest`
+shows the redirect chain directly.
 
 The registered functions are:
 
@@ -500,10 +552,19 @@ The registered functions are:
 ### E.5 Fallback if Inngest is unavailable
 
 With `INNGEST_EVENT_KEY` unset, `inngest.send()` is a no-op and
-`GET /api/cron/run` (Bearer `CRON_SECRET`) performs the same sweep.
-`vercel.json` registers that cron every 5 minutes as a safety net. The app
-reports `publishJobQueued: false` when it could not enqueue, so the UI never
-implies a run that does not exist.
+`GET /api/cron/run` (Bearer `CRON_SECRET`) performs the same sweep:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://<your-domain>/api/cron/run
+```
+
+That route is the fallback, not a substitute — it runs when you call it. See
+**§H.6** for how to schedule it: `vercel.json` deliberately ships without a
+`crons` block, because Vercel limits Hobby projects to daily cron jobs and
+fails the deployment on anything more frequent.
+
+The app reports `publishJobQueued: false` when it could not enqueue, so the UI
+never implies a run that does not exist.
 
 ---
 
@@ -847,6 +908,8 @@ LINKEDIN_ANALYTICS_SCOPE_ENABLED=false
 
 # --- Inngest -------------------------------------------------------------
 INNGEST_EVENT_KEY=
+# Required in production. Without it /api/inngest refuses every request and
+# the Inngest dashboard reports the URL as unreachable.
 INNGEST_SIGNING_KEY=
 # Never set INNGEST_DEV in production (it disables signature verification).
 # INNGEST_DEV=true
@@ -1033,7 +1096,13 @@ rendering, subject and plain-text alternative.
 
 ### K.7 Inngest
 
+- [ ] `curl -si https://<your-domain>/api/inngest` returns **`401 Unauthorized`**
+      (cloud mode, signing key present, verification working). A `503` naming
+      `INNGEST_SIGNING_KEY` means the key is missing — see §E.3
+- [ ] `curl -s https://<your-domain>/api/health` reports
+      `inngestServe: true` and `inngestEvents: true`
 - [ ] All 17 functions appear in Inngest Cloud → Functions
+- [ ] A sync completes: Inngest Cloud → Apps shows a recent successful sync
 - [ ] `dispatch-due-posts` runs every minute without errors
 - [ ] A deliberately failing publish retries and then marks the post `failed`
 
@@ -1060,6 +1129,7 @@ Events worth alerting on:
 | `posts.schedule_failed` | A post is scheduled but no run was queued |
 | `email.send_failed` | Resend rejected or failed a send |
 | `rate_limit.primary_unavailable` | Postgres limiter down; degraded to per-instance |
+| `inngest.serve_unreachable` | `/api/inngest` refused a request because `INNGEST_SIGNING_KEY` is missing |
 | `auth.unmapped_error` | A provider error string we did not recognise (logged, not shown) |
 
 ### L.2 Inngest job failures
