@@ -17,6 +17,7 @@ import {
   getRelated,
   headingId,
   posts,
+  readingTimeFor,
   tableOfContents,
   type Block,
 } from "@/lib/blog";
@@ -311,7 +312,7 @@ export default async function BlogPostPage({ params }: PageProps) {
               <Badge>{post.category}</Badge>
               <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
                 <Clock className="size-3.5" aria-hidden />
-                {post.readingTime}
+                {readingTimeFor(post)}
               </span>
             </div>
             <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.12] tracking-tight text-slate-950 sm:text-[44px]">
@@ -346,6 +347,54 @@ export default async function BlogPostPage({ params }: PageProps) {
           <div className="mx-auto mt-12 max-w-3xl">
             <TableOfContents entries={toc} />
             {post.blocks.map(renderBlock)}
+
+            {post.sources && post.sources.length > 0 && (
+              <section aria-labelledby="sources-heading" className="mt-14">
+                <h2
+                  id="sources-heading"
+                  className="text-lg font-semibold tracking-tight text-slate-900"
+                >
+                  Sources and further reading
+                </h2>
+                <ul className="mt-4 space-y-2.5">
+                  {post.sources.map((source) => (
+                    <li key={source.href} className="flex gap-2.5 text-[15px] leading-7">
+                      <span aria-hidden className="mt-[13px] size-1.5 shrink-0 rounded-full bg-brand-500" />
+                      <span>
+                        <a
+                          href={source.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-brand-700 underline decoration-brand-200 underline-offset-4 transition-colors hover:text-brand-800"
+                        >
+                          {source.label}
+                        </a>
+                        <span className="text-slate-500"> — linkedin.com (official documentation)</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {/* Honest byline note: the articles are written by the team that
+                builds the product, from running LinkedIn publishing daily. No
+                invented personas, no borrowed credentials. */}
+            <aside className="mt-14 rounded-2xl bg-slate-50 p-6 ring-1 ring-slate-200">
+              <h2 className="text-[15px] font-semibold text-slate-900">About the author</h2>
+              <p className="mt-2.5 text-[15px] leading-7 text-slate-600">
+                Written by the Zybble team — the people who build the{" "}
+                <Link
+                  href="/linkedin-scheduler"
+                  className="font-medium text-brand-700 hover:text-brand-800"
+                >
+                  LinkedIn scheduler
+                </Link>{" "}
+                and analytics workspace this blog writes about. We publish, schedule and measure
+                LinkedIn content as part of running the product, and every article here comes from
+                that practice, not from recycled listicles.
+              </p>
+            </aside>
           </div>
         </Container>
       </article>
@@ -383,7 +432,7 @@ export default async function BlogPostPage({ params }: PageProps) {
                     aria-hidden
                   />
                 </h3>
-                <p className="mt-1.5 text-sm text-slate-500">{rel.readingTime}</p>
+                <p className="mt-1.5 text-sm text-slate-500">{readingTimeFor(rel)}</p>
               </Link>
             ))}
           </div>

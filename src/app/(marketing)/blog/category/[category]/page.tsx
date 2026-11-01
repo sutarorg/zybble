@@ -10,7 +10,13 @@ import { FinalCta } from "@/components/marketing/final-cta";
 import { SectionHeading } from "@/components/marketing/section-heading";
 import { Reveal } from "@/components/motion/reveal";
 import { Badge } from "@/components/ui/badge";
-import { categorySlug, getCategories, getCategoryBySlug, postsByCategory } from "@/lib/blog";
+import {
+  categorySlug,
+  getCategories,
+  getCategoryBySlug,
+  postsByCategory,
+  readingTimeFor,
+} from "@/lib/blog";
 import { siteConfig } from "@/lib/site";
 
 interface PageProps {
@@ -129,7 +135,7 @@ export default async function BlogCategoryPage({ params }: PageProps) {
                   <div className="mt-5 flex items-center gap-3 text-sm text-slate-500">
                     <span className="inline-flex items-center gap-1.5">
                       <Clock className="size-3.5" aria-hidden />
-                      {post.readingTime}
+                      {readingTimeFor(post)}
                     </span>
                     <span aria-hidden>·</span>
                     <time dateTime={post.publishedAt}>{formatDate(post.publishedAt)}</time>

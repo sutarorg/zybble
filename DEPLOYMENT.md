@@ -90,14 +90,14 @@ openssl rand -hex 32      # CRON_SECRET
 
 ### A.4 Domain
 
-One domain you control, for example `zybble.app`. You will need to add DNS
+One domain you control, for example `zybble.com`. You will need to add DNS
 records for:
 
 - Vercel (the app itself)
 - Resend (SPF, DKIM, return-path MX, and optionally DMARC)
 
-A subdomain for the sending identity (e.g. `send.zybble.app` or a
-`no-reply@zybble.app` sender) is cleaner than reusing the apex for both web and
+A subdomain for the sending identity (e.g. `send.zybble.com` or a
+`no-reply@zybble.com` sender) is cleaner than reusing the apex for both web and
 mail, but Resend supports either.
 
 ---
@@ -137,7 +137,7 @@ Environment.
 To enable the full suite:
 
 1. **Settings → Environments → New environment** → name it `staging`.
-2. Add environment variables: `E2E_BASE_URL` (e.g. `https://staging.zybble.app`).
+2. Add environment variables: `E2E_BASE_URL` (e.g. `https://staging.zybble.com`).
 3. Optionally restrict the environment to `main` and administrators.
 4. For the CI workflow's E2E step, add a repository secret `E2E_REAL_BACKEND`
    (`1` to enable the authenticated suites, absent to skip them).
@@ -206,8 +206,8 @@ connection limit under load.
 
 | Field | Value |
 | --- | --- |
-| Site URL | `https://zybble.app` |
-| Redirect URLs | `https://zybble.app/auth/callback`, `https://zybble.app/reset-password`, `https://*.vercel.app/auth/callback` (for previews) |
+| Site URL | `https://zybble.com` |
+| Redirect URLs | `https://zybble.com/auth/callback`, `https://zybble.com/reset-password`, `https://*.vercel.app/auth/callback` (for previews) |
 
 Zybble routes everything through `/auth/callback`
 (`src/app/auth/callback/route.ts`), which handles both the PKCE `code` exchange
@@ -326,7 +326,7 @@ Commit the result — the type definitions are part of the build.
 4. Under **Auth → Redirect URLs**, add **exactly** (no trailing slash, no
    wildcard):
    - `http://localhost:3000/api/linkedin/callback` (development)
-   - `https://zybble.app/api/linkedin/callback` (production)
+   - `https://zybble.com/api/linkedin/callback` (production)
    - `https://<preview-domain>/api/linkedin/callback` if you test OAuth on previews
 
    The value must match `LINKEDIN_REDIRECT_URI` byte for byte. `redirectUri()`
@@ -393,7 +393,7 @@ granted at consent time, so old tokens keep their old scope set.
 ### D.4 Verify access
 
 ```bash
-curl -s https://zybble.app/api/health | jq '.analyticsScopeEnabled, .checks.linkedin'
+curl -s https://zybble.com/api/health | jq '.analyticsScopeEnabled, .checks.linkedin'
 ```
 
 Then connect a real account through **Settings → LinkedIn** and confirm:
@@ -469,7 +469,7 @@ and re-syncs your functions on every deploy. If you configure it manually you
 must sync after each deploy:
 
 ```bash
-curl -X PUT https://zybble.app/api/inngest
+curl -X PUT https://zybble.com/api/inngest
 ```
 
 ### E.3 Deploy and verify
@@ -616,7 +616,7 @@ DODO_PAYMENTS_ENVIRONMENT=test_mode
 ### F.3 Configure the webhook
 
 1. **Dashboard → Webhooks → Add endpoint**
-2. URL: `https://zybble.app/api/webhooks/dodo`
+2. URL: `https://zybble.com/api/webhooks/dodo`
 3. Subscribe to:
    - `subscription.active`
    - `subscription.renewed`
@@ -710,9 +710,9 @@ Verification usually completes within about 15 minutes and can take up to 72
 hours globally. Check the records yourself first:
 
 ```bash
-dig +short TXT  send.zybble.app
-dig +short MX   send.zybble.app
-dig +short CNAME <token>._domainkey.send.zybble.app
+dig +short TXT  send.zybble.com
+dig +short MX   send.zybble.com
+dig +short CNAME <token>._domainkey.send.zybble.com
 ```
 
 If it has not verified after 24 hours, use **Restart verification** in the
@@ -724,7 +724,7 @@ DMARC is not required to send, but publish it — it materially improves
 deliverability and stops spoofing:
 
 ```
-_dmarc.zybble.app   TXT   v=DMARC1; p=none; rua=mailto:dmarc@zybble.app;
+_dmarc.zybble.com   TXT   v=DMARC1; p=none; rua=mailto:dmarc@zybble.com;
 ```
 
 Start at `p=none` and read the aggregate reports. Once every legitimate sender
@@ -734,8 +734,8 @@ passes, tighten to `p=quarantine`, then `p=reject`.
 
 1. **Resend → API Keys → Create** → copy into `RESEND_API_KEY`.
 2. Set `EMAIL_FROM` to an address on the **verified** domain, e.g.
-   `Zybble <no-reply@zybble.app>`.
-3. Optionally set `EMAIL_REPLY_TO` (e.g. `support@zybble.app`).
+   `Zybble <no-reply@zybble.com>`.
+3. Optionally set `EMAIL_REPLY_TO` (e.g. `support@zybble.com`).
 
 ### G.5 Test every template
 
@@ -791,11 +791,11 @@ point previews at the production database.
 
 ### H.4 Connect the domain
 
-1. **Settings → Domains → Add** `zybble.app` and `www.zybble.app`.
+1. **Settings → Domains → Add** `zybble.com` and `www.zybble.com`.
 2. Add the A/ALIAS (or nameserver) records Vercel shows.
 3. Vercel issues and renews the TLS certificate automatically; verify at
-   `https://zybble.app` shows a valid certificate.
-4. Set `NEXT_PUBLIC_SITE_URL=https://zybble.app` to match — it is used for
+   `https://zybble.com` shows a valid certificate.
+4. Set `NEXT_PUBLIC_SITE_URL=https://zybble.com` to match — it is used for
    OAuth redirects, email links and canonical URLs.
 
 ### H.5 Deploy
@@ -849,7 +849,7 @@ Then redeploy and confirm under **Settings → Cron Jobs**.
 Until then, invoke the sweep manually when you need it:
 
 ```bash
-curl -H "Authorization: Bearer $CRON_SECRET" https://zybble.app/api/cron/run
+curl -H "Authorization: Bearer $CRON_SECRET" https://zybble.com/api/cron/run
 ```
 
 Note also that Vercel Cron runs against **production deployments only** — never
@@ -869,8 +869,14 @@ key, is the security boundary.
 
 ```env
 # Absolute origin (no trailing slash). Used for OAuth redirects, email links,
-# canonical URLs and the sitemap.
-NEXT_PUBLIC_SITE_URL=https://zybble.app
+# canonical URLs and the sitemap. Must be the canonical HTTPS apex domain —
+# the app normalises it defensively, but set it correctly anyway.
+NEXT_PUBLIC_SITE_URL=https://zybble.com
+
+# Google Search Console verification (the `content` value of the verification
+# meta tag). Optional; when set, a <meta name="google-site-verification"> tag
+# is rendered in the document head of every page.
+NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=
 
 # Supabase project URL and publishable (anon) key.
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
@@ -893,13 +899,13 @@ DATABASE_POOL_MAX=5
 
 # --- Application ---------------------------------------------------------
 # Optional override for links in transactional email (defaults to NEXT_PUBLIC_SITE_URL).
-APP_URL=https://zybble.app
+APP_URL=https://zybble.com
 
 # --- LinkedIn -------------------------------------------------------------
 LINKEDIN_CLIENT_ID=
 LINKEDIN_CLIENT_SECRET=
 # Must be registered in the LinkedIn portal exactly, including the path.
-LINKEDIN_REDIRECT_URI=https://zybble.app/api/linkedin/callback
+LINKEDIN_REDIRECT_URI=https://zybble.com/api/linkedin/callback
 # Pinned API version, YYYYMM. Check sunset dates before changing.
 LINKEDIN_API_VERSION=202604
 # true ONLY after Community Management API approval. Requesting the scope
@@ -927,8 +933,8 @@ DODO_SEAT_PRORATION_MODE=difference_immediately
 
 # --- Resend --------------------------------------------------------------
 RESEND_API_KEY=
-EMAIL_FROM=Zybble <no-reply@zybble.app>
-# EMAIL_REPLY_TO=support@zybble.app
+EMAIL_FROM=Zybble <no-reply@zybble.com>
+# EMAIL_REPLY_TO=support@zybble.com
 
 # --- Security ------------------------------------------------------------
 # 32 random bytes, base64. Encrypts LinkedIn tokens (AES-256-GCM).
@@ -948,7 +954,7 @@ Used by the E2E suite, never by the application:
 E2E_REAL_BACKEND=1      # enable the authenticated E2E suites
 E2E_LINKEDIN_LIVE=1     # allow tests that publish to a real account (dangerous)
 E2E_ANALYTICS_SCOPE=1   # assert that r_member_postAnalytics is requested
-E2E_BASE_URL=https://staging.zybble.app
+E2E_BASE_URL=https://staging.zybble.com
 ```
 
 ### I.4 Quick audit
@@ -1036,10 +1042,10 @@ Work through this in order. Each item can fail independently.
 ### K.1 Public surface (no credentials needed)
 
 ```bash
-curl -s https://zybble.app/api/health | jq .
-curl -sI https://zybble.app/           | grep -i "x-content-type\|x-frame\|referrer"
-curl -s  https://zybble.app/robots.txt
-curl -s  https://zybble.app/sitemap.xml | head -5
+curl -s https://zybble.com/api/health | jq .
+curl -sI https://zybble.com/           | grep -i "x-content-type\|x-frame\|referrer"
+curl -s  https://zybble.com/robots.txt
+curl -s  https://zybble.com/sitemap.xml | head -5
 ```
 
 - [ ] Homepage, pricing, blog, privacy, terms all return 200 with one `<h1>` each

@@ -15,7 +15,7 @@ export const schedulingPoints = [
   },
   {
     title: "Time zones handled quietly",
-    copy: "Schedule in your audience's time zone, not yours. Zybble does the conversion so Tuesday 9:30 means their Tuesday 9:30.",
+    copy: "Schedule in your own time zone — detected automatically. Zybble stores the exact moment and publishes at that instant, so Tuesday 9:30 means Tuesday 9:30, wherever Tuesday finds you.",
   },
 ] as const;
 

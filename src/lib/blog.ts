@@ -35,12 +35,56 @@ export interface BlogPost {
   publishedAt: string; // ISO date
   /** Only set when the article has genuinely been revised since publication. */
   updatedAt?: string;
-  readingTime: string;
   category: string;
   /** Target queries for internal search-intent tracking. Never rendered. */
   keywords?: string[];
+  /**
+   * External references the article relies on for factual claims about
+   * LinkedIn mechanics. Rendered as a "Sources and further reading" list.
+   * Only primary, verifiable sources belong here — never invented studies.
+   */
+  sources?: Array<{ label: string; href: string }>;
   cover: { src: string; alt: string };
   blocks: Block[];
+}
+
+/**
+ * Reading time, computed from the article's actual text instead of a
+ * hand-maintained string. Hand-written estimates had drifted (a 350-word
+ * article labelled "6 min read"), which misleads readers and undermines
+ * trust. ~210 words per minute is a comfortable mid-range for non-fiction;
+ * the result is rounded and floored at 1 minute.
+ */
+export function readingTimeFor(post: BlogPost): string {
+  let words = 0;
+  for (const block of post.blocks) {
+    switch (block.type) {
+      case "paragraph":
+      case "heading":
+      case "quote":
+        words += block.text.split(/\s+/).filter(Boolean).length;
+        break;
+      case "list":
+        words += block.items.join(" ").split(/\s+/).filter(Boolean).length;
+        break;
+      case "faq":
+        words += block.items
+          .map((item) => `${item.question} ${item.answer}`)
+          .join(" ")
+          .split(/\s+/).filter(Boolean).length;
+        break;
+      case "table":
+        words += [block.caption ?? "", ...block.headers, ...block.rows.flat()]
+          .join(" ")
+          .split(/\s+/).filter(Boolean).length;
+        break;
+      case "download":
+        words += `${block.label} ${block.hint}`.split(/\s+/).filter(Boolean).length;
+        break;
+    }
+  }
+  const minutes = Math.max(1, Math.round(words / 210));
+  return `${minutes} min read`;
 }
 
 export const posts: BlogPost[] = [
@@ -50,8 +94,14 @@ export const posts: BlogPost[] = [
     description:
       "Forget the generic 'post at 8 AM on Tuesday' advice. Here's how to find the publishing times that actually work for your audience — and measure them properly.",
     publishedAt: "2026-01-19",
-    readingTime: "6 min read",
+    updatedAt: "2026-11-01",
     category: "Analytics",
+    keywords: [
+      "best time to post on linkedin",
+      "when to post on linkedin",
+      "best day to post on linkedin",
+      "linkedin posting times",
+    ],
     cover: {
       src: "/blog/best-time-to-post.jpg",
       alt: "Abstract editorial illustration of a clock face and calendar grid in electric blue tones",
@@ -62,12 +112,28 @@ export const posts: BlogPost[] = [
         text: "Search for the best time to post on LinkedIn and you will find dozens of confident, contradictory answers. Tuesday at 8 AM. Wednesday at noon. Thursday, but only if Mercury is in retrograde. The problem is not the advice — it is the premise. There is no universal best time. There is only the time your audience is ready to read.",
       },
       {
+        type: "paragraph",
+        text: "That distinction matters more than it first appears. A study of thousands of accounts can tell you when LinkedIn users in general are active, but your prospects are not a random sample of LinkedIn users. They are European CFOs, or US hiring managers, or startup engineers — and each group scrolls on its own clock. The purpose of this article is to give you a repeatable method for finding your own answer, not another borrowed number.",
+      },
+      {
         type: "heading",
         text: "Why generic advice fails",
       },
       {
         type: "paragraph",
-        text: "Every audience has its own rhythm. A founder writing for European CFOs plays by a different clock than a consultant serving US hiring managers. Industry, seniority and geography shift when people scroll, and recycled averages flatten all of that into a number that fits no one in particular.",
+        text: "Every audience has its own rhythm. Industry, seniority and geography shift when people scroll, and recycled averages flatten all of that into a number that fits no one in particular. Three forces are doing most of the work:",
+      },
+      {
+        type: "list",
+        items: [
+          "Geography and time zones. If half your buyers are in Berlin and half in New York, a single publishing time is guaranteed to miss one of them. Publish when the segment you most want to reach is awake, and let the other segment catch it later in their feed.",
+          "Role and routine. Operators check LinkedIn in gaps — commute, lunch, between meetings. Founders and consultants tend to scroll early or late. An audience of developers may be quiet all Tuesday and active Sunday night. Who your readers are decides when they read.",
+          "Day-of-week texture. Mondays are often consumed by inboxes; Fridays can be lighter or simply quieter. That texture exists in your data too — but it is a tendency to test, not a law to obey.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "There is a second, subtler failure in the generic charts: they usually measure activity, not response. A feed being busy is not the same as your post being read. Busy hours also mean more competing posts. Sometimes the best slot is the quiet one where you have the feed almost to yourself.",
       },
       {
         type: "heading",
@@ -88,11 +154,95 @@ export const posts: BlogPost[] = [
       },
       {
         type: "heading",
+        text: "A worked example",
+      },
+      {
+        type: "paragraph",
+        text: "Suppose you are a consultant whose clients split roughly between London and New York. You currently post whenever the mood strikes, and you want a hypothesis to test. A sensible experiment:",
+      },
+      {
+        type: "table",
+        caption: "A three-slot timing test. Content type is held constant; only the clock changes.",
+        headers: ["Slot (your time)", "Why this hypothesis", "What could disprove it"],
+        rows: [
+          [
+            "Tue 08:30",
+            "Catches the London commute before New York wakes up.",
+            "London readers scroll but save nothing — engagement rate sits below your median.",
+          ],
+          [
+            "Wed 12:30",
+            "Lunch scroll overlaps both time zones for about ninety minutes.",
+            "Fine in theory, but midday is also the most crowded feed of the day.",
+          ],
+          [
+            "Thu 13:30",
+            "US East Coast lunch begins while London is still at their desk.",
+            "The overlap window is real but your audience may simply not be Thursday people.",
+          ],
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "Run each slot with similar posts — same format, similar topic weight — for two to three weeks. Then compare each slot's median engagement rate against your overall median, not against your single best post, which is usually an outlier. One clear winner with eight or more posts behind it is a decision. A fuzzy picture is a reason to run the test one more cycle, not a reason to panic.",
+      },
+      {
+        type: "heading",
+        text: "Reading the results without fooling yourself",
+      },
+      {
+        type: "list",
+        items: [
+          "Judge slots on medians, not superlatives. Your best-ever post distorts; the typical result reveals.",
+          "Hold the format constant, or annotate it when you cannot. A text post and a document carousel have different baselines.",
+          "Give the test enough posts to mean anything. Three posts per slot is a coincidence detector, not an experiment.",
+          "Beware the topic confound. If all your strong opinions went out at 8:30, the slot will look better than it is.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "For the numbers themselves, engagement rate is the yardstick that survives different audience sizes and reach fluctuations — we explain exactly how to calculate it in [[how to calculate and improve your LinkedIn engagement rate]](/blog/linkedin-engagement-rate-calculate-improve), and the difference between the counts that feed it in [[impressions vs reach vs engagement]](/blog/linkedin-impressions-vs-reach-vs-engagement).",
+      },
+      {
+        type: "heading",
         text: "Let the tool remember, so you can think",
       },
       {
         type: "paragraph",
         text: "This is exactly the kind of analysis that should not live in a spreadsheet. On Zybble Pro, best-time insights are computed from your own publishing history: the workspace surfaces the windows where your posts have historically earned the strongest response, and suggests them directly in the scheduler. You stay the editor; the data does the remembering.",
+      },
+      {
+        type: "paragraph",
+        text: "The system works because scheduling removes the execution variable entirely. When publishing happens automatically at the slot you chose, the only thing that differs between your test groups is the clock — which is the thing you are actually testing. If you are still publishing manually, the schedule itself is quietly corrupting your data.",
+      },
+      {
+        type: "heading",
+        text: "Frequently asked questions",
+      },
+      {
+        type: "faq",
+        items: [
+          {
+            question: "Does the best time to post on LinkedIn exist at all?",
+            answer:
+              "A best time for your audience exists, because your readers have routines you can discover. A best time for everyone does not, because routines differ by industry, seniority and geography. Any chart that promises a universal answer is averaging away the one thing that matters — your specific readers.",
+          },
+          {
+            question: "How many posts do I need before timing data means anything?",
+            answer:
+              "As a practical floor, aim for at least six to eight comparable posts per slot before you trust the comparison, and judge on the median result rather than the best one. Fewer posts than that and a single lucky distribution swing can masquerade as a pattern.",
+          },
+          {
+            question: "Should I post at the exact same time every day?",
+            answer:
+              "Ritual helps you, not the algorithm: a fixed slot makes publishing a habit you can sustain. But there is no evidence LinkedIn rewards a specific clock time, and pinning yourself to one slot means never learning whether another performs better. Set a default, test against it, and keep the winner.",
+          },
+          {
+            question: "Doesn't LinkedIn's own analytics already show my best time?",
+            answer:
+              "LinkedIn shows per-post results, and you can absolutely eyeball them in a spreadsheet. What it does not do is correlate publishing slots with outcomes across months of history and surface the pattern in your scheduler. That aggregation is exactly the work a scheduler like Zybble takes over — see [[Zybble's analytics]](/linkedin-analytics).",
+          },
+        ],
       },
       {
         type: "quote",
@@ -106,8 +256,14 @@ export const posts: BlogPost[] = [
     description:
       "A realistic weekly system for staying visible on LinkedIn when you also have a company to run: fewer ideas, batched writing, one calendar.",
     publishedAt: "2026-01-08",
-    readingTime: "7 min read",
-    category: "Scheduling",
+    updatedAt: "2026-11-01",
+    category: "Strategy",
+    keywords: [
+      "linkedin content calendar for founders",
+      "founder linkedin content plan",
+      "how often should founders post on linkedin",
+      "linkedin posting schedule for founders",
+    ],
     cover: {
       src: "/blog/content-calendar-founders.jpg",
       alt: "Minimal blue and white illustration of a content calendar with organised weekly slots",
@@ -118,12 +274,33 @@ export const posts: BlogPost[] = [
         text: "Most founders do not struggle with what to say. They struggle with the daily negotiation of when to say it. LinkedIn punishes exactly that: the algorithm and your audience reward a steady drumbeat, yet companies are not run on a steady drumbeat. The fix is not more discipline — it is moving the work to when you have the headspace for it.",
       },
       {
+        type: "paragraph",
+        text: "This is the system this article unpacks: one weekly session, two or three slots, one calendar everyone can see. It takes under an hour a week once it is running, and it survives the weeks when the company refuses to behave.",
+      },
+      {
         type: "heading",
         text: "Batch the thinking, not just the writing",
       },
       {
         type: "paragraph",
         text: "Set aside one weekly block — forty-five minutes is enough — and treat it as an editorial meeting of one. In that block you do three things: collect raw material from the week, draft two or three posts, and place every draft on the calendar. Done well, LinkedIn then runs in the background until the next session.",
+      },
+      {
+        type: "paragraph",
+        text: "The order matters. Deciding what to write while you are writing is what makes the session sprawl. Separate the roles: first curate (what did this week hand me?), then draft, then schedule. Founders who skip the curation step end up writing about whatever is nearest — usually the product — instead of what their audience needs to hear.",
+      },
+      {
+        type: "heading",
+        text: "The 45-minute agenda",
+      },
+      {
+        type: "list",
+        items: [
+          "Minutes 0–10 — harvest. Skim your week: customer conversations, decisions, metrics that moved, something you got wrong. Jot the four or five moments that taught you something.",
+          "Minutes 10–30 — draft. Pick the two or three harvest items with the most energy and write the posts. Imperfect and finished beats polished and imaginary.",
+          "Minutes 30–40 — place. Put every draft on the calendar in a specific slot. A draft without a slot is a wish; a draft with a slot is a plan.",
+          "Minutes 40–45 — audit the gaps. Look at next week. If Thursday is empty, move a draft into it now, while you still remember what you meant.",
+        ],
       },
       {
         type: "heading",
@@ -143,7 +320,41 @@ export const posts: BlogPost[] = [
       },
       {
         type: "paragraph",
-        text: "Notice what this is not: a content treadmill. It is a rhythm your audience can learn to expect, and one you can sustain through a funding round, a launch or a frenzied hiring month — because the writing is batched and the publishing is scheduled.",
+        text: "Notice what this is not: a content treadmill. It is a rhythm your audience can learn to expect, and one you can sustain through a funding round, a launch or a frenzied hiring month — because the writing is batched and the publishing is scheduled. If even three feels heavy, start with two; a cadence you actually keep outperforms an ambitious one you abandon in February.",
+      },
+      {
+        type: "heading",
+        text: "An example week, filled in",
+      },
+      {
+        type: "table",
+        caption: "One founder's week, planned in a single 45-minute session. Slots are defaults, not commandments.",
+        headers: ["Day", "Slot", "Post", "Why this slot"],
+        rows: [
+          ["Monday", "08:30", "Lesson: the pricing experiment that failed last quarter", "Monday readers are back at their desks looking for signal, not noise."],
+          ["Wednesday", "12:30", "Perspective: why onboarding is the new marketing in B2B", "Midweek lunch scroll reaches both coasts of your US-heavy audience."],
+          ["Friday", "09:00", "Story: the customer email that made the whole roadmap debate worth it", "Fridays favour the human register; lighter content closes the week."],
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "Your version will differ — that is the point. The calendar is where your strategy stops being an intention and becomes a set of specific posts in specific slots. For the deeper mechanics of building one, the step-by-step guide to [[building a LinkedIn content calendar]](/blog/how-to-build-linkedin-content-calendar) covers the full pipeline, and the [[free content calendar template]](/blog/free-linkedin-content-calendar-template) gives you a starting grid so week one does not start from a blank page.",
+      },
+      {
+        type: "heading",
+        text: "When the week goes wrong",
+      },
+      {
+        type: "paragraph",
+        text: "The system will fail some weeks — a launch slips, a customer escalates, a child gets sick. Build the recovery into the plan so a bad week does not become a dead account:",
+      },
+      {
+        type: "list",
+        items: [
+          "Keep two evergreen drafts banked at all times. When there is no time to write, a banked draft keeps the cadence alive without lowering the bar.",
+          "Miss a slot, not a week. One silent Thursday costs you almost nothing; the instinct to 'make it up' by posting three times on Sunday costs you quality and reads as noise.",
+          "Never announce the silence. Audiences notice absences far less than creators fear; a 'sorry for the quiet' post draws attention to the gap you are trying to close.",
+        ],
       },
       {
         type: "heading",
@@ -151,7 +362,32 @@ export const posts: BlogPost[] = [
       },
       {
         type: "paragraph",
-        text: "Two rules keep the system healthy. First, ideas expire: anything in your drafts older than a month either gets shipped this week or gets deleted. Second, the calendar is visible: if you can see Thursday is empty on Monday, you will fix it on Monday. A scheduling tool earns its place by making that glance effortless — which is precisely the glance Zybble's calendar is built around.",
+        text: "Two rules keep the system healthy. First, ideas expire: anything in your drafts older than a month either gets shipped this week or gets deleted. Second, the calendar is visible: if you can see Thursday is empty on Monday, you will fix it on Monday. A scheduling tool earns its place by making that glance effortless — which is precisely the glance [[Zybble's calendar]](/linkedin-scheduler) is built around.",
+      },
+      {
+        type: "faq",
+        items: [
+          {
+            question: "How often should a founder post on LinkedIn?",
+            answer:
+              "Two to three well-placed posts a week is a sustainable ceiling for most founders running a company at the same time — and a floor you can build a real audience on. Frequency you cannot sustain is worse than a smaller cadence you can, because the algorithm and your audience both respond to reliability more than volume.",
+          },
+          {
+            question: "Should a founder post from a personal profile or the company page?",
+            answer:
+              "Mostly from the personal profile. Founder posts consistently earn more reach and more trust than company-page posts, because people follow people. Use the company page for announcements and proof — launches, hiring, customers — and your own profile for judgement and lessons. The division of labour matters more than any scheduling tactic.",
+          },
+          {
+            question: "How far in advance should I schedule LinkedIn posts?",
+            answer:
+              "One to two weeks ahead is the sweet spot. Far enough that a chaotic week cannot break the cadence; close enough that the posts still reflect what you are actually learning. Beyond a month, posts start to feel stale and you will be tempted to rewrite them anyway.",
+          },
+          {
+            question: "What if I run out of ideas?",
+            answer:
+              "Ideas do not run out; capture does. Every week hands you material — decisions, failures, customer moments, numbers that moved. If the harvest step keeps coming up empty, the bottleneck is usually that nothing is being written down during the week. Keep a running note and dump raw moments into it as they happen; the 45-minute session then becomes editing, not inventing.",
+          },
+        ],
       },
       {
         type: "quote",
@@ -165,8 +401,14 @@ export const posts: BlogPost[] = [
     description:
       "Impressions feel good and mean little. Here are the numbers that actually predict whether your LinkedIn presence is working — and how to read them.",
     publishedAt: "2025-12-15",
-    readingTime: "6 min read",
+    updatedAt: "2026-11-01",
     category: "Analytics",
+    keywords: [
+      "linkedin vanity metrics",
+      "linkedin metrics that matter",
+      "linkedin post analytics",
+      "reading linkedin analytics",
+    ],
     cover: {
       src: "/blog/analytics-beyond-vanity.jpg",
       alt: "Editorial illustration of ascending bar charts and a rising line in Zybble blue",
@@ -177,6 +419,27 @@ export const posts: BlogPost[] = [
         text: "Impressions are the sugar of social analytics: instant, addictive and nutritionally empty. A post can reach tens of thousands of feeds and change nothing. If you are building a business on LinkedIn, the question analytics must answer is narrower and harder: is the right audience paying attention, and is that attention compounding?",
       },
       {
+        type: "paragraph",
+        text: "Vanity metrics are not wrong because they are numbers; they are wrong because they are inputs you do not control and outputs you cannot spend. An impression is a feed rendering, not a person reading. Optimising for it produces posts that interrupt many strangers instead of persuading the few who can buy, refer or follow your work. The metrics below are the ones that survive contact with that test.",
+      },
+      {
+        type: "heading",
+        text: "The metrics, defined honestly",
+      },
+      {
+        type: "list",
+        items: [
+          "Impressions — how many times your post was displayed in feeds. Cheap to earn, easy to inflate, no guarantee anyone looked. Useful mainly as the denominator for everything else.",
+          "Reach — the number of unique people who saw it. Closer to 'audience', still short of 'attention', and harder to get at precisely for member posts, which is why most tools work in impressions.",
+          "Engagement rate — reactions, comments and reposts divided by impressions. The first number that measures response rather than exposure.",
+          "Follower movement — whether your posts are causing people to subscribe to your thinking. The compounding mechanism of the whole channel.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "For the precise relationships between the first three — and why they get conflated so often — see [[impressions vs reach vs engagement on LinkedIn]](/blog/linkedin-impressions-vs-reach-vs-engagement). The rest of this article is about the two numbers worth managing.",
+      },
+      {
         type: "heading",
         text: "Engagement rate over reach",
       },
@@ -185,12 +448,36 @@ export const posts: BlogPost[] = [
         text: "Reactions, comments and reposts divided by impressions is the first honest number. It strips out the lottery of distribution and tells you how the people who saw the post responded. Track it per post, then look at the median across a month — single posts lie, medians do not.",
       },
       {
+        type: "paragraph",
+        text: "A worked example with round numbers. Say a post earned 2,000 impressions, 40 reactions, 12 comments and 6 reposts. Engagement rate is (40 + 12 + 6) ÷ 2,000 = 2.9%. On its own, 2.9% means nothing — there is no universal grade for engagement rate, and anyone selling you one is guessing. What matters is your own baseline: compute the median of your last ten posts, then ask whether this one is above or below the typical post to your audience. Relative movement is the signal.",
+      },
+      {
+        type: "paragraph",
+        text: "The full arithmetic, common pitfalls and the levers that genuinely move this number are covered in [[how to calculate and improve your LinkedIn engagement rate]](/blog/linkedin-engagement-rate-calculate-improve).",
+      },
+      {
         type: "heading",
         text: "Comments are the closest thing to revenue",
       },
       {
         type: "paragraph",
         text: "For consultants and founders, the metric closest to pipeline is the quality of comment section you generate. Comments from people in your target market are leads wearing a disguise. Count them. Read them. Reply to every one — the reply doubles the comment count and often starts the real conversation in DMs.",
+      },
+      {
+        type: "paragraph",
+        text: "Go one step further and keep a simple tally: of the comments on your last ten posts, how many came from people who plausibly fit your customer profile? A post that draws twenty comments from fellow creators teaches you less about demand than one that draws three from buyers. This number never appears in any dashboard by default — which is exactly why it is worth an hour of your attention.",
+      },
+      {
+        type: "heading",
+        text: "Benchmarks are folklore; your median is a fact",
+      },
+      {
+        type: "paragraph",
+        text: "The internet is full of 'average LinkedIn engagement rate' figures, and almost all of them are useless for one of three reasons: they mix personal profiles with company pages, they define engagement rate differently than you do, or they describe an audience that is not yours. Benchmarks answer 'how do I compare to everyone?' — a question with no bearing on any decision you will actually make.",
+      },
+      {
+        type: "paragraph",
+        text: "Your own median answers the only question that matters: 'is my next post better or worse than my typical post?' Improve against that line for a year and the external benchmarks will take care of themselves.",
       },
       {
         type: "heading",
@@ -207,7 +494,36 @@ export const posts: BlogPost[] = [
       },
       {
         type: "paragraph",
-        text: "That last question is the point of analytics. If the review does not change what you do next, you are not measuring — you are spectating. Zybble's analytics view is designed around this loop: per-post performance, then the trend, then the decision.",
+        text: "That last question is the point of analytics. If the review does not change what you do next, you are not measuring — you are spectating. Fifteen minutes a week is enough, provided the numbers are already in one place rather than scattered across LinkedIn's per-post screens.",
+      },
+      {
+        type: "paragraph",
+        text: "This review loop is the design brief for [[Zybble's analytics]](/linkedin-analytics): per-post performance first, then the trend, then the decision. And when you want to connect the numbers to commercial outcomes rather than content quality, [[what LinkedIn content ROI actually looks like for B2B]](/blog/linkedin-content-roi-b2b) picks up exactly where this article stops.",
+      },
+      {
+        type: "faq",
+        items: [
+          {
+            question: "What is a good engagement rate on LinkedIn?",
+            answer:
+              "There is no trustworthy universal number — definitions, populations and time frames vary too much between sources. The honest benchmark is your own trailing median: the median engagement rate of your last ten posts. A post is 'good' when it beats that line, and your presence is improving when the line itself drifts upward over the months.",
+          },
+          {
+            question: "Are impressions or reach more important?",
+            answer:
+              "Neither is a goal; both are denominators. Impressions tell you how widely the feed displayed the post and reach tells you how many unique people were involved — but the number you manage is the response per unit of exposure. Fixating on the numerator metrics (impressions, reach) produces broad, shallow content; managing engagement rate produces content that works on the audience you actually have.",
+          },
+          {
+            question: "How do I see analytics for my LinkedIn posts?",
+            answer:
+              "LinkedIn shows basic per-post numbers (impressions, reactions, comments, reposts) beneath each post and in the analytics section of your profile. The limitation is not access but assembly: comparing dozens of posts over months means exporting and joining the data yourself. That is the specific problem a dedicated tool solves — [[Zybble]](/linkedin-analytics) computes per-post performance and trends automatically for every post it publishes.",
+          },
+          {
+            question: "Can I see who viewed my LinkedIn post?",
+            answer:
+              "LinkedIn shows who reacted and commented, but it does not reveal who viewed a post, and profile-view identities are only partially visible depending on the other person's settings and your account. Treat 'who engaged' as the usable signal — it is public by design and it is the group most likely to become buyers or referrals.",
+          },
+        ],
       },
       {
         type: "quote",
@@ -221,8 +537,14 @@ export const posts: BlogPost[] = [
     description:
       "One viral post fades in a week. A year of steady posting builds an audience that buys. The case for boring, scheduled, compounding visibility.",
     publishedAt: "2025-11-27",
-    readingTime: "5 min read",
+    updatedAt: "2026-11-01",
     category: "Strategy",
+    keywords: [
+      "linkedin consistency",
+      "how often to post on linkedin",
+      "linkedin posting frequency",
+      "post consistently on linkedin",
+    ],
     cover: {
       src: "/blog/consistency-beats-virality.jpg",
       alt: "Abstract illustration of steady ascending steps in blue against a white background",
@@ -233,6 +555,22 @@ export const posts: BlogPost[] = [
         text: "Every LinkedIn creator remembers their first viral post. The notifications cascade, the follower count jumps — and two weeks later the graph is back to baseline, as if it never happened. Virality is a spike. Businesses are not built on spikes; they are built on lines that slope gently upward and refuse to come back down.",
       },
       {
+        type: "paragraph",
+        text: "This is not an argument against ambition. It is an argument about where compounding lives. A viral post is a lottery ticket that pays attention; a consistent presence is an annuity that pays trust. You can live on one of them.",
+      },
+      {
+        type: "heading",
+        text: "The three hidden costs of chasing virality",
+      },
+      {
+        type: "list",
+        items: [
+          "The content treadmill. Once a viral post sets your baseline, ordinary posts feel like failures. Creators chasing the spike publish more, longer and louder until the feed — and the creator — burns out.",
+          "Audience whiplash. Viral posts attract everyone; consistent posts attract someone. Write for the spike and your following fills with people who enjoyed one hot take but will never buy, refer or read again.",
+          "Verdict-dependence. When every post is a lottery draw, your mood tracks the algorithm. When every post is a deposit, the outcome of a single one barely registers.",
+        ],
+      },
+      {
         type: "heading",
         text: "What a year of steady posting actually buys",
       },
@@ -241,12 +579,20 @@ export const posts: BlogPost[] = [
         text: "Compounding on LinkedIn is subtle. It is the prospect who has seen your name forty times before the sales call. It is the hire who applied because they have read your thinking for six months. None of that appears in a dashboard screenshot, yet it is precisely what a consistent presence purchases over a viral hit — trust accumulated in small, regular deposits.",
       },
       {
+        type: "paragraph",
+        text: "How long does it take? Honestly: months, not weeks, before the effects feel tangible — inbound conversations that reference older posts, recognisable names in your comments, opportunities with your thinking cited back to you. Anyone promising faster is selling something. The good news is that the mechanism is boring and reliable, which also means it is available to anyone willing to keep publishing through the quiet first stretch.",
+      },
+      {
         type: "heading",
         text: "The algorithm rewards rhythm too",
       },
       {
         type: "paragraph",
         text: "LinkedIn's distribution favours accounts that post reliably and earn engagement reliably, because predictable creators make the feed better. You need not take anyone's word for it: post sporadically for a month, then three times a week for two months, and compare your own analytics. The second period almost always carries the higher floor.",
+      },
+      {
+        type: "paragraph",
+        text: "One persistent myth deserves retiring here: that scheduling itself suppresses reach. It does not — [[scheduling LinkedIn posts does not kill your reach]](/blog/does-scheduling-linkedin-posts-kill-your-reach) walks through where that belief comes from and what the platform actually responds to. The practical summary: the feed punishes silence and inconsistency far more reliably than it rewards any publishing trick.",
       },
       {
         type: "heading",
@@ -259,6 +605,35 @@ export const posts: BlogPost[] = [
           "Batch writing into one weekly block so a busy Tuesday cannot break the chain.",
           "Schedule posts in advance; willpower should never sit between your content and the publish button.",
           "Review monthly, not daily. Daily graphs invite panic; monthly trends invite strategy.",
+        ],
+      },
+      {
+        type: "paragraph",
+        text: "A system beats a resolution because it removes the daily negotiation. You do not wake up and decide whether to post — the calendar already decided. The [[founder's content calendar system]](/blog/linkedin-content-calendar-for-busy-founders) turns this into a 45-minute weekly routine, and [[thought leadership without posting daily]](/blog/linkedin-thought-leadership-without-posting-daily) shows what the strategy looks like when you genuinely cannot publish often: authority built on depth and repetition of subject rather than frequency.",
+      },
+      {
+        type: "faq",
+        items: [
+          {
+            question: "How often should you post on LinkedIn?",
+            answer:
+              "Often enough to be a presence and rarely enough to stay good: for most professionals that is two to three posts a week, sustained for months. Posting daily is neither required nor forbidden — but an aggressive cadence you abandon after six weeks will lose to a modest one you keep for a year, in both algorithmic and human terms.",
+          },
+          {
+            question: "What actually counts as being consistent?",
+            answer:
+              "Regularity of presence, not sameness of clock time. Your audience experiences consistency as 'I see this person thinking about X most weeks'. A dependable rhythm — same-ish days, recognisable subjects, sustained over months — is consistency. Posting five times one week and vanishing for the next three is not.",
+          },
+          {
+            question: "Can I take a week off without losing momentum?",
+            answer:
+              "Yes, occasionally, and you should — holidays and crunch weeks are real. The damage starts when a week becomes a month, twice a quarter. The practical safeguard is scheduling ahead: queue two or three posts before you step away so your presence continues while you do not. A scheduler makes the difference between a rest and a lapse.",
+          },
+          {
+            question: "Isn't virality still useful for growth?",
+            answer:
+              "It can be a bonus, never the plan. A viral post earns cheap attention; what converts that attention into anything durable is the body of work people find when they check who you are. Build the body of work first and virality becomes a multiplier; chase virality first and there is nothing for the attention to stick to.",
+          },
         ],
       },
       {
@@ -278,7 +653,6 @@ export const posts: BlogPost[] = [
     description:
       "The claim that scheduling tools suppress your LinkedIn reach refuses to die. Here is where the myth comes from, what actually drives distribution, and the one way scheduling genuinely can hurt you.",
     publishedAt: "2026-10-27",
-    readingTime: "5 min read",
     category: "Strategy",
     cover: {
       src: "/blog/scheduling-kill-reach.jpg",
@@ -370,7 +744,6 @@ export const posts: BlogPost[] = [
     description:
       "Nine schedulers that can publish to LinkedIn, and the evaluation criteria that actually predict whether one survives contact with a client roster. Plus how to read a pricing page before you commit.",
     publishedAt: "2026-10-20",
-    readingTime: "6 min read",
     category: "Tools",
     cover: {
       src: "/blog/best-scheduler-agencies.jpg",
@@ -532,7 +905,6 @@ export const posts: BlogPost[] = [
     description:
       "Managing several LinkedIn profiles turns scheduling from a convenience into infrastructure. Seven capabilities that separate a usable multi-account scheduler from an expensive mistake.",
     publishedAt: "2026-10-13",
-    readingTime: "4 min read",
     category: "Tools",
     cover: {
       src: "/blog/multiple-accounts-scheduler.jpg",
@@ -630,7 +1002,6 @@ export const posts: BlogPost[] = [
     description:
       "LinkedIn's built-in scheduler is genuinely useful — until it isn't. Seven limitations that appear the moment you get serious, and how to tell when you have outgrown the free option.",
     publishedAt: "2026-10-06",
-    readingTime: "4 min read",
     category: "Tools",
     cover: {
       src: "/blog/free-vs-paid-scheduler.jpg",
@@ -731,8 +1102,7 @@ export const posts: BlogPost[] = [
     description:
       "The first comment is where links, sources and follow-ups belong. Here is how to keep using it when your posts publish themselves — including the honest limits of scheduling tools.",
     publishedAt: "2026-09-29",
-    readingTime: "4 min read",
-    category: "How-to",
+    category: "Tools",
     cover: {
       src: "/blog/schedule-first-comment.jpg",
       alt: "Minimal illustration of a post card joined by a smaller offset comment card with a clock badge in Zybble blue",
@@ -817,8 +1187,7 @@ export const posts: BlogPost[] = [
     description:
       "A 30-day planning sheet you can fill in one sitting, plus the weekly rhythm that makes a month of content realistic when you have a company to run.",
     publishedAt: "2026-09-15",
-    readingTime: "4 min read",
-    category: "Resources",
+    category: "Tools",
     cover: {
       src: "/blog/content-calendar-template.jpg",
       alt: "Minimal illustration of a printable calendar sheet with six filled day cells in Zybble blue",
@@ -918,7 +1287,6 @@ export const posts: BlogPost[] = [
     description:
       "A LinkedIn content strategy built for founders who have a company to run: pick the audiences that matter, choose themes you can sustain, and set a cadence that does not collapse in a busy month.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Strategy",
     keywords: [
       "linkedin content strategy for b2b founders",
@@ -1266,7 +1634,6 @@ export const posts: BlogPost[] = [
     description:
       "Build a LinkedIn content calendar that holds a month of publishing: choose a defensible cadence, design slot architecture, write hooks in batches and run a monthly review that actually changes what you write.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Strategy",
     keywords: [
       "linkedin content calendar",
@@ -1711,7 +2078,6 @@ export const posts: BlogPost[] = [
     description:
       "Learn how to write LinkedIn hooks that earn the expand: what the first two lines have to do, eight patterns with real examples, the formulas to avoid, and how to test hooks without fooling yourself.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Writing",
     keywords: [
       "linkedin hooks",
@@ -2145,7 +2511,6 @@ export const posts: BlogPost[] = [
     description:
       "How to calculate LinkedIn engagement rate properly, which denominator to use and why it changes the answer, why published benchmarks mislead, and the specific levers that move the number.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Analytics",
     keywords: [
       "linkedin engagement rate",
@@ -2515,13 +2880,18 @@ export const posts: BlogPost[] = [
     description:
       "A clear explanation of LinkedIn impressions, members reached and engagement — how LinkedIn defines each, how they relate, which to use for which decision, and the combinations that diagnose real problems.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Analytics",
     keywords: [
       "linkedin impressions vs reach",
       "linkedin impressions vs reach vs engagement",
       "what are linkedin impressions",
       "linkedin members reached",
+    ],
+    sources: [
+      {
+        label: "LinkedIn Help — posting updates to LinkedIn (feed post mechanics and limits)",
+        href: "https://www.linkedin.com/help/linkedin/answer/a528176",
+      },
     ],
     cover: {
       src: "/blog/impressions-vs-reach.jpg",
@@ -2931,7 +3301,6 @@ export const posts: BlogPost[] = [
     description:
       "Five content pillars built around a consulting buyer's real questions, how to balance them across a quarter, and how to publish evidence without breaching confidentiality or giving away your method.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Strategy",
     keywords: [
       "linkedin content pillars",
@@ -3313,7 +3682,6 @@ export const posts: BlogPost[] = [
     description:
       "A practical system for turning one strong idea into six or more LinkedIn posts: the source hierarchy, six distinct treatments, a worked example, and how to space repeats so the same thinking lands as depth rather than repetition.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Writing",
     keywords: [
       "repurpose linkedin content",
@@ -3696,13 +4064,22 @@ export const posts: BlogPost[] = [
     description:
       "What text posts, document carousels and native video are each genuinely good at, what they cost to produce, the official limits to work within, and a simple decision rule for picking a format per idea.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
-    category: "Formats",
+    category: "Writing",
     keywords: [
       "linkedin text posts vs carousels vs video",
       "linkedin post formats",
       "linkedin carousel vs video",
       "best linkedin post format",
+    ],
+    sources: [
+      {
+        label: "LinkedIn Help — posting updates to LinkedIn (character limits and posting rules)",
+        href: "https://www.linkedin.com/help/linkedin/answer/a528176",
+      },
+      {
+        label: "LinkedIn Help — video specifications for LinkedIn posts",
+        href: "https://www.linkedin.com/help/linkedin/answer/a1311816",
+      },
     ],
     cover: {
       src: "/blog/post-formats.jpg",
@@ -4081,7 +4458,6 @@ export const posts: BlogPost[] = [
     description:
       "Thought leadership is built on position and judgement, not volume. A low-frequency system for becoming known for something specific on LinkedIn — including where borrowed attention beats posting more.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Strategy",
     keywords: [
       "linkedin thought leadership",
@@ -4433,7 +4809,6 @@ export const posts: BlogPost[] = [
     description:
       "A four-level model for measuring LinkedIn content ROI in B2B: what to track at each stage, an attribution approach you can defend, how to value time properly, and how to report it honestly to a board.",
     publishedAt: "2026-11-01",
-    readingTime: "16 min read",
     category: "Analytics",
     keywords: [
       "linkedin content roi",

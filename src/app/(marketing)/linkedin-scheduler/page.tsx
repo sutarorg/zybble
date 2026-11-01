@@ -26,7 +26,7 @@ const capabilities = [
   },
   {
     title: "Queue, calendar or exact slot",
-    copy: "Add to the next open slot, drag onto the calendar, or pick a precise date and time. Your cadence, your rules.",
+    copy: "Queue a post from the composer, tap any day on the calendar to start it there, or pick a precise date and time. Your cadence, your rules.",
   },
   {
     title: "Drafts that never expire",

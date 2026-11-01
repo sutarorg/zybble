@@ -42,7 +42,7 @@ export function ProductPreview() {
           </div>
           <div className="ml-2 flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/70">
             <Lock className="size-3" aria-hidden />
-            app.zybble.app/composer
+            zybble.com/posts/new
           </div>
           <span className="ml-auto hidden rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700 ring-1 ring-brand-100 sm:block">
             Preview illustration
@@ -117,7 +117,7 @@ export function ProductPreview() {
               <CalendarClock className="size-4 shrink-0 text-brand-600" aria-hidden />
               <p className="text-xs font-medium text-brand-900">
                 Tuesday · 9:30 AM
-                <span className="ml-1.5 font-normal text-brand-700">your audience time</span>
+                <span className="ml-1.5 font-normal text-brand-700">your local time</span>
               </p>
               <Sparkles className="ml-auto size-3.5 text-brand-500" aria-hidden />
             </div>

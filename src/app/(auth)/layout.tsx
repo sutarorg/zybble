@@ -29,7 +29,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           href="/"
           className="mt-8 text-sm font-medium text-slate-500 transition-colors hover:text-brand-700"
         >
-          ← Back to zybble.app
+          ← Back to zybble.com
         </Link>
       </div>
     </main>

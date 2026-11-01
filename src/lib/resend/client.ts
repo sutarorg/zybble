@@ -45,7 +45,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 
   try {
     const { data, error } = await resend().emails.send({
-      // EMAIL_FROM is a full RFC-5322 address, e.g. "Zybble <no-reply@zybble.app>".
+      // EMAIL_FROM is a full RFC-5322 address, e.g. "Zybble <no-reply@zybble.com>".
       from: env().EMAIL_FROM,
       to: Array.isArray(input.to) ? input.to : [input.to],
       subject: input.subject,
