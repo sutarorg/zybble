@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ArrowLeft, ArrowUpRight, Clock } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Clock, Download } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: post.title,
       description: post.description,
       publishedTime: post.publishedAt,
-      images: [{ url: post.cover.src, width: 1280, height: 720, alt: post.cover.alt }],
+      images: [{ url: post.cover.src, width: 1600, height: 900, alt: post.cover.alt }],
     },
     twitter: {
       card: "summary_large_image",
@@ -87,6 +87,28 @@ function renderBlock(block: Block, index: number) {
             {block.text}
           </p>
         </blockquote>
+      );
+    case "download":
+      return (
+        <a
+          key={index}
+          href={block.href}
+          download
+          className="mt-8 flex items-start gap-4 rounded-xl bg-brand-50 px-6 py-5 ring-1 ring-brand-100 transition-colors hover:bg-brand-100/70"
+        >
+          <span
+            aria-hidden
+            className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white"
+          >
+            <Download className="size-5" />
+          </span>
+          <span className="flex flex-col gap-1">
+            <span className="text-[15px] font-semibold text-brand-950">
+              {block.label}
+            </span>
+            <span className="text-sm leading-6 text-slate-600">{block.hint}</span>
+          </span>
+        </a>
       );
     default:
       return (
