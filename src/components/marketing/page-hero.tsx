@@ -12,7 +12,11 @@ interface PageHeroProps {
   eyebrow: string;
   title: ReactNode;
   description: string;
-  visual: ReactNode;
+  /**
+   * Optional illustration. When omitted the hero renders as a centred,
+   * single-column block — the right shape for text-led tool pages.
+   */
+  visual?: ReactNode;
   reversed?: boolean;
   primaryCta?: { label: string; href: string };
   secondaryCta?: { label: string; href: string };
@@ -30,6 +34,48 @@ export function PageHero({
   secondaryCta,
   footnote,
 }: PageHeroProps) {
+  // Text-led variant: no visual supplied, so the hero centres itself.
+  if (!visual) {
+    return (
+      <section className="relative overflow-hidden">
+        <div aria-hidden className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-gradient-to-b from-brand-50/70 via-white to-white" />
+          <div className="bg-grid-blue absolute inset-x-0 top-0 h-[320px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]" />
+        </div>
+
+        <Container className="py-16 sm:py-20 lg:py-24">
+          <Reveal className="mx-auto max-w-3xl text-center">
+            <Badge size="md">{eyebrow}</Badge>
+            <h1 className="mx-auto mt-5 max-w-2xl text-balance text-4xl font-semibold leading-[1.1] tracking-tight text-slate-950 sm:text-5xl">
+              {title}
+            </h1>
+            <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-8 text-slate-600">
+              {description}
+            </p>
+          </Reveal>
+          <Reveal delay={120}>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button asChild size="lg">
+                <Link href={primaryCta.href}>
+                  {primaryCta.label}
+                  <ArrowRight aria-hidden />
+                </Link>
+              </Button>
+              {secondaryCta && (
+                <Button asChild variant="secondary" size="lg">
+                  <Link href={secondaryCta.href}>{secondaryCta.label}</Link>
+                </Button>
+              )}
+            </div>
+            {footnote && (
+              <p className="mt-4 text-center text-[13px] text-slate-500">{footnote}</p>
+            )}
+          </Reveal>
+        </Container>
+      </section>
+    );
+  }
+
   return (
     <section className="relative overflow-hidden">
       <div aria-hidden className="absolute inset-0 -z-10">

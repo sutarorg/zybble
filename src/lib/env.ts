@@ -81,6 +81,8 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Zybble <no-reply@zybble.com>"),
   EMAIL_REPLY_TO: z.string().optional(),
+  // Destination inbox for the public contact form (delivered via Resend).
+  CONTACT_FORM_TO: z.string().email().optional(),
   // Where transactional product links point (used by email templates).
   APP_URL: optionalUrl,
 

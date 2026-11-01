@@ -13,11 +13,29 @@ const columns = [
     ],
   },
   {
+    heading: "Free tools",
+    links: [
+      { label: "All free tools", href: siteConfig.links.freeTools },
+      { label: "Engagement rate calculator", href: "/tools/linkedin-engagement-rate-calculator" },
+      { label: "Content calendar template", href: "/resources/linkedin-content-calendar-template" },
+      { label: "Character counter", href: "/tools/linkedin-character-counter" },
+      { label: "Keyword analyzer", href: "/tools/linkedin-keyword-analyzer" },
+    ],
+  },
+  {
     heading: "Resources",
     links: [
       { label: "Blog", href: siteConfig.links.blog },
       { label: "Get started", href: siteConfig.links.signup },
       { label: "Log in", href: siteConfig.links.login },
+    ],
+  },
+  {
+    heading: "Company",
+    links: [
+      { label: "About", href: siteConfig.links.about },
+      { label: "Contact", href: siteConfig.links.contact },
+      { label: "Security", href: siteConfig.links.security },
     ],
   },
   {
@@ -33,7 +51,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-slate-200 bg-slate-50">
       <Container className="py-16">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-8">
           <div className="col-span-2">
             <Logo />
             <p className="mt-4 max-w-xs text-sm leading-6 text-slate-600">

@@ -24,9 +24,17 @@ const staticRoutes: Array<{ path: string; priority: number; lastModified?: Date 
   { path: "/linkedin-scheduler", priority: 0.9 },
   { path: "/linkedin-analytics", priority: 0.9 },
   { path: "/pricing", priority: 0.9 },
+  { path: "/free-linkedin-tools", priority: 0.9 },
+  { path: "/tools/linkedin-engagement-rate-calculator", priority: 0.8 },
+  { path: "/resources/linkedin-content-calendar-template", priority: 0.8 },
+  { path: "/tools/linkedin-character-counter", priority: 0.8 },
+  { path: "/tools/linkedin-keyword-analyzer", priority: 0.8 },
   // The blog index changes whenever any article does, so its date is derived
   // below rather than pinned to the launch date.
   { path: "/blog", priority: 0.8 },
+  { path: "/about", priority: 0.6 },
+  { path: "/contact", priority: 0.5 },
+  { path: "/security", priority: 0.4 },
   { path: "/privacy", priority: 0.3 },
   { path: "/terms", priority: 0.3 },
 ];

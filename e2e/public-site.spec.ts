@@ -30,6 +30,125 @@ test.describe("public pages render", () => {
   }
 });
 
+test.describe("free tools, trust pages and personas", () => {
+  const NEW_PAGES = [
+    { path: "/free-linkedin-tools", heading: /free linkedin tools/i },
+    { path: "/tools/linkedin-engagement-rate-calculator", heading: /engagement rate/i },
+    { path: "/resources/linkedin-content-calendar-template", heading: /content calendar/i },
+    { path: "/tools/linkedin-character-counter", heading: /write to the limit|character/i },
+    { path: "/tools/linkedin-keyword-analyzer", heading: /keyword/i },
+    { path: "/about", heading: /about|zybble exists/i },
+    { path: "/contact", heading: /talk to|contact/i },
+    { path: "/security", heading: /security|protect/i },
+  ];
+
+  for (const page of NEW_PAGES) {
+    test(`${page.path} loads with a single h1 and a canonical`, async ({ page: p }) => {
+      const response = await p.goto(page.path);
+      expect(response?.status()).toBe(200);
+
+      await expect(p.locator("h1")).toHaveCount(1);
+      await expect(p.locator("h1").first()).toContainText(page.heading);
+
+      const canonical = p.locator('link[rel="canonical"]');
+      await expect(canonical).toHaveAttribute("href", new RegExp(`${page.path.replace(/\//g, "\\/")}$`));
+    });
+  }
+
+  test("the engagement calculator computes a rate from inputs", async ({ page }) => {
+    await page.goto("/tools/linkedin-engagement-rate-calculator");
+
+    const labels = [
+      ["Impressions", "4200"],
+      ["Reactions", "85"],
+      ["Comments", "14"],
+      ["Reposts", "6"],
+    ];
+    for (const [label, value] of labels) {
+      await page
+        .locator("label", { hasText: label })
+        .first()
+        .getByRole("textbox")
+        .fill(value);
+    }
+
+    // (85 + 14 + 6) / 4200 = 2.5%
+    await expect(page.getByText("2.50%")).toBeVisible();
+    await expect(page.getByText("(105 ÷ 4,200) × 100")).toBeVisible();
+  });
+
+  test("the character counter counts, warns over the limit and copies", async ({ page }) => {
+    await page.goto("/tools/linkedin-character-counter");
+
+    await page
+      .getByRole("textbox")
+      .fill("A".repeat(3050));
+    await expect(page.getByText(/over LinkedIn/)).toBeVisible();
+
+    await page.getByRole("button", { name: "Clear" }).click();
+    await expect(page.getByText("0", { exact: true }).first()).toBeVisible();
+  });
+
+  test("the keyword analyzer reports on a pasted draft", async ({ page }) => {
+    await page.goto("/tools/linkedin-keyword-analyzer");
+
+    // First textarea is the keyword list, second is the post draft.
+    await page.locator("textarea").nth(0).fill("linkedin analytics");
+    await page
+      .locator("textarea")
+      .nth(1)
+      .fill("linkedin analytics helps founders. ".repeat(12));
+
+    await expect(page.getByText("Keyword report")).toBeVisible();
+    await expect(page.getByText("Present", { exact: true }).first()).toBeVisible();
+  });
+
+  test("the calendar planner stores entries and offers the CSV download", async ({ page }) => {
+    await page.goto("/resources/linkedin-content-calendar-template");
+
+    await page.getByRole("button", { name: "Load example week" }).click();
+    await expect(page.getByText("Status & notes")).toBeVisible();
+
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download CSV" }).click();
+    expect((await download).suggestedFilename()).toBe("linkedin-content-calendar.csv");
+  });
+
+  test("the homepage surfaces the persona wall and the tools strip", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { name: /built for professionals like you/i })).toBeVisible();
+    await expect(page.getByText("Illustrative persona").first()).toBeVisible();
+    await expect(
+      page.getByText(/fictional illustrations of real working styles/i),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /useful before you sign up/i })).toBeVisible();
+  });
+
+  test("the contact form validates and submits against the API", async ({ page }) => {
+    await page.goto("/contact");
+
+    // The form posts to /api/contact, which without a configured email
+    // provider responds with an honest failure — the test asserts the
+    // contract, not the provider.
+    await page.getByLabel("Your name").fill("E2E Visitor");
+    await page.getByLabel("Email").fill("e2e@example.com");
+    await page.getByLabel("Message").fill("This is an automated end-to-end test message.");
+    await page.getByRole("button", { name: /send message/i }).click();
+
+    await expect(
+      page.getByRole("status").or(page.getByRole("alert")),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("the reusable CSV template downloads", async ({ page }) => {
+    const response = await page.request.get("/downloads/linkedin-content-calendar-template.csv");
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Publishing date,Content topic,Post format,Status,Notes");
+  });
+});
+
 test.describe("no dead links", () => {
   test("every marketing navigation link resolves", async ({ page }) => {
     await page.goto("/");
