@@ -4,6 +4,7 @@ import { ArrowRight, Calculator, CalendarDays, Search, Type } from "lucide-react
 import { JsonLd } from "@/components/json-ld";
 import { Container } from "@/components/layout/container";
 import { AnalyticsShowcase } from "@/components/marketing/analytics-showcase";
+import { BlogPreview } from "@/components/marketing/blog-preview";
 import { FaqSection, type FaqItem } from "@/components/marketing/faq";
 import { FeatureBento } from "@/components/marketing/feature-bento";
 import { FinalCta } from "@/components/marketing/final-cta";
@@ -186,6 +187,7 @@ export default function HomePage() {
       <SchedulingShowcase />
       <AnalyticsShowcase />
       <FreeToolsStrip />
+      <BlogPreview />
       <PricingSection />
       <FaqSection
         items={homeFaq}

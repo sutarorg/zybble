@@ -4,6 +4,14 @@ import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -11,8 +19,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { apiPost, errorMessage } from "@/lib/api/client";
 import { useSession } from "@/lib/app/hooks";
+import { useLocalTimezone } from "@/lib/app/hooks";
 import type { Workspace } from "@/lib/app/types";
 
 /**
@@ -30,6 +41,51 @@ export function WorkspaceSwitcher() {
 
   const workspaces = session.data?.workspaces ?? [];
   const current = workspaces[0] ?? null;
+
+  const localTimezone = useLocalTimezone();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  /**
+   * Create a workspace, then move into it.
+   *
+   * Creating alone would leave the user looking at the workspace they were
+   * already in, which reads as "nothing happened" — the switch is what makes
+   * the action visible. The whole page reloads afterwards because every hook
+   * reads the workspace from a cookie.
+   */
+  async function createAndSwitch() {
+    const name = newName.trim();
+    if (!name) {
+      setCreateError("Give the workspace a name.");
+      return;
+    }
+
+    setCreating(true);
+    setCreateError(null);
+
+    try {
+      const { workspace } = await apiPost<{ workspace: { id: string } }>("/api/workspaces", {
+        name,
+        timezone: localTimezone,
+      });
+
+      await apiPost("/api/workspaces/switch", { workspaceId: workspace.id });
+
+      setCreateOpen(false);
+      setNewName("");
+      router.refresh();
+      window.location.reload();
+    } catch (caught) {
+      setCreateError(
+        errorMessage(caught, "Could not create the workspace. Check the name and try again."),
+      );
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function switchTo(workspace: Workspace) {
     if (workspace.id === current?.id) return;
@@ -109,11 +165,16 @@ export function WorkspaceSwitcher() {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <a href="/settings/account">
-              <Plus className="size-4" aria-hidden />
-              Create workspace
-            </a>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              // Let the dialog take focus before the menu unmounts, otherwise
+              // Radix restores focus to a trigger that no longer exists.
+              event.preventDefault();
+              setCreateOpen(true);
+            }}
+          >
+            <Plus className="size-4" aria-hidden />
+            Create workspace
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -122,6 +183,74 @@ export function WorkspaceSwitcher() {
           {error}
         </p>
       )}
+
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) {
+            setNewName("");
+            setCreateError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create a workspace</DialogTitle>
+            <DialogDescription>
+              A workspace keeps LinkedIn accounts, drafts and analytics to itself. You can switch
+              between them whenever you like.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createAndSwitch();
+            }}
+            className="mt-2 space-y-4"
+          >
+            <div>
+              <label
+                htmlFor="new-workspace-name"
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+              >
+                Workspace name
+              </label>
+              <Input
+                id="new-workspace-name"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                placeholder="Acme · Personal"
+                maxLength={80}
+                autoFocus
+              />
+              <p className="mt-1.5 text-[13px] text-slate-500">
+                Timezone is set to {localTimezone}. Both can be changed later in workspace settings.
+              </p>
+            </div>
+
+            {createError && (
+              <p
+                role="alert"
+                className="flex items-start gap-2 rounded-xl bg-red-50 px-3.5 py-2.5 text-[13px] text-red-700 ring-1 ring-red-200"
+              >
+                {createError}
+              </p>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating || newName.trim().length === 0}>
+                {creating && <Loader2 className="animate-spin" aria-hidden />}
+                Create workspace
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

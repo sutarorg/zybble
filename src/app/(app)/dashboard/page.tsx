@@ -270,10 +270,14 @@ export default function DashboardPage() {
               )}
             </div>
           ) : (
-            <>
+            /* The lock overlay is anchored to the placeholder grid rather than
+               to the card, so it covers exactly the blurred heatmap and can
+               never ride up over the heading and description above them,
+               however the text wraps at a given width. */
+            <div className="relative mt-5">
               <div
                 aria-hidden
-                className="pointer-events-none mt-5 grid grid-cols-[2.5rem_repeat(8,1fr)] gap-1 opacity-60 blur-[1.5px]"
+                className="pointer-events-none grid grid-cols-[2.5rem_repeat(8,1fr)] gap-1 opacity-60 blur-[1.5px]"
               >
                 <span />
                 {["6", "8", "10", "12", "14", "16", "18", "20"].map((h) => (
@@ -290,7 +294,7 @@ export default function DashboardPage() {
                   </span>
                 ))}
               </div>
-              <div className="absolute inset-x-6 bottom-6 top-[92px] flex flex-col items-center justify-center rounded-xl bg-white/70 backdrop-blur-[1px]">
+              <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/70 backdrop-blur-[1px]">
                 <p className="text-sm font-medium text-slate-700">
                   {analytics.data?.capabilities.bestTimeUnlocked
                     ? "Not enough data yet"
@@ -309,7 +313,7 @@ export default function DashboardPage() {
                   <Link href="/settings/billing">See Pro</Link>
                 </Button>
               </div>
-            </>
+            </div>
           )}
         </section>
 

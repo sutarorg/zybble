@@ -1,14 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import {
-  AlertTriangle,
-  BadgeCheck,
-  Loader2,
-  RefreshCw,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ConnectLinkedInDialog } from "@/components/app/connect-linkedin-dialog";
 import { SettingsNav } from "@/components/app/settings-nav";
@@ -94,7 +87,7 @@ export default function LinkedInSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <SettingsNav />
       <div className="space-y-6">
         {error && (
@@ -250,61 +243,6 @@ export default function LinkedInSettingsPage() {
               </ul>
             )}
           </div>
-        </section>
-
-        {/* Capability state */}
-        <section aria-labelledby="caps-heading" className="rounded-2xl bg-slate-50 p-6 ring-1 ring-slate-200">
-          <h2 id="caps-heading" className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <BadgeCheck className="size-4 text-brand-600" aria-hidden />
-            What this deployment can do
-          </h2>
-          <dl className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-3">
-            <div>
-              <dt className="text-[13px] text-slate-500">Publishing</dt>
-              <dd className="mt-0.5 text-sm font-medium text-slate-800">
-                {capabilities?.publishing ? "Enabled (w_member_social)" : "Not configured"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[13px] text-slate-500">Post analytics</dt>
-              <dd className="mt-0.5 text-sm font-medium text-slate-800">
-                {capabilities?.analytics ? "Enabled" : "Awaiting Community Management access"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[13px] text-slate-500">LinkedIn API version</dt>
-              <dd className="mt-0.5 font-mono text-sm font-medium text-slate-800">
-                {capabilities?.apiVersion ?? "—"}
-              </dd>
-            </div>
-          </dl>
-          <ul className="mt-5 space-y-4 border-t border-slate-200 pt-5">
-            {[
-              {
-                icon: ShieldCheck,
-                title: "Official OAuth, minimal scopes",
-                copy: "Authorisation happens on linkedin.com. Zybble requests only the scopes it is approved for, stores the token encrypted with AES-256-GCM, and never decrypts it in the browser.",
-              },
-              {
-                icon: RefreshCw,
-                title: "Health monitoring",
-                copy: "A scheduled job checks every connection daily. Expired tokens raise a notification and a reconnect prompt — a dead token never silently eats your queue.",
-              },
-              {
-                icon: Trash2,
-                title: "Clean disconnects",
-                copy: "Disconnecting deletes the stored credential immediately. Published posts stay on LinkedIn; scheduled posts for that account are reported as blocked rather than deleted.",
-              },
-            ].map((cap) => (
-              <li key={cap.title} className="flex gap-3.5">
-                <cap.icon className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
-                <div>
-                  <p className="text-sm font-medium text-slate-800">{cap.title}</p>
-                  <p className="mt-0.5 text-[13px] leading-6 text-slate-600">{cap.copy}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
         </section>
 
         {/* Organisation pages */}
