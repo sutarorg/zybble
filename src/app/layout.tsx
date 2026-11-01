@@ -34,6 +34,20 @@ export const metadata: Metadata = {
     images: [siteConfig.ogImage],
   },
   robots: { index: true, follow: true },
+  /**
+   * Declared explicitly rather than left to the `app/icon.png` file
+   * convention: a file-based icon is dropped as soon as an `icons` field
+   * exists (which it must, for the iOS Home Screen entry below).
+   * `apple-touch-icon.png` is flattened onto white on purpose — iOS renders
+   * PNG transparency as black, so the transparent master cannot be reused.
+   */
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png", sizes: "256x256" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
