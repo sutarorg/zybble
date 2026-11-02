@@ -171,12 +171,6 @@ export function PersonaWall() {
             </article>
           </Reveal>
         </div>
-
-        <p className="mt-10 text-center text-sm leading-6 text-slate-500">
-          The people above are fictional illustrations of real working styles — no quotes, results or
-          reviews are claimed on their behalf. Zybble has not published customer testimonials yet;
-          when it does, they will appear here with permission.
-        </p>
       </Container>
     </section>
   );

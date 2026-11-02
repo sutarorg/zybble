@@ -50,10 +50,15 @@ export class ScheduleLimitError extends AppError {
 }
 
 function mapSqlError(error: { message?: string; code?: string }): AppError {
-  const friendly = describeLimitError(error.code);
+  // Our limit sentinels are raised as the exception *message* with a generic
+  // SQLSTATE (P0001) as the code — `raise exception 'schedule_limit_reached'
+  // using errcode = 'P0001'`. Matching on the code alone therefore never
+  // matched, and every quota violation was reported as an opaque internal
+  // error. Check the message first, then fall back to the code.
+  const friendly = describeLimitError(error.message) ?? describeLimitError(error.code);
 
   if (friendly) {
-    return new EntitlementError(friendly, { code: error.code });
+    return new EntitlementError(friendly, { code: error.message ?? error.code });
   }
 
   logger.error("posts.sql_error", { message: error.message, code: error.code });
@@ -189,18 +194,24 @@ export async function createPost(
   let status: PostRow["status"] = "draft";
 
   if (input.intent === "schedule" || input.intent === "publish_now") {
+    // Both paths create a scheduled row — "publish now" simply sets the
+    // instant a few seconds ahead — so both consume the monthly allowance.
+    // The check used to sit inside the `schedule` branch only, which left a
+    // Free account able to publish without limit as long as it never touched
+    // the scheduler. The composer blocks this too; doing it here means the API
+    // cannot be used to walk around the UI.
+    if (
+      entitlements.monthlyScheduleLimit !== null &&
+      snapshot.scheduledPostsUsed >= entitlements.monthlyScheduleLimit
+    ) {
+      throw new ScheduleLimitError(
+        `You have used all ${entitlements.monthlyScheduleLimit} scheduled posts included in the Free plan this month. Upgrade to Pro for unlimited scheduling.`,
+      );
+    }
+
     if (input.intent === "publish_now") {
       scheduledAt = new Date(Date.now() + 5_000);
     } else {
-      if (
-        entitlements.monthlyScheduleLimit !== null &&
-        snapshot.scheduledPostsUsed >= entitlements.monthlyScheduleLimit
-      ) {
-        throw new ScheduleLimitError(
-          `You have used all ${entitlements.monthlyScheduleLimit} scheduled posts included in the Free plan this month. Upgrade to Pro for unlimited scheduling.`,
-        );
-      }
-
       scheduledAt = resolveScheduledAt({
         date: input.scheduleDate,
         time: input.scheduleTime,

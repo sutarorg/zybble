@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { AlertTriangle, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ConnectLinkedInDialog } from "@/components/app/connect-linkedin-dialog";
+import { GoProDialog } from "@/components/app/go-pro-dialog";
 import { SettingsNav } from "@/components/app/settings-nav";
 import { LinkedinIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
@@ -52,11 +53,20 @@ export default function LinkedInSettingsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDisconnect, setPendingDisconnect] = useState<LinkedInAccount | null>(null);
+  const [proOpen, setProOpen] = useState(false);
 
   const connections = accounts.data?.connections ?? [];
   const capabilities = accounts.data?.capabilities ?? null;
   const accountLimit = usage.data?.accountLimit ?? 1;
   const atLimit = connections.filter((account) => account.status !== "revoked").length >= accountLimit;
+
+  /**
+   * A Free workspace at its limit gets the Pro card rather than a dead button:
+   * the limit is a reason to upgrade, so it should say so and show what Pro
+   * adds. A Pro workspace at *its* limit has nowhere to upgrade to, so the
+   * button stays disabled and tells the user to disconnect one instead.
+   */
+  const gateBehindPro = atLimit && usage.data?.plan !== "pro";
 
   async function recheck(account: LinkedInAccount) {
     setBusyId(account.id);
@@ -121,12 +131,19 @@ export default function LinkedInSettingsPage() {
                     }.`}
               </p>
             </div>
-            <ConnectLinkedInDialog>
-              <Button disabled={atLimit || accounts.loading}>
+            {gateBehindPro ? (
+              <Button onClick={() => setProOpen(true)}>
                 <LinkedinIcon className="size-4" />
                 Connect account
               </Button>
-            </ConnectLinkedInDialog>
+            ) : (
+              <ConnectLinkedInDialog>
+                <Button disabled={atLimit || accounts.loading}>
+                  <LinkedinIcon className="size-4" />
+                  Connect account
+                </Button>
+              </ConnectLinkedInDialog>
+            )}
           </div>
 
           {atLimit && (
@@ -251,10 +268,11 @@ export default function LinkedInSettingsPage() {
             <div>
               <h3 className="text-sm font-semibold text-slate-900">Company pages</h3>
               <p className="mt-1 max-w-md text-[13px] leading-6 text-slate-500">
-                Organisation publishing needs the{" "}
-                <code className="font-mono text-[12px]">w_organization_social</code> scope plus
-                Marketing API approval and a page admin role. Zybble does not request it until that
-                access is granted.
+                Zybble publishes to your personal LinkedIn profile. Company-page publishing is not
+                supported yet — it needs the{" "}
+                <code className="font-mono text-[12px]">w_organization_social</code> scope,
+                Marketing Developer Platform approval and a page admin role that Zybble has not been
+                granted. This stays disabled until that changes.
               </p>
             </div>
             <Button variant="secondary" disabled>
@@ -294,6 +312,14 @@ export default function LinkedInSettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <GoProDialog
+        open={proOpen}
+        onOpenChange={setProOpen}
+        title="A second LinkedIn account needs Pro"
+        description="The Free plan connects one LinkedIn account. Pro allows up to five in the same workspace — your own profile alongside a client's, for instance — and every one of them can publish and be measured."
+        limitNote={`This workspace has ${connections.filter((account) => account.status !== "revoked").length} of ${accountLimit} account${accountLimit === 1 ? "" : "s"} connected on the Free plan.`}
+      />
     </div>
   );
 }

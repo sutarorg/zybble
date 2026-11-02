@@ -14,15 +14,24 @@ import {
   ThumbsUp,
   MessageCircle,
   Repeat2,
+  Trash2,
   X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -32,7 +41,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConnectLinkedInDialog } from "@/components/app/connect-linkedin-dialog";
-import { apiPatch, apiPost, apiUpload, errorMessage } from "@/lib/api/client";
+import { GoProDialog } from "@/components/app/go-pro-dialog";
+import {
+  apiDelete,
+  apiPatch,
+  apiPost,
+  apiUploadToSignedUrl,
+  errorMessage,
+} from "@/lib/api/client";
 import { useLocalTimezone } from "@/lib/app/hooks";
 import type { DashboardPost, LinkedInAccount, MediaAssetRef } from "@/lib/app/types";
 import { cn } from "@/lib/utils";
@@ -142,6 +158,17 @@ export function PostComposer({
   } | null>(null);
   // Generated once per mount so a double-submitted form creates one post.
   const [idempotencyKey] = useState(() => crypto.randomUUID());
+  /** Which Pro-gated action the user just attempted. */
+  const [proGate, setProGate] = useState<"schedule" | "publish_now" | null>(null);
+
+  /**
+   * Id of the draft once one exists, so an autosave followed by a manual save
+   * updates the same post instead of creating a second one.
+   */
+  const [draftId, setDraftId] = useState<string | null>(initialPost?.id ?? null);
+  const [autosavedAt, setAutosavedAt] = useState<Date | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const resolvedTz = timezone || initialPost?.timezone || detectedTz;
   const charCount = text.length;
@@ -192,6 +219,26 @@ export function PostComposer({
   async function save(publishNow = false) {
     if (!validate()) return;
 
+    /**
+     * Gate the two actions that put a post into the publishing queue.
+     *
+     * Both "Schedule" and "Publish now" create a scheduled row, so both draw
+     * on the same monthly allowance — the only difference is that one fires in
+     * five seconds. Drafts are unlimited on every plan, which is what
+     * /pricing promises, so they are never blocked here.
+     *
+     * An existing post is exempt: re-saving one that is already scheduled does
+     * not consume a fresh slot.
+     */
+    const consumesQuota = publishNow || intent === "schedule";
+    const quotaUsed =
+      remainingScheduleSlots !== null && remainingScheduleSlots <= 0 && !initialPost;
+
+    if (consumesQuota && quotaUsed) {
+      setProGate(publishNow ? "publish_now" : "schedule");
+      return;
+    }
+
     setSaving(true);
     setErrors({});
 
@@ -204,17 +251,22 @@ export function PostComposer({
       ...(intent === "schedule" && !publishNow
         ? { scheduleDate: date, scheduleTime: time }
         : {}),
-      ...(initialPost ? {} : { idempotencyKey }),
+      ...(initialPost?.id ?? draftId ? {} : { idempotencyKey }),
     };
 
+    // An autosave may already have created this draft, in which case the
+    // manual save has to update that row rather than insert a duplicate.
+    const targetId = initialPost?.id ?? draftId;
+
     try {
-      const result = initialPost
+      const result = targetId
         ? await apiPatch<{ post: DashboardPost; warning: string | null }>(
-            `/api/posts/${initialPost.id}`,
+            `/api/posts/${targetId}`,
             payload,
           )
         : await apiPost<{ post: DashboardPost; warning: string | null }>("/api/posts", payload);
 
+      setDraftId(result.post.id);
       setSaved({
         status: result.post.status === "published" ? "scheduled" : (result.post.status as "draft" | "scheduled"),
         id: result.post.id,
@@ -298,11 +350,26 @@ export function PostComposer({
         { assetId: placeholderId, kind, name: file.name, bytes: file.size, url: null, uploading: true },
       ]);
 
-      const formData = new FormData();
-      formData.append("file", file);
-
       try {
-        const uploaded = await apiUpload<{ asset: MediaAssetRef }>("/api/posts/media", formData);
+        // Two steps, on purpose:
+        //   1. ask the server what is allowed and where the bytes should go;
+        //   2. send them straight to storage.
+        // A single POST through our API is capped at 4.5 MB by the platform,
+        // which is smaller than one large image and far smaller than the 200 MB
+        // video LinkedIn accepts — every video upload failed with an
+        // unparseable "Request Entity Too Large" before this changed.
+        const ticket = await apiPost<{ assetId: string; uploadUrl: string }>(
+          "/api/posts/media/ticket",
+          { name: file.name, type: file.type, size: file.size },
+        );
+
+        await apiUploadToSignedUrl(ticket.uploadUrl, file);
+
+        // Confirms the bytes landed before the asset can be attached to a post.
+        const uploaded = await apiPost<{ asset: MediaAssetRef }>("/api/posts/media/finalize", {
+          assetId: ticket.assetId,
+        });
+
         setMedia((previous) =>
           previous.map((asset) =>
             asset.assetId === placeholderId
@@ -327,8 +394,165 @@ export function PostComposer({
     }
   }
 
-  function removeMedia(assetId: string) {
+  /**
+   * Remove a file from the composer and delete it from storage.
+   *
+   * Uploads are stored the moment a file is chosen, so dropping one from state
+   * alone would leave the object in the bucket: unreferenced, still billed and
+   * invisible to the user. The API only deletes assets that are not attached to
+   * a saved post, so removing media from an existing draft detaches it on save
+   * instead of destroying the file behind the post's back.
+   */
+  async function removeMedia(assetId: string) {
     setMedia((previous) => previous.filter((asset) => asset.assetId !== assetId));
+
+    try {
+      await apiDelete(`/api/posts/media?assetId=${encodeURIComponent(assetId)}`);
+    } catch (error) {
+      // Not silent: the file is gone from the composer but still in storage, so
+      // the user is owed the truth rather than a clean-looking success.
+      setErrors((previous) => ({
+        ...previous,
+        media: errorMessage(
+          error,
+          "Removed from this post, but it could not be deleted from storage. It will be cleaned up automatically.",
+        ),
+      }));
+    }
+  }
+
+  /**
+   * Autosave.
+   *
+   * Losing a half-written post to a switched tab or a mistyped URL is the
+   * failure people actually remember, so the composer saves a draft whenever
+   * it stops being visible.
+   *
+   * Two constraints shape this:
+   *  - `keepalive: true`, because `visibilitychange` and `pagehide` fire while
+   *    the browser may already be discarding the page; an ordinary fetch would
+   *    be cancelled before it reached the server.
+   *  - reads go through a ref, updated in an effect, so the listener is
+   *    registered once instead of being torn down on every keystroke.
+   */
+  const autosaveState = useRef({
+    text,
+    media,
+    authorAccountId,
+    resolvedTz,
+    draftId,
+    uploading,
+    idempotencyKey,
+  });
+
+  useEffect(() => {
+    autosaveState.current = {
+      text,
+      media,
+      authorAccountId,
+      resolvedTz,
+      draftId,
+      uploading,
+      idempotencyKey,
+    };
+  });
+
+  useEffect(() => {
+    function autosave() {
+      const state = autosaveState.current;
+
+      // Nothing worth saving.
+      if (!state.text.trim() && state.media.length === 0) return;
+      // An upload still in flight has a placeholder id — saving now would
+      // attach a row that does not exist yet.
+      if (state.uploading) return;
+      // There is no post without an authoring account.
+      if (!state.authorAccountId) return;
+
+      const payload = {
+        authorAccountId: state.authorAccountId,
+        body: state.text.trim(),
+        timezone: state.resolvedTz,
+        mediaAssetIds: state.media.map((asset) => asset.assetId),
+        intent: "draft" as const,
+        ...(state.draftId ? {} : { idempotencyKey: state.idempotencyKey }),
+      };
+
+      void fetch(state.draftId ? `/api/posts/${state.draftId}` : "/api/posts", {
+        method: state.draftId ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "same-origin",
+        keepalive: true,
+      })
+        .then(async (response) => {
+          if (!response.ok) return;
+          const json = (await response.json()) as { data?: { post?: { id?: string } } };
+          if (json.data?.post?.id) setDraftId(json.data.post.id);
+          setAutosavedAt(new Date());
+        })
+        .catch(() => {
+          // Best-effort by design. A failed autosave must never interrupt
+          // navigation, and the manual save path is still there.
+        });
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "hidden") autosave();
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    // `pagehide` covers the mobile case where visibilitychange never fires.
+    window.addEventListener("pagehide", autosave);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", autosave);
+    };
+  }, []);
+
+  /**
+   * Discard the post.
+   *
+   * With a draft id this deletes the saved draft and returns to the list.
+   * Without one there is nothing on the server yet, so it clears the composer
+   * and — importantly — deletes any uploaded media, which is already sitting
+   * in storage by this point.
+   */
+  async function deleteDraft() {
+    setDeleting(true);
+    setErrors({});
+
+    try {
+      const targetId = initialPost?.id ?? draftId;
+
+      if (targetId) {
+        await apiDelete(`/api/posts/${targetId}`);
+      } else {
+        // Unattached uploads belong to this composer; removing them keeps the
+        // bucket from filling with files nobody can find again.
+        await Promise.all(
+          media.map((asset) =>
+            apiDelete(`/api/posts/media?assetId=${encodeURIComponent(asset.assetId)}`).catch(
+              () => undefined,
+            ),
+          ),
+        );
+      }
+
+      setDeleteOpen(false);
+      setText("");
+      setMedia([]);
+      setDraftId(null);
+      setAutosavedAt(null);
+      router.refresh();
+
+      if (targetId) router.push("/posts");
+    } catch (error) {
+      setErrors({ form: errorMessage(error, "Could not delete this draft.") });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const tzOptions = TIMEZONES.includes(resolvedTz) ? TIMEZONES : [resolvedTz, ...TIMEZONES];
@@ -443,9 +667,11 @@ export function PostComposer({
 
           {/* Media row */}
           <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+            {/* Matches Video and Document: `secondary` drew a bordered white
+                block behind this one button only. */}
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={() => imageInputRef.current?.click()}
             >
@@ -696,7 +922,9 @@ export function PostComposer({
               {intent === "schedule" ? "Schedule post" : "Save draft"}
             </Button>
 
-            {initialPost && initialPost.status !== "published" && (
+            {/* Also offered on a new post: writing something and wanting it
+                out now is the common case, not an edge case. */}
+            {(!initialPost || initialPost.status !== "published") && (
               <Button
                 variant="secondary"
                 size="lg"
@@ -714,10 +942,26 @@ export function PostComposer({
               </Button>
             )}
 
-            <p className="text-xs leading-5 text-slate-500 sm:ml-auto sm:max-w-56">
-              The server converts this wall time to a UTC instant, so daylight saving is handled
-              correctly.
+            <Button
+              variant="ghost"
+              size="lg"
+              disabled={saving || deleting || uploading}
+              onClick={() => setDeleteOpen(true)}
+              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 aria-hidden />
+              Delete
+            </Button>
+
+            <p
+              role="status"
+              className="text-xs leading-5 text-slate-500 sm:ml-auto sm:max-w-56"
+            >
+              {autosavedAt
+                ? `Draft autosaved at ${autosavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`
+                : "Your draft is saved automatically when you switch away."}
             </p>
+
           </div>
         </section>
       </div>
@@ -788,6 +1032,62 @@ export function PostComposer({
           </div>
         </div>
       </aside>
+
+      <GoProDialog
+        open={proGate !== null}
+        onOpenChange={(open) => {
+          if (!open) setProGate(null);
+        }}
+        title={
+          proGate === "publish_now"
+            ? "Publishing now needs a scheduled slot"
+            : "You have used this month's scheduled posts"
+        }
+        description={
+          proGate === "publish_now"
+            ? "Publishing straight away still creates a scheduled post — Zybble hands it to the LinkedIn API within a few seconds — so it draws on the same monthly allowance as scheduling ahead."
+            : "The Free plan includes 10 scheduled posts each month. Pro removes the ceiling entirely, so the calendar can hold as much as you write."
+        }
+        limitNote="All 10 scheduled posts included in the Free plan are used this month. Drafts are always unlimited."
+        // Drafts are free on every plan, so there is always a way to keep the
+        // work. Switching the intent does the rest — the user presses Save.
+        fallback={{
+          label: "Keep it as a draft",
+          onClick: () => {
+            setProGate(null);
+            setIntent("draft");
+          },
+        }}
+      />
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {initialPost?.id ?? draftId ? "Delete this post?" : "Discard this draft?"}
+            </DialogTitle>
+            <DialogDescription>
+              {initialPost?.id ?? draftId
+                ? "The post and its media are deleted from your workspace. This cannot be undone."
+                : "The text is cleared and anything you uploaded is removed from storage. This cannot be undone."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setDeleteOpen(false)}>
+              Keep it
+            </Button>
+            <Button
+              className="bg-red-600 text-white hover:bg-red-700 active:bg-red-800"
+              disabled={deleting}
+              onClick={() => void deleteDraft()}
+            >
+              {deleting && <Loader2 className="animate-spin" aria-hidden />}
+              <Trash2 aria-hidden />
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

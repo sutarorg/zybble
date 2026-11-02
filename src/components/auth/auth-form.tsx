@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Loader2, Mail } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,45 @@ import { cn } from "@/lib/utils";
  * workspace is sent to onboarding rather than dropped into an empty dashboard.
  */
 
+/**
+ * Google's mark.
+ *
+ * Lucide dropped brand glyphs, and this is one place the real logo matters:
+ * a generic icon beside the word "Google" reads as a bug, and Google's
+ * trademark guidelines ask that the four-colour mark be used unaltered.
+ */
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden focusable="false" className={className}>
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.55 10.78l7.98-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
+  );
+}
+
 interface AuthFormProps {
   mode: "login" | "signup";
   /** Set when arriving from a Pro CTA — shown as context, never charged. */
   plan?: string;
+  /**
+   * Prefilled email. Arrives from `/login?email=…`, which the sign-up form
+   * links to when it discovers the address already has an account.
+   */
+  initialEmail?: string;
   /**
    * A message the server already knows about, e.g. the proxy bounced the user
    * here because auth is not configured. Shown in the same place as a submit
@@ -40,6 +75,7 @@ type SignupResponse = {
   requiresEmailConfirmation: boolean;
   userId: string | null;
   sessionState: { requiresOnboarding: boolean } | null;
+  emailTaken: boolean;
 };
 
 type LoginResponse = { requiresOnboarding: boolean };
@@ -47,7 +83,7 @@ type LoginResponse = { requiresOnboarding: boolean };
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_MIN = 12;
 
-export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
+export function AuthForm({ mode, plan, initialEmail = "", initialError = null }: AuthFormProps) {
   const router = useRouter();
   const timezone = useLocalTimezone();
 
@@ -55,6 +91,10 @@ export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
   const [formError, setFormError] = useState<string | null>(initialError);
   const [busy, setBusy] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  /** Set when sign-up found an existing account for this address. */
+  const [emailTakenFor, setEmailTakenFor] = useState<string | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const isSignup = mode === "signup";
 
   function validate(form: HTMLFormElement) {
@@ -85,6 +125,7 @@ export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
     const next = validate(form);
     setErrors(next);
     setFormError(null);
+    setEmailTakenFor(null);
 
     if (Object.keys(next).length > 0) return;
 
@@ -104,6 +145,14 @@ export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
           timezone,
         });
 
+        // Handled before the email-confirmation branch on purpose: without it
+        // an existing account is told to confirm an email that will never
+        // arrive, because there is nothing left to confirm.
+        if (result.emailTaken) {
+          setEmailTakenFor(email);
+          return;
+        }
+
         if (result.requiresEmailConfirmation || result.sessionState === null) {
           setConfirmEmail(email);
           return;
@@ -120,6 +169,26 @@ export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
       setFormError(errorMessage(error, "That did not work. Please try again."));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Hand the browser to Google.
+   *
+   * The whole page navigates, so this never comes back on the success path —
+   * `busy` stays set on purpose to stop a second click while the redirect is
+   * in flight.
+   */
+  async function startGoogle() {
+    setGoogleBusy(true);
+    setFormError(null);
+
+    try {
+      const { url } = await apiPost<{ url: string }>("/api/auth/google", {});
+      window.location.assign(url);
+    } catch (error) {
+      setGoogleBusy(false);
+      setFormError(errorMessage(error, "Could not start Google sign-in."));
     }
   }
 
@@ -199,6 +268,29 @@ export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
           </p>
         )}
 
+        {emailTakenFor && (
+          <div
+            role="alert"
+            className="rounded-xl bg-amber-50 px-3.5 py-3 ring-1 ring-amber-200"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden />
+              <div className="text-[13px] leading-6 text-amber-900">
+                <p>
+                  <span className="font-medium">{emailTakenFor}</span> already has a Zybble
+                  account.
+                </p>
+                <a
+                  href={`/login?email=${encodeURIComponent(emailTakenFor)}`}
+                  className="mt-1 inline-block font-semibold underline underline-offset-2 transition-colors hover:text-amber-950"
+                >
+                  Log in instead →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isSignup && (
           <div>
             <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -223,6 +315,7 @@ export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
             type="email"
             autoComplete="email"
             placeholder="you@company.com"
+            defaultValue={initialEmail}
           />
           {errors.email && (
             <p role="alert" className="mt-1.5 text-[13px] text-red-600">
@@ -245,13 +338,30 @@ export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
               </a>
             )}
           </div>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete={isSignup ? "new-password" : "current-password"}
-            placeholder={isSignup ? `At least ${PASSWORD_MIN} characters` : "Your password"}
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete={isSignup ? "new-password" : "current-password"}
+              placeholder={isSignup ? `At least ${PASSWORD_MIN} characters` : "Your password"}
+              className="pr-11"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              aria-controls="password"
+              className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 transition-colors hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-brand-600"
+            >
+              {showPassword ? (
+                <EyeOff className="size-[18px]" aria-hidden />
+              ) : (
+                <Eye className="size-[18px]" aria-hidden />
+              )}
+            </button>
+          </div>
           {errors.password && (
             <p role="alert" className="mt-1.5 text-[13px] text-red-600">
               {errors.password}
@@ -264,10 +374,34 @@ export function AuthForm({ mode, plan, initialError = null }: AuthFormProps) {
           {isSignup ? "Create free account" : "Log in"}
         </Button>
 
+        <div className="flex items-center gap-3" aria-hidden>
+          <span className="h-px flex-1 bg-slate-200" />
+          <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            or
+          </span>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="lg"
+          className="w-full"
+          disabled={busy || googleBusy}
+          onClick={() => void startGoogle()}
+        >
+          {googleBusy ? (
+            <Loader2 className="animate-spin" aria-hidden />
+          ) : (
+            <GoogleIcon className="size-[18px]" />
+          )}
+          Continue with Google
+        </Button>
+
         <p className="text-center text-[13px] leading-5 text-slate-500">
           {isSignup
             ? "Free forever for one LinkedIn account and 10 scheduled posts a month. No card required."
-            : "Sessions are httpOnly cookies refreshed on every request — nothing is stored in your browser."}
+            : "Zybble encrypts your LinkedIn token at rest and publishes only what you schedule — nothing goes out on its own."}
         </p>
       </form>
     </div>

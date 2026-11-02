@@ -17,6 +17,8 @@ export interface PlanEntitlements {
   plan: PlanId;
   maxLinkedInAccounts: number; // free: 1 · pro: 5
   monthlyScheduleLimit: number | null; // free: 10 · pro: null (unlimited)
+  /** Workspaces an account may own: free: 1 · pro: 3. */
+  maxWorkspaces: number;
   analyticsHistoryDays: number; // free: 7 · pro: 365
   bestTimeInsights: boolean;
   teamCollaboration: boolean;
@@ -46,9 +48,24 @@ export interface Workspace {
 }
 
 export interface SessionState {
-  user: { id: string; email: string; emailVerified: boolean };
+  user: {
+    id: string;
+    email: string;
+    emailVerified: boolean;
+    /** Sign-in methods on the account, e.g. ["google"] or ["google", "email"]. */
+    providers: string[];
+    /** False for a Google-only account, until its owner sets a password. */
+    hasPassword: boolean;
+  };
   profile: UserProfile;
   workspaces: Workspace[];
+  /**
+   * The workspace the `zybble_workspace` cookie selects right now.
+   *
+   * Without this the UI can only guess — it used to assume `workspaces[0]`,
+   * which made switching look broken once a second workspace existed.
+   */
+  activeWorkspaceId: string | null;
   requiresOnboarding: boolean;
   capabilities: {
     supabaseConfigured: boolean;

@@ -23,12 +23,15 @@ const REDIRECT_MESSAGES: Record<string, string> = {
 };
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; email?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { error } = await searchParams;
+  const { error, email } = await searchParams;
   const initialError = error ? (REDIRECT_MESSAGES[error] ?? null) : null;
+  // Prefilled by the sign-up form when it finds this address already has an
+  // account, so nobody has to retype an email they just typed.
+  const initialEmail = typeof email === "string" ? email.slice(0, 200) : "";
 
   return (
     <>
@@ -40,7 +43,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           Log in to your Zybble workspace.
         </p>
       </div>
-      <AuthForm mode="login" initialError={initialError} />
+      <AuthForm mode="login" initialEmail={initialEmail} initialError={initialError} />
       <p className="mt-6 text-center text-sm text-slate-600">
         New to Zybble?{" "}
         <Link

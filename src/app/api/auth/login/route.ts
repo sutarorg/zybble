@@ -1,5 +1,6 @@
 import { defineRoute } from "@/lib/api/http";
 import { signIn } from "@/features/auth/service";
+import { recordSession } from "@/features/auth/sessions";
 import { loginSchema } from "@/lib/validation/auth";
 import { writeAudit } from "@/features/workspaces/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -27,6 +28,14 @@ export const POST = defineRoute(
       entityId: state.user.id,
       ipAddress: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
       userAgent: req.headers.get("user-agent"),
+    });
+
+    // Best-effort: builds the device list shown on the account screen. A
+    // failure here must never block someone who has just proved who they are.
+    await recordSession({
+      userId: state.user.id,
+      userAgent: req.headers.get("user-agent"),
+      headers: req.headers,
     });
 
     return state;

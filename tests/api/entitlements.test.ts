@@ -10,6 +10,7 @@ import {
   isPro,
   monthlyAmountCents,
   remainingScheduleSlots,
+  workspaceAllowance,
 } from "@/features/billing/entitlements";
 
 /**
@@ -22,6 +23,7 @@ describe("plan catalogue", () => {
     expect(PLAN_ENTITLEMENTS.free).toMatchObject({
       maxLinkedInAccounts: 1,
       monthlyScheduleLimit: 10,
+      maxWorkspaces: 1,
       analyticsHistoryDays: 7,
       bestTimeInsights: false,
       teamCollaboration: false,
@@ -30,10 +32,41 @@ describe("plan catalogue", () => {
     expect(PLAN_ENTITLEMENTS.pro).toMatchObject({
       maxLinkedInAccounts: 5,
       monthlyScheduleLimit: null,
+      maxWorkspaces: 3,
       analyticsHistoryDays: 365,
       bestTimeInsights: true,
       teamCollaboration: true,
     });
+  });
+
+  /**
+   * The workspace cap is per account, not per workspace: upgrading one
+   * workspace is what raises the ceiling. SQL enforces the same number in
+   * `public.workspace_allowance()`, so these constants are the copy the UI
+   * reads and must not drift from it.
+   */
+  describe("workspaceAllowance", () => {
+    it("allows a single workspace on the Free plan", () => {
+      expect(workspaceAllowance(["free"])).toBe(1);
+      expect(workspaceAllowance(["free", "free"])).toBe(1);
+    });
+
+    it("allows three once any workspace is on Pro", () => {
+      expect(workspaceAllowance(["pro"])).toBe(3);
+      // Pro alongside Free workspaces, and in either order.
+      expect(workspaceAllowance(["free", "pro"])).toBe(3);
+      expect(workspaceAllowance(["pro", "free"])).toBe(3);
+    });
+
+    it("allows one for an account with no workspaces at all", () => {
+      expect(workspaceAllowance([])).toBe(1);
+    });
+  });
+
+  it("explains the workspace limit in words a person can act on", () => {
+    const message = describeLimitError("workspace_limit_reached");
+    expect(message).toContain("one workspace");
+    expect(message).toContain("three");
   });
 
   it("charges $15 per seat per month", () => {

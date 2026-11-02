@@ -1,6 +1,7 @@
 import { defineRoute } from "@/lib/api/http";
 import { getSessionState } from "@/features/auth/service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { WORKSPACE_COOKIE } from "@/lib/api/workspace";
 import { NotFoundError } from "@/lib/errors";
 
 /**
@@ -18,8 +19,15 @@ export const GET = defineRoute(
     rateLimit: { limit: 120, windowMs: 60_000 },
     scope: "auth:session",
   },
-  async ({ supabase, user }) => {
+  async ({ supabase, user, req }) => {
     if (!supabase || !user) throw new NotFoundError("No session.");
-    return getSessionState(supabase, user);
+
+    // Pass the switcher's cookie through so the client is told which workspace
+    // it is actually looking at, instead of having to assume the first one.
+    return getSessionState(
+      supabase,
+      user,
+      req.cookies.get(WORKSPACE_COOKIE)?.value ?? null,
+    );
   },
 );

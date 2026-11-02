@@ -29,6 +29,14 @@ export type SessionState = {
     id: string;
     email: string;
     emailVerified: boolean;
+    /**
+     * Every sign-in method attached to the account, e.g. `["google"]`, or
+     * `["google", "email"]` once a password has been set. Read from Supabase's
+     * `app_metadata.providers`.
+     */
+    providers: string[];
+    /** False for a Google-only account until the owner sets a password. */
+    hasPassword: boolean;
   };
   /** Mirrors `UserProfile` in `src/lib/app/types.ts`. */
   profile: {
@@ -50,6 +58,12 @@ export type SessionState = {
     createdAt: string;
     role: string;
   }>;
+  /**
+   * The workspace the caller's cookie selects, or their first one if the
+   * cookie is absent, stale or points at a workspace they have left. Null when
+   * they have none at all.
+   */
+  activeWorkspaceId: string | null;
   /** True when the user has no workspace yet and must complete onboarding. */
   requiresOnboarding: boolean;
   capabilities: {
@@ -72,6 +86,34 @@ export function safeReturnPath(candidate: string | undefined | null, fallback: s
   if (!candidate) return appUrl(fallback);
   if (!candidate.startsWith("/") || candidate.startsWith("//")) return appUrl(fallback);
   return appUrl(candidate);
+}
+
+/**
+ * Which sign-in methods an account has, and whether it has a password.
+ *
+ * Supabase records these in `app_metadata.providers`. An account created with
+ * Google starts as `["google"]`; it gains `"email"` when a password is added,
+ * including by calling `updateUser({ password })` on an existing OAuth account.
+ *
+ * That distinction drives the account screen: a Google-only account has no
+ * password to change, so it is offered "Set password" instead. Without it the
+ * UI would invite someone to type a current password they have never had.
+ */
+export function authProvidersFor(user: User): { providers: string[]; hasPassword: boolean } {
+  const metadata = (user.app_metadata ?? {}) as { providers?: unknown };
+
+  const fromMetadata = Array.isArray(metadata.providers)
+    ? metadata.providers.filter((value): value is string => typeof value === "string")
+    : [];
+
+  // Fall back to the identities array for projects whose app_metadata is bare.
+  const fromIdentities = (user.identities ?? [])
+    .map((identity) => identity.provider)
+    .filter((value): value is string => typeof value === "string");
+
+  const providers = Array.from(new Set([...fromMetadata, ...fromIdentities]));
+
+  return { providers, hasPassword: providers.includes("email") };
 }
 
 /**
@@ -137,18 +179,32 @@ export async function ensureProfile(
   return created as ProfileRow;
 }
 
+/**
+ * @param preferredWorkspaceId The workspace the client's cookie asks for. It
+ * is a *preference*: it is only honoured when the caller genuinely belongs to
+ * that workspace, and otherwise falls back to the first one. A stale or
+ * hand-edited cookie therefore cannot make the session unreadable.
+ */
 export async function getSessionState(
   supabase: ServerSupabase,
   user: User,
+  preferredWorkspaceId?: string | null,
 ): Promise<SessionState> {
   const profile = await ensureProfile(supabase, user);
   const workspaces = await listWorkspaces(supabase);
+  const { providers, hasPassword } = authProvidersFor(user);
+
+  const preferred = preferredWorkspaceId
+    ? (workspaces.find((workspace) => workspace.id === preferredWorkspaceId) ?? null)
+    : null;
 
   return {
     user: {
       id: user.id,
       email: user.email ?? profile.email,
       emailVerified: Boolean(user.email_confirmed_at),
+      providers,
+      hasPassword,
     },
     profile: {
       id: profile.id,
@@ -168,6 +224,7 @@ export async function getSessionState(
       createdAt: workspace.created_at,
       role: "owner",
     })),
+    activeWorkspaceId: preferred?.id ?? workspaces[0]?.id ?? null,
     requiresOnboarding: workspaces.length === 0,
     capabilities: {
       supabaseConfigured: isSupabaseConfigured(),
@@ -182,6 +239,11 @@ export type SignupResult = {
   requiresEmailConfirmation: boolean;
   userId: string | null;
   sessionState: SessionState | null;
+  /**
+   * True when the address is already registered and the caller should sign in
+   * instead of creating a second account.
+   */
+  emailTaken: boolean;
 };
 
 export async function signUp(input: {
@@ -209,6 +271,18 @@ export async function signUp(input: {
   });
 
   if (error) {
+    // Depending on how the project is configured, a taken address comes back
+    // either as the empty-identities user handled below or as this error. Both
+    // mean the same thing to the person filling the form in.
+    if (error.message.toLowerCase().includes("user already registered")) {
+      return {
+        requiresEmailConfirmation: false,
+        userId: null,
+        sessionState: null,
+        emailTaken: true,
+      };
+    }
+
     throw new AppError("validation_failed", friendlyAuthError(error.message), {
       cause: error,
     });
@@ -220,8 +294,30 @@ export async function signUp(input: {
     throw new AppError("internal_error", "Sign-up did not return a user. Try again.");
   }
 
-  // Supabase returns a session when email confirmation is disabled, and
-  // `identities: []` when the address already exists but is unconfirmed.
+  /**
+   * Supabase deliberately answers a sign-up for an already-registered address
+   * with a user object whose `identities` array is empty, rather than an
+   * error, so the endpoint cannot be used to enumerate accounts.
+   *
+   * That default is right for the API, but it produces a misleading screen:
+   * the form would tell someone who already has an account to go and confirm
+   * their email, and the confirmation mail never arrives because there is
+   * nothing to confirm. Detect it here and let the caller offer a way in.
+   *
+   * This does disclose whether an address is registered. That is the
+   * deliberate trade-off for the sign-up screen: the alternative is sending
+   * existing users down a dead end.
+   */
+  if (Array.isArray(user.identities) && user.identities.length === 0) {
+    return {
+      requiresEmailConfirmation: false,
+      userId: null,
+      sessionState: null,
+      emailTaken: true,
+    };
+  }
+
+  // Supabase returns a session when email confirmation is disabled.
   const requiresEmailConfirmation = data.session === null;
 
   let sessionState: SessionState | null = null;
@@ -232,7 +328,7 @@ export async function signUp(input: {
     await queueWelcomeEmail(user.id);
   }
 
-  return { requiresEmailConfirmation, userId: user.id, sessionState };
+  return { requiresEmailConfirmation, userId: user.id, sessionState, emailTaken: false };
 }
 
 export async function signIn(input: { email: string; password: string }): Promise<SessionState> {
@@ -248,6 +344,57 @@ export async function signIn(input: { email: string; password: string }): Promis
   }
 
   return getSessionState(supabase, data.user);
+}
+
+/**
+ * Start a Google sign-in and hand the browser the provider URL.
+ *
+ * `skipBrowserRedirect` is deliberate: this runs inside a server route, so a
+ * server-initiated 302 would bypass the client entirely. Returning the URL lets
+ * the form navigate there itself.
+ *
+ * `createSupabaseServerClient` runs with `persistSession: false`, so the PKCE
+ * code verifier lives in the cookie this call sets and is read back by
+ * `/auth/callback`. The redirect target is passed through `safeReturnPath`, so
+ * a crafted `redirectTo` cannot point the flow at another origin.
+ *
+ * Fails loudly when the provider is not enabled in Supabase: a button that
+ * silently does nothing is worse than one that explains itself.
+ */
+export async function startGoogleSignIn(input: {
+  redirectTo?: string;
+}): Promise<{ url: string }> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: safeReturnPath(input.redirectTo, "/auth/callback"),
+      skipBrowserRedirect: true,
+    },
+  });
+
+  if (error || !data.url) {
+    logger.error("auth.google_start_failed", { error: error?.message });
+    throw new AppError(
+      "internal_error",
+      "Google sign-in is not available. It has to be enabled in the Supabase dashboard first.",
+      { cause: error ?? undefined },
+    );
+  }
+
+  return { url: data.url };
+}
+
+/**
+ * Add a password to an account that does not have one.
+ *
+ * Used by Google-only accounts so they can also sign in with an email address
+ * and password. Supabase's `updateUser` accepts this for an authenticated
+ * session regardless of how the account was created.
+ */
+export async function setPassword(password: string): Promise<void> {
+  return updatePassword(password);
 }
 
 export async function signOut(): Promise<void> {

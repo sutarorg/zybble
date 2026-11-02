@@ -152,6 +152,142 @@ export async function storeMediaAsset(input: {
   return { asset: data as MediaAssetRow, checksum };
 }
 
+/**
+ * Reserve a slot and mint a URL the browser can upload straight to.
+ *
+ * This exists because media used to be POSTed through this API, which meant
+ * the bytes travelled through a serverless function. Vercel caps request
+ * bodies at 4.5 MB, so a video (up to 200 MB) — or even a 5 MB image at the
+ * top of LinkedIn's limit — was rejected by the platform before our code ran,
+ * with a plain-text "Request Entity Too Large" the client could not parse.
+ *
+ * Uploading directly to storage fixes the ceiling. The server still decides
+ * *whether* an upload may happen: the declared size and type are validated
+ * against LinkedIn's published limits here, before any URL is minted, and the
+ * row is recorded up front so an abandoned upload leaves a trace that can be
+ * swept rather than an orphan nobody knows about.
+ */
+export async function createMediaUploadTicket(input: {
+  workspaceId: string;
+  userId: string;
+  file: { name: string; type: string; size: number };
+  postId?: string | null;
+  sortOrder?: number;
+}): Promise<{ assetId: string; uploadUrl: string }> {
+  const kind = classifyMedia(input.file.type);
+  assertWithinLimits({ kind, mimeType: input.file.type, byteSize: input.file.size });
+
+  const admin = createSupabaseAdminClient();
+  const assetId = crypto.randomUUID();
+  const storagePath = `${input.workspaceId}/${assetId}.${extensionFor(input.file.type)}`;
+
+  const { data, error } = await admin.storage
+    .from(POST_MEDIA_BUCKET)
+    .createSignedUploadUrl(storagePath);
+
+  if (error || !data?.signedUrl) {
+    logger.error("media.sign_failed", {
+      workspaceId: input.workspaceId,
+      error: error?.message,
+    });
+    throw new Error("Could not start the upload.");
+  }
+
+  const { error: insertError } = await admin.from("media_assets").insert({
+    id: assetId,
+    workspace_id: input.workspaceId,
+    post_id: input.postId ?? null,
+    kind,
+    file_name: input.file.name.slice(0, 200),
+    mime_type: input.file.type,
+    byte_size: input.file.size,
+    checksum_sha256: null,
+    storage_path: storagePath,
+    upload_status: "pending",
+    sort_order: input.sortOrder ?? 0,
+    created_by: input.userId,
+  });
+
+  if (insertError) {
+    logger.error("media.ticket_record_failed", { error: insertError.message });
+    throw new Error("Could not reserve the upload.");
+  }
+
+  return { assetId, uploadUrl: data.signedUrl };
+}
+
+/**
+ * Confirm the bytes actually landed, and mark the asset usable.
+ *
+ * The browser could claim success without uploading anything, so the object is
+ * looked up in the bucket and its size compared with what was declared when the
+ * ticket was minted. `list` returns metadata only — checking a 200 MB video
+ * this way costs nothing like downloading it.
+ */
+export async function finalizeMediaAsset(input: {
+  workspaceId: string;
+  assetId: string;
+}): Promise<MediaAssetRow> {
+  const admin = createSupabaseAdminClient();
+
+  const { data: asset, error } = await admin
+    .from("media_assets")
+    .select("*")
+    .eq("id", input.assetId)
+    .eq("workspace_id", input.workspaceId)
+    .maybeSingle();
+
+  if (error || !asset) {
+    throw new Error("That upload is no longer valid.");
+  }
+
+  const row = asset as MediaAssetRow;
+
+  if (row.upload_status === "stored") return row;
+
+  const directory = row.storage_path.includes("/")
+    ? row.storage_path.slice(0, row.storage_path.lastIndexOf("/"))
+    : "";
+  const fileName = row.storage_path.slice(row.storage_path.lastIndexOf("/") + 1);
+
+  const { data: entries, error: listError } = await admin.storage
+    .from(POST_MEDIA_BUCKET)
+    .list(directory, { search: fileName });
+
+  const object = (entries ?? []).find((entry) => entry.name === fileName);
+
+  if (listError || !object) {
+    logger.warn("media.finalize_missing_object", { assetId: input.assetId });
+    throw new Error("The upload did not finish. Please remove the file and try again.");
+  }
+
+  // `list` reports metadata size as a string in some client versions.
+  const actualSize = Number(object.metadata?.size ?? 0);
+
+  if (actualSize > 0 && actualSize !== row.byte_size) {
+    logger.warn("media.finalize_size_mismatch", {
+      assetId: input.assetId,
+      declared: row.byte_size,
+      actual: actualSize,
+    });
+    throw new Error("The uploaded file did not match what was declared. Please try again.");
+  }
+
+  const { data: updated, error: updateError } = await admin
+    .from("media_assets")
+    .update({ upload_status: "stored" })
+    .eq("id", input.assetId)
+    .eq("workspace_id", input.workspaceId)
+    .select("*")
+    .maybeSingle();
+
+  if (updateError || !updated) {
+    throw new Error("Could not confirm the upload.");
+  }
+
+  return updated as MediaAssetRow;
+}
+
 /** Download the bytes of a stored asset. Server-side only. */
 export async function loadMediaBytes(asset: MediaAssetRow): Promise<Buffer> {
   const admin = createSupabaseAdminClient();
@@ -183,20 +319,35 @@ export async function createMediaPreviewUrl(asset: MediaAssetRow): Promise<strin
   return data.signedUrl;
 }
 
+/**
+ * Delete an asset and its object.
+ *
+ * Only ever removes an *unattached* asset. One that belongs to a post is the
+ * post's to delete: dropping its bytes here would leave the post pointing at a
+ * file that no longer exists, with nothing left to say what was lost. Detaching
+ * an asset from a saved post goes through that post's own save path.
+ *
+ * Returns what happened so the caller can say something useful rather than
+ * reporting success for a deletion that never occurred.
+ */
 export async function removeMediaAsset(
   workspaceId: string,
   assetId: string,
-): Promise<void> {
+): Promise<{ deleted: boolean; reason?: "attached" | "missing" }> {
   const admin = createSupabaseAdminClient();
 
   const { data } = await admin
     .from("media_assets")
-    .select("storage_path")
+    .select("storage_path, post_id")
     .eq("id", assetId)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
 
-  if (data?.storage_path) {
+  if (!data) return { deleted: false, reason: "missing" };
+
+  if (data.post_id) return { deleted: false, reason: "attached" };
+
+  if (data.storage_path) {
     await admin.storage
       .from(POST_MEDIA_BUCKET)
       .remove([data.storage_path as string])
@@ -204,4 +355,6 @@ export async function removeMediaAsset(
   }
 
   await admin.from("media_assets").delete().eq("id", assetId).eq("workspace_id", workspaceId);
+
+  return { deleted: true };
 }
