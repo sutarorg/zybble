@@ -1,7 +1,7 @@
 import { inngest } from "@/inngest/client";
 import { cron, event } from "@/inngest/functions/triggers";
 import { logger } from "@/lib/logger";
-import { POST_MEDIA_BUCKET } from "@/features/posts/media";
+import { deleteObjects, listKeys } from "@/lib/r2/objects";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -73,26 +73,34 @@ export const deleteWorkspace = inngest.createFunction(
     });
 
     await step.run("remove-media", async () => {
-      const admin = createSupabaseAdminClient();
-      const { data: files, error } = await admin.storage.from(POST_MEDIA_BUCKET).list(workspaceId, {
-        limit: 1000,
-      });
+      // Media lives in R2 under `<workspace_id>/…`, so one prefix listing
+      // finds the whole workspace's objects. `listKeys` follows pagination,
+      // which matters here: Supabase's single-call `list` silently capped at
+      // 1000 and would have left older objects behind.
+      let keys: string[] = [];
 
-      if (error) {
-        logger.error("workspace.storage_list_failed", { error: error.message });
+      try {
+        keys = await listKeys(`${workspaceId}/`);
+      } catch (error) {
+        logger.error("workspace.storage_list_failed", {
+          workspaceId,
+          error: error instanceof Error ? error.message : "unknown",
+        });
         return { removed: 0 };
       }
 
-      const paths = (files ?? []).map((file) => `${workspaceId}/${file.name}`);
+      if (keys.length === 0) return { removed: 0 };
 
-      if (paths.length > 0) {
-        const { error: removeError } = await admin.storage.from(POST_MEDIA_BUCKET).remove(paths);
-        if (removeError) {
-          logger.error("workspace.storage_remove_failed", { error: removeError.message });
-        }
+      try {
+        const { deleted } = await deleteObjects(keys);
+        return { removed: deleted };
+      } catch (error) {
+        logger.error("workspace.storage_remove_failed", {
+          workspaceId,
+          error: error instanceof Error ? error.message : "unknown",
+        });
+        return { removed: 0 };
       }
-
-      return { removed: paths.length };
     });
 
     await step.run("delete-row", async () => {

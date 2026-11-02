@@ -34,14 +34,17 @@ tests. No network calls are made by the suite.
 
 ## 2. Integrations: exactly what is used
 
-### 2.1 Supabase (Postgres + Auth + Storage)
+### 2.1 Supabase (Postgres + Auth)
 
 **What we use**
 
 * Postgres with RLS as the tenant boundary.
 * Supabase Auth with `@supabase/ssr` cookie sessions, refreshed on every request.
-* One private storage bucket, `post-media`.
 * The service-role client **server-side only**, in webhooks and background jobs.
+
+**What we do *not* use:** Supabase Storage. Media moved to Cloudflare R2 (§2.5);
+`0013_drop_supabase_storage.sql` removes the bucket policies and the
+`storage_workspace_id()` helper.
 
 **Credentials**
 
@@ -54,11 +57,9 @@ tests. No network calls are made by the suite.
 
 **Setup steps**
 
-1. Apply migrations in order (`supabase/migrations/0001…0010`) with the Supabase
+1. Apply migrations in order (`supabase/migrations/0001…0013`) with the Supabase
    CLI: `supabase db push`, or `supabase migration up` against the project.
-2. Create the `post-media` bucket if `0009_storage.sql` failed to (the migration
-   is idempotent but the bucket create may be restricted on some plans).
-3. In **Authentication → URL Configuration**, add:
+2. In **Authentication → URL Configuration**, add:
    * Site URL: `https://your-domain.com`
    * Redirect URLs: `https://your-domain.com/auth/callback`,
      `https://your-domain.com/reset-password`
@@ -222,6 +223,50 @@ never fatal to the operation they report on.
 
 ---
 
+### 2.6 Cloudflare R2 (media storage)
+
+**What it is:** the only place media bytes live. Images, video and PDFs are
+stored in a private R2 bucket and reached over R2's **S3-compatible API** using
+`@aws-sdk/client-s3` (`src/lib/r2/client.ts`, `src/lib/r2/objects.ts`). Supabase
+Storage is fully retired.
+
+**Credentials**
+
+| Variable | Where to find it | Notes |
+| --- | --- | --- |
+| `R2_ACCOUNT_ID` | R2 → Overview, sidebar | 33 characters |
+| `R2_ACCESS_KEY_ID` | R2 → Manage R2 API Tokens | token scoped to the bucket, *Object Read & Write* |
+| `R2_SECRET_ACCESS_KEY` | same | shown once at creation |
+| `R2_BUCKET` | the bucket you created | defaults to `zybble-post-media`; not auto-created |
+| `R2_PUBLIC_URL` | optional | only if you intentionally enable public read |
+
+**R2-specific gotchas** (all handled in `src/lib/r2/client.ts`, listed so they
+are not "fixed" later):
+
+* the endpoint is account-scoped — `https://<account_id>.r2.cloudflarestorage.com`;
+* the region is literally `auto`; any real region fails signature validation;
+* `forcePathStyle: true` is required — the account endpoint does not resolve
+  virtual-hosted-style bucket URLs;
+* SigV4 only.
+
+**Two operational requirements**
+
+1. **CORS must be configured on the bucket**, allowing `PUT` and `GET` from your
+   origins with `content-type` in `AllowedHeaders`. Uploads are browser-direct,
+   so without this every upload fails with an opaque CORS error. The presigned
+   URL signs `content-type`, so it must be an allowed header. See DEPLOYMENT.md
+   §C.6 for the policy JSON.
+2. **The bucket stays private by default.** Previews are 60-second signed URLs.
+   Setting `R2_PUBLIC_URL` switches them to plain links — only do that once you
+   have deliberately enabled public read, because it makes every stored object
+   readable by anyone with the URL.
+
+**Object layout:** `{workspace_id}/{asset_id}.{ext}` — unchanged from the old
+Supabase Storage layout, so existing objects can be copied across without
+rewriting keys or rows.
+
+---
+
 ## 3. Environment variables (complete)
 
 ```
@@ -234,6 +279,13 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=       # server only
 DATABASE_URL=                    # pooled, port 6543 in production
+
+# Cloudflare R2 (media storage — Supabase Storage is not used)
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=zybble-post-media
+R2_PUBLIC_URL=                   # optional; only with public read enabled
 
 # LinkedIn
 LINKEDIN_CLIENT_ID=

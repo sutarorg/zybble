@@ -271,22 +271,74 @@ the migrations against a real Postgres (PGlite) and asserts that one workspace
 cannot read or write another workspace's posts, LinkedIn tokens, analytics,
 media or subscription.
 
-### C.6 Create the storage bucket
+### C.6 Create the R2 bucket (media storage)
 
-`supabase/migrations/0009_storage.sql` creates a **private** bucket called
-`post-media` with `file_size_limit` and `allowed_mime_types` at the bucket
-level, plus four RLS policies. Verify in **Storage → Buckets**; if your plan
-restricted the SQL create, create the bucket by hand with:
+Media lives in **Cloudflare R2**, reached over its S3-compatible API.
+Supabase Storage is no longer used at all — migration
+`0013_drop_supabase_storage.sql` removes the old `post-media` bucket's policies
+and the `storage_workspace_id()` helper they depended on.
 
-- **Name:** `post-media`
-- **Public:** **off**
-- **File size limit:** 200 MB
-- **Allowed MIME types:** `image/jpeg`, `image/png`, `image/gif`, `video/mp4`, `application/pdf`
+**1. Create the bucket.** Cloudflare dashboard → **R2** → **Create bucket**:
 
-Objects are stored under `{workspace_id}/…` and the policies derive the owning
-workspace from the path with `storage_workspace_id(object_name)`, so renaming an
-object cannot move it between tenants. The browser only ever receives
-short-lived signed URLs.
+- **Name:** `zybble-post-media` (or whatever you set `R2_BUCKET` to)
+- **Location:** closest to your users; *Automatic* is fine
+- **Public access:** leave **off** unless you intend to set `R2_PUBLIC_URL`
+
+**2. Create an API token.** R2 → **Manage R2 API Tokens** → **Create API token**:
+
+- **Permissions:** *Object Read & Write*
+- **Scope:** this bucket only
+
+Copy the Access Key ID and Secret Access Key — the secret is shown only once.
+
+**3. Set the environment variables** in Vercel and `.env.local`:
+
+| Variable | Where to find it |
+| --- | --- |
+| `R2_ACCOUNT_ID` | R2 → Overview, right-hand sidebar |
+| `R2_ACCESS_KEY_ID` | step 2 |
+| `R2_SECRET_ACCESS_KEY` | step 2 |
+| `R2_BUCKET` | bucket name from step 1 |
+| `R2_PUBLIC_URL` | optional, see step 5 |
+
+**4. Configure CORS — this step is required.** Uploads go straight from the
+browser to R2, because a serverless function cannot carry a 200 MB video. The
+bucket therefore has to accept a cross-origin `PUT`; without it, uploads fail
+with an opaque browser CORS error. Bucket → **Settings** → **CORS Policy**:
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "http://localhost:3000",
+      "https://zybble.com",
+      "https://*.vercel.app"
+    ],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+`AllowedHeaders` **must** include `content-type`: the presigned URL signs that
+header, so leaving it out breaks every upload with a signature mismatch. Add
+your real production and preview origins; `*.vercel.app` covers preview
+deployments.
+
+**5. (Optional) Public previews.** By default previews are 60-second signed
+URLs and the bucket stays private. For plain, cacheable preview links instead,
+enable public access on the bucket (custom domain or the `r2.dev` subdomain)
+and set `R2_PUBLIC_URL` to that origin. Only do this if you are content for
+stored media to be readable by anyone holding the URL.
+
+Objects are keyed `{workspace_id}/{asset_id}.{ext}` — the same layout as
+before, so no data migration is needed if you copy existing objects across.
+Isolation now comes from server-minted signed URLs and workspace-scoped
+database rows rather than a SQL policy over a shared `storage.objects` table.
+Erasure still works by prefix: `listKeys("<workspace_id>/")` followed by a bulk
+delete.
 
 ### C.7 Generate the database types
 
@@ -1228,9 +1280,11 @@ existing deployment.
 2. Prefer **Restore to a new project** — non-destructive, and lets you copy out
    just the rows you need.
 3. Restoring over the live project is a last resort and is destructive.
-4. Storage objects are **not** included in a database restore. Media in
-   `post-media` must be restored separately (or is lost, in which case posts
-   lose their attachments but keep their text and analytics).
+4. Media is **not** included in a database restore — the bytes live in R2, not
+   Postgres. Restoring the database brings back the `media_assets` rows but not
+   the objects they point at. Enable R2 versioning or replicate the bucket to
+   protect against this; without it, posts lose their attachments but keep
+   their text and analytics.
 
 ### M.6 Reconnect expired LinkedIn integrations
 

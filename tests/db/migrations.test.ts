@@ -86,24 +86,31 @@ describe("migrations", () => {
     expect(policyTables.has("rate_limit_counters")).toBe(false);
   });
 
-  it("creates the private post-media bucket and its policies", async () => {
-    const { rows: buckets } = await db.admin.query<{ id: string; public: boolean }>(
-      `select id, public from storage.buckets where id = 'post-media'`,
+  /**
+   * Media moved to Cloudflare R2. Supabase Storage must be gone, not merely
+   * unused: a bucket full of unreferenced objects and four policies over a
+   * shared table is surface area with no owner. `0013` removes all three —
+   * bucket row, policies, and the `storage_workspace_id()` helper they used.
+   */
+  it("removes Supabase Storage completely: bucket, policies and helper", async () => {
+    const { rows: buckets } = await db.admin.query<{ id: string }>(
+      `select id from storage.buckets where id = 'post-media'`,
     );
 
-    expect(buckets[0]).toBeDefined();
-    expect(buckets[0].public).toBe(false);
+    expect(buckets[0], "the post-media bucket should have been dropped").toBeUndefined();
 
     const { rows: policies } = await db.admin.query<{ policyname: string }>(
       `select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects'`,
     );
 
-    expect(policies.map((row) => row.policyname).sort()).toEqual([
-      "post_media_delete",
-      "post_media_insert",
-      "post_media_select",
-      "post_media_update",
-    ]);
+    expect(policies.map((row) => row.policyname)).toEqual([]);
+
+    const { rows: helpers } = await db.admin.query<{ proname: string }>(
+      `select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and proname = 'storage_workspace_id'`,
+    );
+
+    expect(helpers).toEqual([]);
   });
 
   it("defines the helper functions used by policies", async () => {

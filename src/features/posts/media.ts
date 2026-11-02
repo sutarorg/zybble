@@ -3,14 +3,34 @@ import { MediaValidationError } from "@/lib/linkedin/media";
 import { MEDIA_LIMITS, type MediaKind } from "@/lib/linkedin/config";
 import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  createDownloadUrl,
+  createUploadUrl,
+  deleteObject,
+  getObjectBytes,
+  headObject,
+  putObject,
+} from "@/lib/r2/objects";
 import type { MediaAssetRow } from "@/lib/supabase/database.types";
 
 /**
  * Media handling.
  *
- * Files live in the private `post-media` bucket under
- * `<workspace_id>/<post_id>/<asset_id>.<ext>`. Storage policies key off the
- * first path segment, so another workspace cannot read or overwrite them.
+ * Bytes live in **Cloudflare R2**, reached over its S3-compatible API; only the
+ * metadata lives in Postgres. The split matters: R2 is where the object is,
+ * `public.media_assets` is the record of it, and nothing here assumes the two
+ * are the same system.
+ *
+ * Objects are addressed `<workspace_id>/<asset_id>.<ext>`. Media is uploaded
+ * *before* the post it belongs to exists (the composer uploads as you type), so
+ * the asset row is attached to a post later and the object never has to move.
+ * Keeping the workspace id as the first path segment means a whole workspace's
+ * media can be listed and deleted by prefix — which is what account erasure
+ * relies on.
+ *
+ * The bucket is private. Access is granted by short-lived signed URLs minted
+ * here, so a workspace can never read or overwrite another's files, and a
+ * preview link expires before it can be meaningfully shared.
  *
  * Uploads are validated twice, on purpose:
  *  1. here, against the limits LinkedIn actually enforces (so the user learns
@@ -18,8 +38,6 @@ import type { MediaAssetRow } from "@/lib/supabase/database.types";
  *  2. again in the publish pipeline, because the file may have been stored
  *     before a limit changed.
  */
-
-export const POST_MEDIA_BUCKET = "post-media";
 
 export type IncomingFile = {
   name: string;
@@ -71,6 +89,11 @@ function extensionFor(mimeType: string): string {
   return map[mimeType] ?? "bin";
 }
 
+/** Object key for a new asset. Deterministic from ids, so it can be rebuilt. */
+function keyFor(workspaceId: string, assetId: string, mimeType: string): string {
+  return `${workspaceId}/${assetId}.${extensionFor(mimeType)}`;
+}
+
 export type StoredMedia = {
   asset: MediaAssetRow;
   checksum: string;
@@ -79,12 +102,9 @@ export type StoredMedia = {
 /**
  * Store an uploaded file.
  *
- * The object is addressed by workspace and asset id only —
- * `<workspace_id>/<asset_id>.<ext>` — because media is uploaded *before* the
- * post it belongs to exists (the composer uploads as you type). The asset row is
- * attached to a post later by `attachMedia`, and the object never has to move.
- * The bucket is private and every policy re-derives the workspace from the first
- * path segment, so the missing post folder costs nothing in isolation.
+ * Writes the bytes from the server, so it is only suitable for small payloads —
+ * anything user-supplied should use `createMediaUploadTicket` and go straight
+ * to storage, since a serverless request body is capped at 4.5 MB.
  */
 export async function storeMediaAsset(input: {
   workspaceId: string;
@@ -104,23 +124,16 @@ export async function storeMediaAsset(input: {
 
   const checksum = createHash("sha256").update(body).digest("hex");
   const assetId = crypto.randomUUID();
-  const storagePath = `${input.workspaceId}/${assetId}.${extensionFor(input.file.type)}`;
+  const storagePath = keyFor(input.workspaceId, assetId, input.file.type);
 
-  const { error: uploadError } = await admin.storage
-    .from(POST_MEDIA_BUCKET)
-    .upload(storagePath, body, {
-      contentType: input.file.type,
-      // `upsert: false` means a collision (path replay) fails loudly.
-      upsert: false,
-      cacheControl: "3600",
-    });
-
-  if (uploadError) {
+  try {
+    await putObject({ key: storagePath, body, contentType: input.file.type });
+  } catch (error) {
     logger.error("media.upload_failed", {
       workspaceId: input.workspaceId,
-      error: uploadError.message,
+      error: error instanceof Error ? error.message : "unknown",
     });
-    throw new Error(`Could not store the file: ${uploadError.message}`);
+    throw new Error("Could not store the file.");
   }
 
   const { data, error } = await admin
@@ -144,7 +157,7 @@ export async function storeMediaAsset(input: {
 
   if (error || !data) {
     // Do not leave an orphaned object in the bucket.
-    await admin.storage.from(POST_MEDIA_BUCKET).remove([storagePath]).catch(() => undefined);
+    await deleteObject(storagePath).catch(() => undefined);
     logger.error("media.record_failed", { error: error?.message });
     throw new Error("Could not record the uploaded file.");
   }
@@ -155,17 +168,14 @@ export async function storeMediaAsset(input: {
 /**
  * Reserve a slot and mint a URL the browser can upload straight to.
  *
- * This exists because media used to be POSTed through this API, which meant
- * the bytes travelled through a serverless function. Vercel caps request
- * bodies at 4.5 MB, so a video (up to 200 MB) — or even a 5 MB image at the
- * top of LinkedIn's limit — was rejected by the platform before our code ran,
- * with a plain-text "Request Entity Too Large" the client could not parse.
+ * The bytes deliberately never touch our API: a serverless request body is
+ * capped at 4.5 MB, so a video (up to 200 MB) — or even a 5 MB image at the top
+ * of LinkedIn's limit — would be rejected by the platform before our code ran.
  *
- * Uploading directly to storage fixes the ceiling. The server still decides
- * *whether* an upload may happen: the declared size and type are validated
- * against LinkedIn's published limits here, before any URL is minted, and the
- * row is recorded up front so an abandoned upload leaves a trace that can be
- * swept rather than an orphan nobody knows about.
+ * The server still decides *whether* an upload may happen. The declared size and
+ * type are validated against LinkedIn's published limits before any URL is
+ * minted, and the row is recorded up front so an abandoned upload leaves a
+ * trace that can be swept rather than an orphan nobody knows about.
  */
 export async function createMediaUploadTicket(input: {
   workspaceId: string;
@@ -179,16 +189,19 @@ export async function createMediaUploadTicket(input: {
 
   const admin = createSupabaseAdminClient();
   const assetId = crypto.randomUUID();
-  const storagePath = `${input.workspaceId}/${assetId}.${extensionFor(input.file.type)}`;
+  const storagePath = keyFor(input.workspaceId, assetId, input.file.type);
 
-  const { data, error } = await admin.storage
-    .from(POST_MEDIA_BUCKET)
-    .createSignedUploadUrl(storagePath);
+  let uploadUrl: string;
 
-  if (error || !data?.signedUrl) {
+  try {
+    uploadUrl = await createUploadUrl({
+      key: storagePath,
+      contentType: input.file.type,
+    });
+  } catch (error) {
     logger.error("media.sign_failed", {
       workspaceId: input.workspaceId,
-      error: error?.message,
+      error: error instanceof Error ? error.message : "unknown",
     });
     throw new Error("Could not start the upload.");
   }
@@ -213,16 +226,16 @@ export async function createMediaUploadTicket(input: {
     throw new Error("Could not reserve the upload.");
   }
 
-  return { assetId, uploadUrl: data.signedUrl };
+  return { assetId, uploadUrl };
 }
 
 /**
  * Confirm the bytes actually landed, and mark the asset usable.
  *
  * The browser could claim success without uploading anything, so the object is
- * looked up in the bucket and its size compared with what was declared when the
- * ticket was minted. `list` returns metadata only — checking a 200 MB video
- * this way costs nothing like downloading it.
+ * looked up with a HEAD and its size compared with what was declared when the
+ * ticket was minted. A HEAD returns metadata only — checking a 200 MB video this
+ * way costs nothing like downloading it.
  */
 export async function finalizeMediaAsset(input: {
   workspaceId: string;
@@ -245,30 +258,18 @@ export async function finalizeMediaAsset(input: {
 
   if (row.upload_status === "stored") return row;
 
-  const directory = row.storage_path.includes("/")
-    ? row.storage_path.slice(0, row.storage_path.lastIndexOf("/"))
-    : "";
-  const fileName = row.storage_path.slice(row.storage_path.lastIndexOf("/") + 1);
+  const head = await headObject(row.storage_path);
 
-  const { data: entries, error: listError } = await admin.storage
-    .from(POST_MEDIA_BUCKET)
-    .list(directory, { search: fileName });
-
-  const object = (entries ?? []).find((entry) => entry.name === fileName);
-
-  if (listError || !object) {
+  if (!head.exists) {
     logger.warn("media.finalize_missing_object", { assetId: input.assetId });
     throw new Error("The upload did not finish. Please remove the file and try again.");
   }
 
-  // `list` reports metadata size as a string in some client versions.
-  const actualSize = Number(object.metadata?.size ?? 0);
-
-  if (actualSize > 0 && actualSize !== row.byte_size) {
+  if (head.size !== null && head.size !== row.byte_size) {
     logger.warn("media.finalize_size_mismatch", {
       assetId: input.assetId,
       declared: row.byte_size,
-      actual: actualSize,
+      actual: head.size,
     });
     throw new Error("The uploaded file did not match what was declared. Please try again.");
   }
@@ -290,33 +291,35 @@ export async function finalizeMediaAsset(input: {
 
 /** Download the bytes of a stored asset. Server-side only. */
 export async function loadMediaBytes(asset: MediaAssetRow): Promise<Buffer> {
-  const admin = createSupabaseAdminClient();
-
-  const { data, error } = await admin.storage
-    .from(POST_MEDIA_BUCKET)
-    .download(asset.storage_path);
-
-  if (error || !data) {
+  try {
+    return await getObjectBytes(asset.storage_path);
+  } catch (error) {
     logger.error("media.download_failed", {
       assetId: asset.id,
-      error: error?.message,
+      error: error instanceof Error ? error.message : "unknown",
     });
     throw new Error("Could not read the stored media file.");
   }
-
-  return Buffer.from(await data.arrayBuffer());
 }
 
-/** Short-lived URL for the composer preview. 60 seconds, private bucket. */
+/**
+ * Short-lived URL for the composer preview.
+ *
+ * Signed for 60 seconds while the bucket is private, which is how it behaved on
+ * Supabase Storage. If `R2_PUBLIC_URL` is set the link is plain instead — the
+ * objects are already readable in that configuration, and an unsigned link at
+ * least lets the browser cache it.
+ */
 export async function createMediaPreviewUrl(asset: MediaAssetRow): Promise<string | null> {
-  const admin = createSupabaseAdminClient();
-
-  const { data, error } = await admin.storage
-    .from(POST_MEDIA_BUCKET)
-    .createSignedUrl(asset.storage_path, 60);
-
-  if (error || !data) return null;
-  return data.signedUrl;
+  try {
+    return await createDownloadUrl({ key: asset.storage_path });
+  } catch (error) {
+    logger.error("media.preview_url_failed", {
+      assetId: asset.id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return null;
+  }
 }
 
 /**
@@ -348,10 +351,14 @@ export async function removeMediaAsset(
   if (data.post_id) return { deleted: false, reason: "attached" };
 
   if (data.storage_path) {
-    await admin.storage
-      .from(POST_MEDIA_BUCKET)
-      .remove([data.storage_path as string])
-      .catch(() => undefined);
+    // Delete the object first. A row without bytes is recoverable in the sense
+    // that nothing is being paid to store it; an object without a row is not.
+    await deleteObject(data.storage_path as string).catch((error: unknown) => {
+      logger.error("media.object_delete_failed", {
+        assetId,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    });
   }
 
   await admin.from("media_assets").delete().eq("id", assetId).eq("workspace_id", workspaceId);

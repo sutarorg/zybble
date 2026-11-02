@@ -212,19 +212,30 @@ describe("workspace isolation", () => {
     expect(await countAs(null, `select id from public.linkedin_accounts`)).toBe(0);
   });
 
-  it("keeps private media private in storage", async () => {
-    await db.admin.query(
-      `insert into storage.objects (bucket_id, name, owner) values ('post-media', $1, $2::uuid)`,
-      [`${workspaceA}/post/asset.png`, alice],
+  /**
+   * Media bytes moved to Cloudflare R2, so customer files no longer sit in a
+   * shared `storage.objects` table at all — a stronger guarantee than a policy
+   * could give. This asserts the bucket row is gone, which is what makes a
+   * stray insert *impossible* rather than merely policy-blocked, and is the
+   * property worth keeping under test after the migration.
+   *
+   * Row-level isolation of media metadata is still covered above, by
+   * "hides other workspaces' media assets".
+   */
+  it("stores no media in Supabase Storage at all", async () => {
+    const { rows: buckets } = await db.admin.query<{ id: string }>(
+      `select id from storage.buckets where id = 'post-media'`,
     );
 
-    const asAlice = await db.asUser(alice);
-    const { rows: visible } = await asAlice.query(`select id from storage.objects`);
-    expect(visible.length).toBe(1);
+    expect(buckets.length, "the post-media bucket should no longer exist").toBe(0);
 
-    const asBob = await db.asUser(bob);
-    const { rows: hidden } = await asBob.query(`select id from storage.objects`);
-    expect(hidden.length).toBe(0);
+    // Without the bucket row the foreign key rejects the insert outright.
+    await expect(
+      db.admin.query(
+        `insert into storage.objects (bucket_id, name, owner) values ('post-media', $1, $2::uuid)`,
+        [`${workspaceA}/post/asset.png`, alice],
+      ),
+    ).rejects.toThrow();
   });
 });
 

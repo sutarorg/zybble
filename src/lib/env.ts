@@ -43,6 +43,25 @@ const schema = z.object({
     .default("false")
     .transform((value) => value === "true"),
 
+  // Cloudflare R2 (media storage) ------------------------------------------
+  // R2 speaks the S3 protocol, so these are the only credentials needed — no
+  // region picker, no Cloudflare-specific SDK.
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  /** Defaults to `zybble-post-media`; override to point at an existing bucket. */
+  R2_BUCKET: z.string().min(1).max(63).default("zybble-post-media"),
+  /**
+   * Optional public base URL (an r2.dev subdomain, or a custom domain).
+   *
+   * When set, preview URLs are plain links under this origin instead of
+   * presigned GETs. That is worth doing if you enable public read on the
+   * bucket, since it lets the browser cache previews. Leave it unset to keep
+   * the bucket private — previews then use short-lived signed URLs, exactly as
+   * they did on Supabase Storage.
+   */
+  R2_PUBLIC_URL: optionalUrl,
+
   // Inngest -----------------------------------------------------------------
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
@@ -199,6 +218,36 @@ export function linkedinCapabilities() {
         : []),
     ] as string[],
   };
+}
+
+/**
+ * Media storage is Cloudflare R2, reached over its S3-compatible API.
+ *
+ * All four parts are required; a partial configuration is treated as
+ * unconfigured rather than half-working, so a missing secret surfaces as a
+ * clear "not configured" state instead of a signature error at upload time.
+ */
+export function isR2Configured(): boolean {
+  const configuration = env();
+  return Boolean(
+    configuration.R2_ACCOUNT_ID &&
+      configuration.R2_ACCESS_KEY_ID &&
+      configuration.R2_SECRET_ACCESS_KEY,
+  );
+}
+
+/** Human-readable reason R2 is unavailable, for admin-facing diagnostics. */
+export function r2Blockers(): string[] {
+  if (isR2Configured()) return [];
+
+  const configuration = env();
+  const missing = [
+    !configuration.R2_ACCOUNT_ID ? "R2_ACCOUNT_ID" : null,
+    !configuration.R2_ACCESS_KEY_ID ? "R2_ACCESS_KEY_ID" : null,
+    !configuration.R2_SECRET_ACCESS_KEY ? "R2_SECRET_ACCESS_KEY" : null,
+  ].filter((value): value is string => value !== null);
+
+  return [`Media storage (Cloudflare R2) is not configured — missing ${missing.join(", ")}`];
 }
 
 export function isDodoConfigured(): boolean {
