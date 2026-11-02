@@ -189,21 +189,32 @@ Covered by `tests/webhooks/dodo-signature.test.ts` and
 * Ids are UUIDs; enums are closed; numbers are bounded (`limit` ≤ 200).
 * LinkedIn post bodies are capped at 3,000 characters, matching the API.
 * Uploads are checked against `MEDIA_LIMITS` (type, size, count) **before** any
-  storage write, and again at the storage bucket via `allowed_mime_types` and
-  `file_size_limit`.
+  storage write, and again in the publish pipeline — the file may have been
+  stored before a limit changed.
 
 ---
 
 ## 7. File uploads
 
-* Private bucket `post-media`; objects are stored under `{workspace_id}/…`.
-* Four storage RLS policies (insert / select / update / delete) derive the
-  owning workspace from the object path with `storage_workspace_id(object_name)`,
-  so renaming an object cannot move it between tenants.
-* The browser receives **short-lived signed URLs**, never the bucket path as a
-  public URL.
+* Objects live in a **private Cloudflare R2 bucket**, keyed
+  `{workspace_id}/{asset_id}.{ext}`. Supabase Storage is not used at all.
+* Tenant isolation no longer rests on a SQL policy over a shared table. Access
+  is granted by short-lived URLs signed server-side for one specific key, so a
+  workspace cannot read or overwrite another's files even in principle; the
+  bucket credentials never reach the browser.
+* **Uploads go browser → R2 directly** over a presigned `PUT`, because a
+  serverless request body cannot carry a 200 MB video. The server still decides
+  whether an upload may happen (size and type are validated before the URL is
+  minted), and `finalizeMediaAsset` confirms the bytes with a HEAD — comparing
+  the real size with the declared one — before an asset can be attached to a
+  post. An unconfirmed upload cannot become a post's media.
+* The browser receives **short-lived signed URLs**, never a permanent public
+  link, unless `R2_PUBLIC_URL` is deliberately set (which implies public read
+  and is documented as such).
 * Media is uploaded to LinkedIn through the official register-then-upload
   workflow; no file is written to a public location at any point.
+* Erasure is prefix-based: deleting a workspace lists and removes every key
+  under `{workspace_id}/`, following pagination so no objects are left behind.
 
 ---
 

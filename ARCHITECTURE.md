@@ -27,13 +27,16 @@ in [`API_CONTRACTS.md`](./API_CONTRACTS.md), the threat model and controls in
         │                           │                          │
         └──────────┬────────────────┴──────────────────────────┘
                    ▼
-        Supabase Postgres (RLS) + Auth + Storage
+        Supabase Postgres (RLS) + Auth
                    ▲
                    │ service role (server only)
         ┌──────────┴───────────┬──────────────┬─────────────────┐
         ▼                      ▼              ▼                 ▼
    LinkedIn REST         Dodo Payments     Resend          Inngest Cloud
    (publish/analytics)   (checkout+webhooks) (email)      (scheduler)
+        ▲
+        │ media bytes (presigned, browser-direct)
+   Cloudflare R2 (S3-compatible API, private bucket)
 ```
 
 Two rules hold everywhere:
@@ -135,11 +138,27 @@ Twenty tables across ten ordered migrations in `supabase/migrations/`.
 
 ### Storage
 
-One private bucket, `post-media`, with `file_size_limit` and
-`allowed_mime_types` configured at the bucket level plus four RLS policies
-(insert / select / update / delete). Objects live under
-`{workspace_id}/…`, and `storage_workspace_id(object_name)` derives the owning
-workspace from the path so the policy cannot be sidestepped by renaming.
+Media bytes live in **Cloudflare R2**, reached over its S3-compatible API from
+`src/lib/r2/objects.ts`. Only metadata lives in Postgres (`media_assets`), and
+Supabase Storage is not used at all.
+
+Objects are keyed `{workspace_id}/{asset_id}.{ext}`. The bucket is private;
+access is granted by short-lived signed URLs minted server-side, so the browser
+never holds a credential and a workspace cannot reach another's files.
+Isolation therefore comes from the signed URL and a workspace-scoped database
+row, not from a SQL policy over a shared `storage.objects` table — which is why
+`0013_drop_supabase_storage.sql` could remove the old policies outright.
+
+Two consequences worth knowing:
+
+* **Uploads go browser → R2 directly**, via a presigned `PUT` from
+  `createMediaUploadTicket`. A serverless request body is capped at 4.5 MB, so
+  proxying a 200 MB video through our API is impossible. `finalizeMediaAsset`
+  then confirms the bytes with a HEAD before the asset can be attached to a
+  post, comparing the real size with what was declared.
+* **Erasure is prefix-based.** `listKeys("<workspace_id>/")` plus a bulk delete
+  removes a workspace's media, which is what account deletion relies on. The
+  listing follows pagination, so it no longer silently caps at 1000 objects.
 
 ---
 

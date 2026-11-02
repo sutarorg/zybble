@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { env, isDodoConfigured, isSupabaseAdminConfigured, isSupabaseConfigured } from "@/lib/env";
+import {
+  env,
+  isDodoConfigured,
+  isR2Configured,
+  isSupabaseAdminConfigured,
+  isSupabaseConfigured,
+} from "@/lib/env";
 import { capabilities as linkedinCapabilities } from "@/lib/linkedin/config";
 import { canSendInngestEvents, isInngestServeConfigured } from "@/inngest/client";
 
@@ -20,6 +26,8 @@ export async function GET() {
   const checks = {
     supabase: isSupabaseConfigured(),
     supabaseAdmin: isSupabaseAdminConfigured(),
+    /** Media storage. All file uploads fail without this. */
+    r2: isR2Configured(),
     linkedin: linkedinCapabilities().configured,
     dodoPayments: isDodoConfigured(),
     resend: Boolean(configuration.RESEND_API_KEY),
