@@ -143,8 +143,12 @@ test.describe("free tools, trust pages and personas", () => {
 
     await expect(page.getByRole("heading", { name: /built for professionals like you/i })).toBeVisible();
     await expect(page.getByText("Illustrative persona").first()).toBeVisible();
+    // The standalone disclaimer paragraph under the wall was removed as
+    // redundant (every card carries an "Illustrative persona" badge). The
+    // honesty signal still has to live somewhere, so assert the section
+    // heading still says these are not customer testimonials.
     await expect(
-      page.getByText(/fictional illustrations of real working styles/i),
+      page.getByText(/illustrative personas — not customer testimonials/i),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: /useful before you sign up/i })).toBeVisible();
   });

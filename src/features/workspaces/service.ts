@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { inngest } from "@/inngest/client";
-import { entitlementsFor } from "@/features/billing/entitlements";
+import { describeLimitError, entitlementsFor } from "@/features/billing/entitlements";
 import type { WorkspaceContext } from "@/features/workspaces/access";
-import { AppError, ConflictError, NotFoundError } from "@/lib/errors";
+import { AppError, ConflictError, EntitlementError, NotFoundError } from "@/lib/errors";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -56,6 +56,16 @@ export async function createWorkspace(
   });
 
   if (error) {
+    // `create_workspace` raises its limit sentinels as the exception *message*
+    // with a generic SQLSTATE (P0001), so the message is what identifies a
+    // breach. Reporting this as an internal error would leave someone staring
+    // at "Could not create the workspace" with no way to fix it.
+    const friendly = describeLimitError(error.message) ?? describeLimitError(error.code);
+
+    if (friendly) {
+      throw new EntitlementError(friendly, { code: error.message ?? error.code });
+    }
+
     throw new AppError("internal_error", "Could not create the workspace.", {
       details: { code: error.code },
     });

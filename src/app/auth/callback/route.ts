@@ -1,13 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSessionState } from "@/features/auth/service";
+import { recordSession } from "@/features/auth/sessions";
 import { logger } from "@/lib/logger";
 
 /**
- * GET /auth/callback — Supabase email link handler.
+ * GET /auth/callback — Supabase link *and* OAuth handler.
  *
- * Handles both flows Supabase supports for links:
- *  - `?code=…`  — PKCE exchange (email confirmation, magic link, recovery),
- *  - `?token_hash=…&type=…` — legacy template format.
+ * Handles every PKCE flow Supabase supports:
+ *  - `?code=…`  — email confirmation, magic link, recovery and OAuth
+ *    providers such as Google,
+ *  - `?token_hash=…&type=…` — legacy email template format.
  *
  * A recovery link is redirected to the password form; everything else lands on
  * the dashboard. Failures redirect to /login with a reason instead of rendering
@@ -48,8 +51,30 @@ export async function GET(req: NextRequest) {
       // Supabase does not tell us the flow type on the code path; the query
       // parameter it appends to `next` does.
       const isRecovery = (next ?? "").includes("type=recovery") || type === "recovery";
+      if (isRecovery) return redirect(req, "/reset-password");
 
-      return redirect(req, isRecovery ? "/reset-password" : "/dashboard");
+      // OAuth sign-ins (Google) land here as well as email links. A brand-new
+      // account has no workspace yet, so send it to onboarding instead of a
+      // dashboard with nothing in it.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        // Google sign-ins arrive here rather than through /api/auth/login, so
+        // the device row has to be recorded on this path too or the account
+        // screen would show no devices for an OAuth-only account.
+        await recordSession({
+          userId: user.id,
+          userAgent: req.headers.get("user-agent"),
+          headers: req.headers,
+        });
+
+        const state = await getSessionState(supabase, user);
+        return redirect(req, state.requiresOnboarding ? "/onboarding" : "/dashboard");
+      }
+
+      return redirect(req, "/dashboard");
     }
 
     const { error } = await supabase.auth.verifyOtp({

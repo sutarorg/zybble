@@ -19,6 +19,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
     plan: "free",
     maxLinkedInAccounts: 1,
     monthlyScheduleLimit: 10,
+    maxWorkspaces: 1,
     analyticsHistoryDays: 7,
     bestTimeInsights: false,
     teamCollaboration: false,
@@ -27,11 +28,25 @@ export const PLAN_ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
     plan: "pro",
     maxLinkedInAccounts: 5,
     monthlyScheduleLimit: null,
+    maxWorkspaces: 3,
     analyticsHistoryDays: 365,
     bestTimeInsights: true,
     teamCollaboration: true,
   },
 };
+
+/**
+ * Workspaces an account may own, given the plans it currently holds.
+ *
+ * The cap is per *account*, not per workspace: upgrading one workspace to Pro
+ * is what raises the ceiling, so it is derived from the best plan across the
+ * account rather than from a single row. Kept in step with
+ * `public.workspace_allowance()` in 0011_sessions_and_workspace_limits.sql,
+ * which is the copy that actually enforces it.
+ */
+export function workspaceAllowance(plans: readonly PlanId[]): number {
+  return plans.includes("pro") ? PLAN_ENTITLEMENTS.pro.maxWorkspaces : PLAN_ENTITLEMENTS.free.maxWorkspaces;
+}
 
 /** $15 per paid seat per month. */
 export const PRO_SEAT_PRICE_CENTS = 1500;
@@ -121,6 +136,8 @@ export function describeLimitError(code: string | undefined): string | null {
       return "You have used all 10 scheduled posts included in the Free plan this month. Upgrade to Pro for unlimited scheduling, or move a scheduled post back to drafts.";
     case "linkedin_account_limit_reached":
       return "The Free plan allows one connected LinkedIn account. Upgrade to Pro for up to five.";
+    case "workspace_limit_reached":
+      return "The Free plan includes one workspace. Upgrade to Pro for up to three — one for yourself, one for client work, one for a team.";
     case "workspace_requires_owner":
       return "A workspace must keep at least one owner.";
     case "invitation_expired":

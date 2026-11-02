@@ -17,7 +17,13 @@ export type MemberStatus = "active" | "invited" | "removed";
 
 export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "failed" | "cancelled";
 export type MediaKind = "image" | "video" | "document";
-export type MediaUploadStatus = "stored" | "registering" | "registered" | "ready" | "failed";
+export type MediaUploadStatus =
+  | "pending"
+  | "stored"
+  | "registering"
+  | "registered"
+  | "ready"
+  | "failed";
 
 export type LinkedInAccountStatus = "active" | "expired" | "revoked" | "reauth_required";
 export type LinkedInAccountKind = "member" | "organization";
@@ -359,6 +365,20 @@ export type UsageCounterRow = {
   updated_at: string;
 };
 
+/** A device an account has signed in from. See migration 0011. */
+export type AuthSessionRow = {
+  id: string;
+  user_id: string;
+  device_label: string;
+  /** '' when unknown — never a guess. */
+  ip_hash: string;
+  city: string;
+  region: string;
+  country: string;
+  first_seen_at: string;
+  last_seen_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -492,6 +512,11 @@ export type Database = {
           metric: "scheduled_posts";
         },
         Partial<UsageCounterRow>
+      >;
+      auth_sessions: Table<
+        AuthSessionRow,
+        Partial<AuthSessionRow> & { user_id: string; device_label: string },
+        Partial<AuthSessionRow>
       >;
     };
     Views: Record<string, never>;

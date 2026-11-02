@@ -124,7 +124,21 @@ export const DELETE = defineRoute(
       throw new ValidationError("`assetId` is required.");
     }
 
-    await removeMediaAsset(context.workspace.id, assetId);
+    const result = await removeMediaAsset(context.workspace.id, assetId);
+
+    if (!result.deleted) {
+      await writeAudit(supabase!, {
+        workspaceId: context.workspace.id,
+        actorUserId: context.user.id,
+        action: "media.delete_skipped",
+        entityType: "media_asset",
+        entityId: assetId,
+        metadata: { reason: result.reason },
+        requestId,
+      });
+
+      return { deleted: false, reason: result.reason };
+    }
 
     await writeAudit(supabase!, {
       workspaceId: context.workspace.id,

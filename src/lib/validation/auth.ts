@@ -53,6 +53,15 @@ export const verifyResendSchema = z.object({
   redirectTo: z.string().trim().max(300).optional(),
 });
 
+/**
+ * Start an OAuth flow. `redirectTo` is a relative path only — it is passed
+ * through `safeReturnPath` on the server, which rejects anything that is not
+ * a same-origin path, so an attacker-supplied value cannot steal the code.
+ */
+export const googleSignInSchema = z.object({
+  redirectTo: z.string().trim().max(300).optional(),
+});
+
 export const onboardingSchema = z.object({
   workspaceName: z.string().trim().min(1).max(80),
   timezone: timezoneSchema.default("UTC"),

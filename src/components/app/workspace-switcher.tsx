@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { apiPost, errorMessage } from "@/lib/api/client";
 import { useSession } from "@/lib/app/hooks";
 import { useLocalTimezone } from "@/lib/app/hooks";
+import { workspaceAllowance } from "@/features/billing/entitlements";
 import type { Workspace } from "@/lib/app/types";
 
 /**
@@ -40,7 +41,28 @@ export function WorkspaceSwitcher() {
   const [error, setError] = useState<string | null>(null);
 
   const workspaces = session.data?.workspaces ?? [];
-  const current = workspaces[0] ?? null;
+
+  /**
+   * The cookie decides which workspace is current, not array order.
+   *
+   * This used to be `workspaces[0]`, which is why switching appeared to do
+   * nothing: `listWorkspaces` orders by membership creation date, so once a
+   * second workspace existed the switcher kept displaying the older one no
+   * matter which was selected, and the check mark never moved.
+   *
+   * Falling back to the first workspace keeps a stale or deleted cookie from
+   * leaving the control empty.
+   */
+  const current =
+    workspaces.find((workspace) => workspace.id === session.data?.activeWorkspaceId) ??
+    workspaces[0] ??
+    null;
+
+  // The cap is an account-wide allowance derived from the best plan held, not
+  // a per-workspace counter. SQL enforces the same number, so this is only
+  // here to avoid letting someone fill in a form that is guaranteed to fail.
+  const workspaceLimit = workspaceAllowance(workspaces.map((workspace) => workspace.plan));
+  const workspacesFull = workspaces.length >= workspaceLimit;
 
   const localTimezone = useLocalTimezone();
   const [createOpen, setCreateOpen] = useState(false);
@@ -136,8 +158,8 @@ export function WorkspaceSwitcher() {
                 {current.name}
               </span>
               <span className="block text-xs text-slate-500">
-                {current.plan === "pro" ? "Pro" : "Free"} plan
-                {workspaces.length > 1 ? ` · ${workspaces.length} workspaces` : ""}
+                {current.plan === "pro" ? "Pro" : "Free"} plan · {workspaces.length} of{" "}
+                {workspaceLimit} {workspaceLimit === 1 ? "workspace" : "workspaces"}
               </span>
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-slate-500" aria-hidden />
@@ -165,7 +187,15 @@ export function WorkspaceSwitcher() {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
+          {workspacesFull && (
+            <p className="px-2 py-1.5 text-[11px] leading-4 text-slate-500">
+              {workspaceLimit === 1
+                ? "The Free plan includes one workspace. Upgrade to Pro for up to three."
+                : "You have used all three workspaces included in Pro."}
+            </p>
+          )}
           <DropdownMenuItem
+            disabled={workspacesFull}
             onSelect={(event) => {
               // Let the dialog take focus before the menu unmounts, otherwise
               // Radix restores focus to a trigger that no longer exists.
@@ -199,7 +229,9 @@ export function WorkspaceSwitcher() {
             <DialogTitle>Create a workspace</DialogTitle>
             <DialogDescription>
               A workspace keeps LinkedIn accounts, drafts and analytics to itself. You can switch
-              between them whenever you like.
+              between them whenever you like. This account can hold {workspaceLimit}{" "}
+              {workspaceLimit === 1 ? "workspace" : "workspaces"} on the{" "}
+              {workspaceLimit > 1 ? "Pro" : "Free"} plan.
             </DialogDescription>
           </DialogHeader>
 
