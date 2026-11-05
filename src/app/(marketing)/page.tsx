@@ -25,6 +25,8 @@ const TOOL_ICONS = {
   search: Search,
 } as const;
 
+
+
 /**
  * Compact strip surfacing the four free tools from the homepage. The full
  * editorial treatment lives on /free-linkedin-tools; this section is the
@@ -83,11 +85,47 @@ function FreeToolsStrip() {
   );
 }
 
+/**
+ * `absolute` bypasses the root layout's `%s · Zybble` template. This title is
+ * specified verbatim, and appending the brand would spend ~9 of the ~60
+ * characters Google shows before truncating.
+ *
+ * The brand is not lost: it is carried by `og:site_name`, the favicon and the
+ * `WebSite` structured data below, which together are what Google's site-name
+ * system reads when deciding whether to label this result "Zybble" or fall
+ * back to printing the bare host.
+ */
 export const metadata: Metadata = {
-  title: "Schedule LinkedIn Posts. Track Performance. Grow Smarter.",
+  title: { absolute: "LinkedIn Post Scheduler & Analytics" },
   description:
-    "Zybble is the LinkedIn post scheduler and analytics workspace for B2B founders, consultants and creators. Plan content, publish on time, measure what works. Free plan included.",
+    "Schedule LinkedIn posts, track engagement, and discover the best time to publish. Grow your LinkedIn presence with Zybble.",
+  keywords: [
+    "LinkedIn post scheduler",
+    "LinkedIn scheduling tool",
+    "LinkedIn analytics tool",
+    "LinkedIn content management",
+    "LinkedIn post automation",
+    "LinkedIn engagement tracker",
+    "LinkedIn publishing tool",
+    "LinkedIn growth platform",
+  ],
   alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: siteConfig.url,
+    title: "LinkedIn Post Scheduler & Analytics",
+    description:
+      "Schedule LinkedIn posts, track engagement, and discover the best time to publish. Grow your LinkedIn presence with Zybble.",
+    siteName: siteConfig.name,
+    images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: siteConfig.name }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LinkedIn Post Scheduler & Analytics",
+    description:
+      "Schedule LinkedIn posts, track engagement, and discover the best time to publish. Grow your LinkedIn presence with Zybble.",
+    images: [siteConfig.ogImage],
+  },
 };
 
 const homeFaq: FaqItem[] = [
@@ -132,11 +170,24 @@ const structuredData = [
     logo: `${siteConfig.url}${siteConfig.logoPath}`,
     description: siteConfig.description,
   },
+  /**
+   * Google's site-name system is automated and falls back to the bare domain
+   * when it is not confident in a name. `WebSite` is the strongest signal it
+   * reads, so this single node carries the whole job — which is why it stays
+   * the only `WebSite` block on the page (duplicating it splits the signal).
+   *
+   * The homepage <title> deliberately does not contain the brand (see the
+   * metadata above), so this markup, `og:site_name` and the visible heading
+   * copy are what tell Google the site is called "Zybble" and not
+   * "zybble.com". `alternateName` gives the system fallback spellings to
+   * choose from before it gives up and prints the host.
+   */
   {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: siteConfig.name,
-    url: siteConfig.url,
+    alternateName: ["Zybble LinkedIn Scheduler", "Zybble LinkedIn Analytics"],
+    url: `${siteConfig.url}/`,
   },
   {
     "@context": "https://schema.org",

@@ -30,13 +30,39 @@ export const INLINE_LINK = /\[\[([^\]]+)\]\]\(([^)]+)\)/g;
 
 export interface BlogPost {
   slug: string;
+  /**
+   * The on-page headline (the article's H1, and what a reader sees shared).
+   * Deliberately NOT the search title — see `metaTitle`.
+   */
   title: string;
+  /**
+   * The search title, when it differs from the H1.
+   *
+   * These are allowed to diverge on purpose: an H1 earns a click from someone
+   * already reading, while a search title has to match the query someone
+   * typed. `how-to-find-your-best-time-to-post-on-linkedin` is the clearest
+   * case — the H1 frames it as a question, the search title targets the
+   * "best time to post" query directly. Falls back to `title` when unset.
+   */
+  metaTitle?: string;
+  /** The editorial summary shown on the article and in blog listings. */
   description: string;
+  /**
+   * The search description. Like `metaTitle`, this targets a query, so it is
+   * written more plainly than the editorial summary above. Falls back to
+   * `description` when unset.
+   */
+  metaDescription?: string;
   publishedAt: string; // ISO date
   /** Only set when the article has genuinely been revised since publication. */
   updatedAt?: string;
   category: string;
-  /** Target queries for internal search-intent tracking. Never rendered. */
+  /**
+   * Target queries. Rendered as the page's meta keywords and as OpenGraph
+   * `article:tag`. Google has ignored meta keywords for ranking since 2009 —
+   * they are kept because the terms document each article's intent, and they
+   * cost nothing.
+   */
   keywords?: string[];
   /**
    * External references the article relies on for factual claims about
@@ -91,16 +117,23 @@ export const posts: BlogPost[] = [
   {
     slug: "how-to-find-your-best-time-to-post-on-linkedin",
     title: "How to find your best time to post on LinkedIn",
+    metaTitle: "Best Time to Post on LinkedIn",
     description:
       "Forget the generic 'post at 8 AM on Tuesday' advice. Here's how to find the publishing times that actually work for your audience — and measure them properly.",
+    metaDescription:
+      "Learn how to find your best time to post on LinkedIn using audience behaviour, engagement patterns, historical performance and publishing experiments.",
     publishedAt: "2026-01-19",
     updatedAt: "2026-11-01",
     category: "Analytics",
     keywords: [
-      "best time to post on linkedin",
-      "when to post on linkedin",
-      "best day to post on linkedin",
-      "linkedin posting times",
+      "best time to post on LinkedIn",
+      "LinkedIn posting times",
+      "best days to post on LinkedIn",
+      "LinkedIn engagement timing",
+      "LinkedIn posting schedule",
+      "LinkedIn audience activity",
+      "LinkedIn analytics insights",
+      "optimal LinkedIn posting time",
     ],
     cover: {
       src: "/blog/best-time-to-post.jpg",
@@ -253,16 +286,23 @@ export const posts: BlogPost[] = [
   {
     slug: "linkedin-content-calendar-for-busy-founders",
     title: "A LinkedIn content calendar for founders who have no time",
+    metaTitle: "LinkedIn Content Calendar for Busy Founders",
     description:
       "A realistic weekly system for staying visible on LinkedIn when you also have a company to run: fewer ideas, batched writing, one calendar.",
+    metaDescription:
+      "Discover how busy founders can build a practical LinkedIn content calendar, plan weekly posts and maintain a consistent publishing schedule.",
     publishedAt: "2026-01-08",
     updatedAt: "2026-11-01",
     category: "Strategy",
     keywords: [
-      "linkedin content calendar for founders",
-      "founder linkedin content plan",
-      "how often should founders post on linkedin",
-      "linkedin posting schedule for founders",
+      "LinkedIn content calendar for founders",
+      "founder LinkedIn strategy",
+      "LinkedIn content planning",
+      "LinkedIn posting schedule",
+      "B2B founder marketing",
+      "weekly LinkedIn content plan",
+      "LinkedIn post ideas for founders",
+      "LinkedIn scheduling",
     ],
     cover: {
       src: "/blog/content-calendar-founders.jpg",
@@ -398,16 +438,23 @@ export const posts: BlogPost[] = [
   {
     slug: "linkedin-analytics-beyond-vanity-metrics",
     title: "LinkedIn analytics beyond vanity metrics",
+    metaTitle: "LinkedIn Analytics Beyond Vanity Metrics",
     description:
       "Impressions feel good and mean little. Here are the numbers that actually predict whether your LinkedIn presence is working — and how to read them.",
+    metaDescription:
+      "Move beyond LinkedIn likes and impressions. Learn which engagement metrics matter, how to measure post performance and how to improve your content strategy.",
     publishedAt: "2025-12-15",
     updatedAt: "2026-11-01",
     category: "Analytics",
     keywords: [
-      "linkedin vanity metrics",
-      "linkedin metrics that matter",
-      "linkedin post analytics",
-      "reading linkedin analytics",
+      "LinkedIn analytics metrics",
+      "LinkedIn vanity metrics",
+      "LinkedIn engagement measurement",
+      "LinkedIn post performance",
+      "LinkedIn analytics guide",
+      "LinkedIn impressions analysis",
+      "LinkedIn content measurement",
+      "LinkedIn engagement tracking",
     ],
     cover: {
       src: "/blog/analytics-beyond-vanity.jpg",
@@ -534,16 +581,23 @@ export const posts: BlogPost[] = [
   {
     slug: "why-consistency-beats-virality-on-linkedin",
     title: "Why consistency beats virality on LinkedIn",
+    metaTitle: "Why Consistency Beats Virality on LinkedIn",
     description:
       "One viral post fades in a week. A year of steady posting builds an audience that buys. The case for boring, scheduled, compounding visibility.",
+    metaDescription:
+      "Learn why consistent LinkedIn posting can build stronger audience relationships, improve content habits and support long-term professional growth.",
     publishedAt: "2025-11-27",
     updatedAt: "2026-11-01",
     category: "Strategy",
     keywords: [
-      "linkedin consistency",
-      "how often to post on linkedin",
-      "linkedin posting frequency",
-      "post consistently on linkedin",
+      "LinkedIn posting consistency",
+      "consistent LinkedIn content",
+      "LinkedIn growth strategy",
+      "LinkedIn posting frequency",
+      "LinkedIn content habits",
+      "LinkedIn audience growth",
+      "LinkedIn personal branding",
+      "LinkedIn marketing strategy",
     ],
     cover: {
       src: "/blog/consistency-beats-virality.jpg",
@@ -650,8 +704,21 @@ export const posts: BlogPost[] = [
     slug: "does-scheduling-linkedin-posts-kill-your-reach",
     title:
       "Does Scheduling LinkedIn Posts Kill Your Reach? The Algorithm Myth Nobody Wants to Talk About",
+    metaTitle: "Does Scheduling LinkedIn Posts Hurt Your Reach?",
     description:
       "The claim that scheduling tools suppress your LinkedIn reach refuses to die. Here is where the myth comes from, what actually drives distribution, and the one way scheduling genuinely can hurt you.",
+    metaDescription:
+      "Discover whether scheduling LinkedIn posts affects reach, what influences post distribution and how to develop a smarter LinkedIn publishing strategy.",
+    keywords: [
+      "does scheduling LinkedIn posts hurt reach",
+      "LinkedIn scheduled posts reach",
+      "LinkedIn algorithm",
+      "LinkedIn post reach",
+      "LinkedIn organic reach",
+      "LinkedIn scheduling impact",
+      "LinkedIn engagement strategy",
+      "LinkedIn content distribution",
+    ],
     publishedAt: "2026-10-27",
     category: "Strategy",
     cover: {
@@ -741,8 +808,21 @@ export const posts: BlogPost[] = [
     slug: "best-linkedin-scheduler-for-agencies-2026",
     title:
       "Best LinkedIn Scheduler for Agencies in 2026: 9 Tools Compared on Pricing, Automation & Features",
+    metaTitle: "Best LinkedIn Scheduler for Agencies in 2026",
     description:
       "Nine schedulers that can publish to LinkedIn, and the evaluation criteria that actually predict whether one survives contact with a client roster. Plus how to read a pricing page before you commit.",
+    metaDescription:
+      "Explore LinkedIn scheduling tools for agencies, compare publishing workflows and analytics capabilities, and find a solution for managing client content.",
+    keywords: [
+      "best LinkedIn scheduler for agencies",
+      "LinkedIn scheduling software for agencies",
+      "agency LinkedIn management",
+      "LinkedIn client management",
+      "multi-account LinkedIn scheduler",
+      "LinkedIn content management tools",
+      "agency social media scheduler",
+      "LinkedIn analytics for agencies",
+    ],
     publishedAt: "2026-10-20",
     category: "Tools",
     cover: {
@@ -902,8 +982,21 @@ export const posts: BlogPost[] = [
     slug: "linkedin-scheduler-for-multiple-accounts",
     title:
       "LinkedIn Scheduler for Multiple Accounts: 7 Features to Check Before You Waste Money on the Wrong Tool",
+    metaTitle: "LinkedIn Scheduler for Multiple Accounts",
     description:
       "Managing several LinkedIn profiles turns scheduling from a convenience into infrastructure. Seven capabilities that separate a usable multi-account scheduler from an expensive mistake.",
+    metaDescription:
+      "Learn how to organise LinkedIn publishing across multiple authorised accounts, manage content calendars and maintain a consistent posting workflow.",
+    keywords: [
+      "LinkedIn scheduler multiple accounts",
+      "manage multiple LinkedIn accounts",
+      "multiple LinkedIn profiles scheduler",
+      "LinkedIn account management",
+      "LinkedIn content calendar",
+      "LinkedIn scheduling software",
+      "multi-account publishing",
+      "LinkedIn workflow management",
+    ],
     publishedAt: "2026-10-13",
     category: "Tools",
     cover: {
@@ -999,8 +1092,21 @@ export const posts: BlogPost[] = [
     slug: "linkedin-free-scheduler-vs-paid-tools",
     title:
       "LinkedIn's Free Scheduler vs Paid Tools: 7 Limitations That Could Be Holding Back Your Growth",
+    metaTitle: "Free vs Paid LinkedIn Scheduler",
     description:
       "LinkedIn's built-in scheduler is genuinely useful — until it isn't. Seven limitations that appear the moment you get serious, and how to tell when you have outgrown the free option.",
+    metaDescription:
+      "Compare free and paid LinkedIn scheduling tools, understand their features and choose the right scheduler for your publishing and analytics needs.",
+    keywords: [
+      "free LinkedIn scheduler",
+      "paid LinkedIn scheduler",
+      "LinkedIn scheduler comparison",
+      "LinkedIn scheduling tools",
+      "free LinkedIn post scheduler",
+      "LinkedIn analytics software",
+      "LinkedIn publishing platform",
+      "best LinkedIn scheduling tool",
+    ],
     publishedAt: "2026-10-06",
     category: "Tools",
     cover: {
@@ -1099,8 +1205,21 @@ export const posts: BlogPost[] = [
     slug: "schedule-linkedin-post-with-first-comment",
     title:
       "How to Schedule LinkedIn Posts With a First Comment Without Being Online 24/7",
+    metaTitle: "How to Schedule a LinkedIn Post With a First Comment",
     description:
       "The first comment is where links, sources and follow-ups belong. Here is how to keep using it when your posts publish themselves — including the honest limits of scheduling tools.",
+    metaDescription:
+      "Learn how LinkedIn first comments work, how to plan them alongside your posts and what to check when scheduling LinkedIn content.",
+    keywords: [
+      "schedule LinkedIn post with first comment",
+      "LinkedIn first comment",
+      "LinkedIn scheduled comments",
+      "LinkedIn post scheduling",
+      "LinkedIn content automation",
+      "LinkedIn comment strategy",
+      "LinkedIn post workflow",
+      "LinkedIn publishing tools",
+    ],
     publishedAt: "2026-09-29",
     category: "Tools",
     cover: {
@@ -1184,8 +1303,21 @@ export const posts: BlogPost[] = [
     slug: "free-linkedin-content-calendar-template",
     title:
       "Free LinkedIn Content Calendar Template: Plan 30 Days of Posts Without Posting Every Day",
+    metaTitle: "Free LinkedIn Content Calendar Template and Planning Guide",
     description:
       "A 30-day planning sheet you can fill in one sitting, plus the weekly rhythm that makes a month of content realistic when you have a company to run.",
+    metaDescription:
+      "Organise your LinkedIn publishing with a free content calendar template. Plan topics, schedule posts and create a consistent content workflow.",
+    keywords: [
+      "free LinkedIn content calendar",
+      "LinkedIn calendar template",
+      "LinkedIn content planner",
+      "LinkedIn posting calendar",
+      "LinkedIn scheduling template",
+      "social media content calendar",
+      "LinkedIn marketing planner",
+      "LinkedIn content organisation",
+    ],
     publishedAt: "2026-09-15",
     category: "Tools",
     cover: {
@@ -1288,15 +1420,22 @@ export const posts: BlogPost[] = [
     slug: "linkedin-content-strategy-b2b-founders",
     title:
       "LinkedIn Content Strategy for B2B Founders: How to Build One That Survives Your Busiest Quarter",
+    metaTitle: "LinkedIn Content Strategy for B2B Founders",
     description:
       "A LinkedIn content strategy built for founders who have a company to run: pick the audiences that matter, choose themes you can sustain, and set a cadence that does not collapse in a busy month.",
+    metaDescription:
+      "Build a LinkedIn content strategy for your B2B business with practical content pillars, post ideas, publishing plans and audience engagement tactics.",
     publishedAt: "2026-11-01",
     category: "Strategy",
     keywords: [
-      "linkedin content strategy for b2b founders",
-      "linkedin strategy for founders",
-      "b2b linkedin content plan",
-      "linkedin content strategy",
+      "LinkedIn content strategy for B2B founders",
+      "B2B LinkedIn marketing",
+      "LinkedIn founder marketing",
+      "LinkedIn content strategy",
+      "B2B personal branding",
+      "LinkedIn lead generation strategy",
+      "founder thought leadership",
+      "LinkedIn growth for startups",
     ],
     cover: {
       src: "/blog/content-strategy-b2b-founders.jpg",
@@ -1635,15 +1774,22 @@ export const posts: BlogPost[] = [
     slug: "how-to-build-linkedin-content-calendar",
     title:
       "How to Build an Effective LinkedIn Content Calendar: A Six-Step System You Can Run in an Hour a Week",
+    metaTitle: "How to Build a LinkedIn Content Calendar That Works",
     description:
       "Build a LinkedIn content calendar that holds a month of publishing: choose a defensible cadence, design slot architecture, write hooks in batches and run a monthly review that actually changes what you write.",
+    metaDescription:
+      "Learn how to create a LinkedIn content calendar, organise post ideas, plan publishing dates and maintain a consistent content strategy.",
     publishedAt: "2026-11-01",
     category: "Strategy",
     keywords: [
-      "linkedin content calendar",
-      "how to build a linkedin content calendar",
-      "linkedin posting schedule template",
-      "linkedin content planning",
+      "how to build LinkedIn content calendar",
+      "LinkedIn content calendar",
+      "LinkedIn editorial calendar",
+      "LinkedIn content planner",
+      "LinkedIn weekly posting plan",
+      "LinkedIn publishing schedule",
+      "content calendar strategy",
+      "LinkedIn post planning",
     ],
     cover: {
       src: "/blog/build-content-calendar.jpg",
@@ -2079,15 +2225,22 @@ export const posts: BlogPost[] = [
     slug: "linkedin-hooks-that-capture-attention",
     title:
       "How to Write LinkedIn Hooks That Capture Attention: Patterns, Examples and an Honest Testing Method",
+    metaTitle: "LinkedIn Hooks That Capture Attention",
     description:
       "Learn how to write LinkedIn hooks that earn the expand: what the first two lines have to do, eight patterns with real examples, the formulas to avoid, and how to test hooks without fooling yourself.",
+    metaDescription:
+      "Discover effective LinkedIn post hooks, learn how to write attention-grabbing opening lines and improve the readability of your professional content.",
     publishedAt: "2026-11-01",
     category: "Writing",
     keywords: [
-      "linkedin hooks",
-      "how to write linkedin hooks",
-      "linkedin hook examples",
-      "linkedin post opening line",
+      "LinkedIn hooks",
+      "LinkedIn opening lines",
+      "LinkedIn post hooks examples",
+      "attention-grabbing LinkedIn headlines",
+      "LinkedIn writing tips",
+      "LinkedIn post ideas",
+      "LinkedIn copywriting",
+      "LinkedIn content engagement",
     ],
     cover: {
       src: "/blog/linkedin-hooks.jpg",
@@ -2516,15 +2669,22 @@ export const posts: BlogPost[] = [
     slug: "linkedin-engagement-rate-calculate-improve",
     title:
       "LinkedIn Engagement Rate: How to Calculate It, Read It Honestly, and Improve It",
+    metaTitle: "LinkedIn Engagement Rate",
     description:
       "How to calculate LinkedIn engagement rate properly, which denominator to use and why it changes the answer, why published benchmarks mislead, and the specific levers that move the number.",
+    metaDescription:
+      "Understand the LinkedIn engagement rate formula, calculate post engagement and discover practical ways to improve interactions with your audience.",
     publishedAt: "2026-11-01",
     category: "Analytics",
     keywords: [
-      "linkedin engagement rate",
-      "how to calculate linkedin engagement rate",
-      "good linkedin engagement rate",
-      "improve linkedin engagement",
+      "LinkedIn engagement rate",
+      "LinkedIn engagement rate formula",
+      "calculate LinkedIn engagement",
+      "LinkedIn engagement benchmark",
+      "improve LinkedIn engagement",
+      "LinkedIn post analytics",
+      "LinkedIn reactions and comments",
+      "engagement rate calculator",
     ],
     cover: {
       src: "/blog/engagement-rate.jpg",
@@ -2889,15 +3049,22 @@ export const posts: BlogPost[] = [
     slug: "linkedin-impressions-vs-reach-vs-engagement",
     title:
       "LinkedIn Impressions vs Reach vs Engagement: What Each One Actually Measures",
+    metaTitle: "LinkedIn Impressions vs Reach vs Engagement Explained",
     description:
       "A clear explanation of LinkedIn impressions, members reached and engagement — how LinkedIn defines each, how they relate, which to use for which decision, and the combinations that diagnose real problems.",
+    metaDescription:
+      "Understand the difference between LinkedIn impressions, reach and engagement, how these metrics work and which numbers matter when analysing posts.",
     publishedAt: "2026-11-01",
     category: "Analytics",
     keywords: [
-      "linkedin impressions vs reach",
-      "linkedin impressions vs reach vs engagement",
-      "what are linkedin impressions",
-      "linkedin members reached",
+      "LinkedIn impressions vs reach",
+      "LinkedIn reach vs engagement",
+      "LinkedIn impressions explained",
+      "LinkedIn engagement metrics",
+      "LinkedIn post analytics",
+      "LinkedIn content performance",
+      "social media reach metrics",
+      "LinkedIn analytics guide",
     ],
     sources: [
       {
@@ -3310,15 +3477,22 @@ export const posts: BlogPost[] = [
     slug: "linkedin-content-pillars-for-consultants",
     title:
       "LinkedIn Content Pillars for Consultants: How to Demonstrate Expertise Without Giving Away the Work",
+    metaTitle: "LinkedIn Content Pillars for Consultants",
     description:
       "Five content pillars built around a consulting buyer's real questions, how to balance them across a quarter, and how to publish evidence without breaching confidentiality or giving away your method.",
+    metaDescription:
+      "Discover effective LinkedIn content pillars for consultants, with ideas for educational posts, industry insights, personal branding and thought leadership.",
     publishedAt: "2026-11-01",
     category: "Strategy",
     keywords: [
-      "linkedin content pillars",
-      "linkedin content pillars for consultants",
-      "consultant linkedin strategy",
-      "linkedin content themes",
+      "LinkedIn content pillars for consultants",
+      "consultant LinkedIn strategy",
+      "LinkedIn content ideas for consultants",
+      "consultant personal branding",
+      "LinkedIn thought leadership",
+      "consulting marketing strategy",
+      "LinkedIn authority building",
+      "consultant content planning",
     ],
     cover: {
       src: "/blog/content-pillars.jpg",
@@ -3691,15 +3865,22 @@ export const posts: BlogPost[] = [
     slug: "repurpose-one-idea-multiple-linkedin-posts",
     title:
       "How to Repurpose One Idea Into Multiple LinkedIn Posts Without Becoming Repetitive",
+    metaTitle: "How to Repurpose One Idea into Multiple LinkedIn Posts",
     description:
       "A practical system for turning one strong idea into six or more LinkedIn posts: the source hierarchy, six distinct treatments, a worked example, and how to space repeats so the same thinking lands as depth rather than repetition.",
+    metaDescription:
+      "Learn how to turn one original idea into multiple LinkedIn posts using different formats, perspectives and content angles without repeating yourself.",
     publishedAt: "2026-11-01",
     category: "Writing",
     keywords: [
-      "repurpose linkedin content",
-      "turn one idea into multiple linkedin posts",
-      "linkedin content repurposing",
-      "linkedin post ideas",
+      "repurpose LinkedIn content",
+      "LinkedIn content repurposing",
+      "create multiple LinkedIn posts",
+      "LinkedIn content ideas",
+      "content repurposing strategy",
+      "LinkedIn post formats",
+      "B2B content marketing",
+      "LinkedIn content workflow",
     ],
     cover: {
       src: "/blog/repurpose-content.jpg",
@@ -4073,15 +4254,22 @@ export const posts: BlogPost[] = [
     slug: "linkedin-text-posts-vs-carousels-vs-video",
     title:
       "LinkedIn Text Posts vs Carousels vs Video: How to Choose the Right Format",
+    metaTitle: "LinkedIn Text Posts vs Carousels vs Video",
     description:
       "What text posts, document carousels and native video are each genuinely good at, what they cost to produce, the official limits to work within, and a simple decision rule for picking a format per idea.",
+    metaDescription:
+      "Compare LinkedIn text posts, carousels and videos to understand their strengths and choose content formats that suit your audience and goals.",
     publishedAt: "2026-11-01",
     category: "Writing",
     keywords: [
-      "linkedin text posts vs carousels vs video",
-      "linkedin post formats",
-      "linkedin carousel vs video",
-      "best linkedin post format",
+      "LinkedIn text posts vs carousels",
+      "LinkedIn video posts",
+      "LinkedIn carousel posts",
+      "LinkedIn content formats",
+      "best LinkedIn post format",
+      "LinkedIn content strategy",
+      "LinkedIn engagement formats",
+      "LinkedIn marketing content",
     ],
     sources: [
       {
@@ -4467,15 +4655,22 @@ export const posts: BlogPost[] = [
     slug: "linkedin-thought-leadership-without-posting-daily",
     title:
       "How to Build Thought Leadership on LinkedIn Without Posting Every Day",
+    metaTitle: "Build LinkedIn Thought Leadership Without Posting Daily",
     description:
       "Thought leadership is built on position and judgement, not volume. A low-frequency system for becoming known for something specific on LinkedIn — including where borrowed attention beats posting more.",
+    metaDescription:
+      "Learn how founders and consultants can build LinkedIn authority through valuable content, consistent publishing and meaningful engagement without daily posting.",
     publishedAt: "2026-11-01",
     category: "Strategy",
     keywords: [
-      "linkedin thought leadership",
-      "thought leadership on linkedin without posting daily",
-      "how to become a thought leader on linkedin",
-      "linkedin authority building",
+      "LinkedIn thought leadership",
+      "build authority on LinkedIn",
+      "LinkedIn personal branding",
+      "LinkedIn posting frequency",
+      "LinkedIn authority strategy",
+      "thought leadership content",
+      "founder personal branding",
+      "consultant LinkedIn growth",
     ],
     cover: {
       src: "/blog/thought-leadership.jpg",
@@ -4818,15 +5013,22 @@ export const posts: BlogPost[] = [
     slug: "linkedin-content-roi-b2b",
     title:
       "How to Measure LinkedIn Content ROI for B2B Businesses Without Faking the Numbers",
+    metaTitle: "How to Measure LinkedIn Content ROI for B2B Businesses",
     description:
       "A four-level model for measuring LinkedIn content ROI in B2B: what to track at each stage, an attribution approach you can defend, how to value time properly, and how to report it honestly to a board.",
+    metaDescription:
+      "Learn how to measure LinkedIn content ROI using engagement, website traffic, lead quality and business outcomes to improve your B2B content strategy.",
     publishedAt: "2026-11-01",
     category: "Analytics",
     keywords: [
-      "linkedin content roi",
-      "measure linkedin roi b2b",
-      "linkedin marketing roi",
-      "b2b content roi measurement",
+      "LinkedIn content ROI",
+      "LinkedIn marketing ROI",
+      "B2B LinkedIn marketing",
+      "measure LinkedIn performance",
+      "LinkedIn lead generation",
+      "LinkedIn analytics metrics",
+      "B2B content measurement",
+      "LinkedIn business growth",
     ],
     cover: {
       src: "/blog/content-roi.jpg",

@@ -59,13 +59,13 @@ lastmod 2026-11-01T09:53:26.185Z (×9)      ← build timestamp, fake freshness
 
 ### After (verified on the production build)
 ```
-https://zybble.com/                        ← 7 static routes, launch-dated, no auth routes
+https://zybble.com/                        ← 15 static routes, launch-dated, no auth routes
 https://zybble.com/blog/<slug> ×20         ← lastModified = article publish/revision date
-https://zybble.com/blog/category/<slug> ×4 ← lastModified = newest article in that category
 robots.txt → Sitemap: https://zybble.com/sitemap.xml
 ```
-- **31 entries total. Every URL is `https://zybble.com`.** Login, signup, dashboard, calendar, posts, analytics, settings, onboarding are excluded (and remain noindexed + robots-disallowed + `X-Robots-Tag`-protected).
-- `lastModified` is now derived from real content dates; rebuilds no longer fake freshness. Blog-index `lastModified` tracks the newest article; category archives track the newest article they contain.
+- **35 entries total. Every URL is `https://zybble.com`.** Login, signup, dashboard, calendar, posts, analytics, settings, onboarding are excluded (and remain noindexed + robots-disallowed + `X-Robots-Tag`-protected).
+- `lastModified` is derived from real content dates; rebuilds no longer fake freshness. Blog-index `lastModified` tracks the newest article.
+- **Category archives are deliberately not listed** (`/blog/category/<slug>`). They are thin aggregations of articles already in the sitemap, so listing both asks Google to pick between two URLs for the same intent. The archives stay live and reachable by internal links; they are just not submitted as first-class indexable URLs.
 - Regression-guarded by `e2e/public-site.spec.ts` (no auth paths, all `https://zybble.com/`, ≥20 entries, articles present).
 
 ---
@@ -94,7 +94,8 @@ Verified against the production build — **all 31 public URLs** (7 static + 20 
 - ✅ `<link rel="canonical">` present on every page, pointing at its own `https://zybble.com/…` URL (homepage canonical is `https://zybble.com`).
 - ✅ `meta robots` **absent (indexable)** on every public page; no stray `noindex`.
 - ✅ OG + Twitter card tags on every page (`og:title`, `og:description`, `og:url`, `og:image`, `article:published_time`/`modified_time` on articles, 1200×630 OG image verified present at `/og/og-image.png`).
-- ✅ Unique `<title>` per page via the root template (`%s · Zybble`).
+- ✅ Unique `<title>` per page, each now written individually and set with `title.absolute` so the root layout's `%s · Zybble` template cannot append a redundant brand suffix. The brand is carried by `og:site_name`, the favicon and the homepage `WebSite` structured data instead, which are what Google reads when deciding whether to label a result "Zybble" or print the bare host.
+- ✅ `meta keywords` on every page. Google has ignored these for ranking since 2009; they are present because they document each page's target queries, not because they move rankings.
 - Private surfaces (verified):
   - `/dashboard`, `/settings/*`, `/onboarding`, `/calendar`, `/posts`, `/analytics` → unauthenticated requests redirect (307) **with `X-Robots-Tag: noindex, nofollow`** header; authenticated app shell metadata also sets `noindex`.
   - `/login`, `/signup`, `/forgot-password`, `/reset-password` → **verified `noindex, nofollow` meta robots**; excluded from sitemap; disallowed in robots.txt; `no-store` cache headers via next.config.

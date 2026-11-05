@@ -9,14 +9,24 @@ import { Reveal } from "@/components/motion/reveal";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "About Zybble — the team behind the LinkedIn scheduler",
+  title: { absolute: "About Zybble" },
   description:
-    "Zybble is a focused LinkedIn scheduling and analytics workspace built in Pune, India. Read the story, the product philosophy and the founder behind it.",
+    "Discover Zybble's mission to simplify LinkedIn scheduling and analytics, and meet Tejas Sutar, the founder building a focused LinkedIn growth platform.",
+  keywords: [
+    "about Zybble",
+    "Zybble founder",
+    "LinkedIn scheduling company",
+    "LinkedIn analytics platform",
+    "LinkedIn productivity tools",
+    "LinkedIn SaaS platform",
+    "B2B content management",
+    "LinkedIn marketing software",
+  ],
   alternates: { canonical: "/about" },
   openGraph: {
     type: "website",
     url: `${siteConfig.url}/about`,
-    title: "About Zybble — the team behind the LinkedIn scheduler",
+    title: "About Zybble",
     description:
       "Why Zybble exists: a focused LinkedIn scheduler and analytics workspace for founders and consultants who publish seriously.",
   },

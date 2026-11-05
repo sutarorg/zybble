@@ -10,14 +10,24 @@ import { CharacterCounter } from "@/components/tools/character-counter";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "LinkedIn Character Counter — live count with post limits",
+  title: { absolute: "LinkedIn Character Counter" },
   description:
-    "Write LinkedIn posts with a live character and word counter. See LinkedIn's 3,000-character post limit, headline and comment limits at a glance, and copy your post when it is ready.",
+    "Count characters and words in your LinkedIn posts instantly with Zybble's free character counter. Write, edit and optimise your content before publishing.",
+  keywords: [
+    "LinkedIn character counter",
+    "LinkedIn post character limit",
+    "LinkedIn word counter",
+    "LinkedIn text counter",
+    "LinkedIn post length checker",
+    "LinkedIn writing tool",
+    "social media character counter",
+    "LinkedIn post editor",
+  ],
   alternates: { canonical: "/tools/linkedin-character-counter" },
   openGraph: {
     type: "website",
     url: `${siteConfig.url}/tools/linkedin-character-counter`,
-    title: "LinkedIn Character Counter — live count with post limits",
+    title: "LinkedIn Character Counter",
     description:
       "A clean writing surface with a live count against LinkedIn's real character limits — posts, headlines, comments and more.",
   },

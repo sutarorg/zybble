@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { categorySlug, getCategories, posts, postsByCategory } from "@/lib/blog";
+import { posts } from "@/lib/blog";
 import { siteConfig } from "@/lib/site";
 
 /**
@@ -61,18 +61,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     }));
 
-  const categoryEntries: MetadataRoute.Sitemap = getCategories().map((category) => {
-    const latest = postsByCategory(categorySlug(category)).reduce((max, post) => {
-      const changed = new Date(post.updatedAt ?? post.publishedAt);
-      return changed > max ? changed : max;
-    }, new Date(0));
-    return {
-      url: `${siteConfig.url}/blog/category/${categorySlug(category)}`,
-      lastModified: latest,
-      changeFrequency: "monthly" as const,
-      priority: 0.5,
-    };
-  });
-
-  return [...staticEntries, ...blogEntries, ...categoryEntries];
+  /**
+   * Category archives are intentionally NOT listed.
+   *
+   * They are thin, near-duplicate aggregations of the article pages already
+   * listed above — a full article body sits one click away from an archive
+   * that contains only an excerpt. Listing both asks Google to choose between
+   * two URLs for the same intent, which is how a site ends up with the weaker
+   * page ranking for its own queries.
+   *
+   * The archives remain navigable for readers and stay crawlable via the
+   * internal links in each article; they are simply not submitted as
+   * first-class indexable URLs.
+   */
+  return [...staticEntries, ...blogEntries];
 }

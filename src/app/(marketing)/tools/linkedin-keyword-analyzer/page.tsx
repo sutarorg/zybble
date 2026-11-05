@@ -10,14 +10,24 @@ import { KeywordAnalyzer } from "@/components/tools/keyword-analyzer";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "LinkedIn Keyword Analyzer — free post analysis, no signup",
+  title: { absolute: "LinkedIn Keyword Analyzer" },
   description:
-    "Analyse your LinkedIn post for keyword frequency, density and placement. Spot overused words, missing keywords and get concrete optimisation suggestions — computed in your browser, with no invented search volumes.",
+    "Analyse keywords in your LinkedIn posts, identify keyword frequency and discover content optimisation opportunities with Zybble's free analyzer.",
+  keywords: [
+    "LinkedIn keyword analyzer",
+    "LinkedIn keyword tool",
+    "LinkedIn post SEO",
+    "LinkedIn content optimisation",
+    "LinkedIn keyword research",
+    "LinkedIn post keywords",
+    "LinkedIn content analyzer",
+    "LinkedIn writing optimisation",
+  ],
   alternates: { canonical: "/tools/linkedin-keyword-analyzer" },
   openGraph: {
     type: "website",
     url: `${siteConfig.url}/tools/linkedin-keyword-analyzer`,
-    title: "LinkedIn Keyword Analyzer — free post analysis, no signup",
+    title: "LinkedIn Keyword Analyzer",
     description:
       "Real keyword frequency, density and placement analysis for your LinkedIn drafts — computed in your browser, with no fabricated search data.",
   },

@@ -11,14 +11,24 @@ import { CalendarPlanner } from "@/components/tools/calendar-planner";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Free LinkedIn Content Calendar Template — planner + CSV",
+  title: { absolute: "Free LinkedIn Content Calendar Template" },
   description:
-    "Plan a week or month of LinkedIn posts in minutes. Interactive weekly and monthly planner plus a free downloadable CSV template with date, topic, format and status fields.",
+    "Download a free LinkedIn content calendar template to plan post ideas, organise publishing dates, manage content formats and stay consistent.",
+  keywords: [
+    "LinkedIn content calendar template",
+    "free LinkedIn calendar",
+    "LinkedIn posting schedule template",
+    "LinkedIn content planner",
+    "monthly LinkedIn calendar",
+    "weekly LinkedIn planner",
+    "social media calendar template",
+    "LinkedIn content strategy template",
+  ],
   alternates: { canonical: "/resources/linkedin-content-calendar-template" },
   openGraph: {
     type: "website",
     url: `${siteConfig.url}/resources/linkedin-content-calendar-template`,
-    title: "Free LinkedIn Content Calendar Template — planner + CSV",
+    title: "Free LinkedIn Content Calendar Template",
     description:
       "An interactive weekly and monthly LinkedIn content planner with a free CSV download — no email gate.",
   },

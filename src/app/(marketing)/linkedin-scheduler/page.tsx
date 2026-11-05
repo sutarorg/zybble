@@ -13,9 +13,24 @@ import { Reveal } from "@/components/motion/reveal";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "LinkedIn Scheduler — plan a week of posts in one sitting",
+  /**
+   * `absolute` overrides the `%s · Zybble` template in the root layout. These
+   * titles are specified per page and several already carry the brand, so a
+   * blind suffix would both truncate in the SERP and print it twice.
+   */
+  title: { absolute: "LinkedIn Post Scheduler" },
   description:
-    "Zybble's LinkedIn scheduler: a clean composer, unlimited drafts, a visual content calendar and automatic publishing through the official LinkedIn API. Free plan includes 10 scheduled posts a month.",
+    "Schedule LinkedIn posts effortlessly with Zybble. Plan content, manage drafts, organise your publishing calendar and stay consistent on LinkedIn.",
+  keywords: [
+    "LinkedIn post scheduler",
+    "LinkedIn scheduler",
+    "schedule LinkedIn posts",
+    "LinkedIn scheduling tool",
+    "LinkedIn content scheduler",
+    "LinkedIn post planner",
+    "LinkedIn publishing software",
+    "social media scheduling for LinkedIn",
+  ],
   alternates: { canonical: "/linkedin-scheduler" },
 };
 

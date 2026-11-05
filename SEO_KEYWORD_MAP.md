@@ -16,13 +16,14 @@ Purpose: assign every target query exactly **one primary URL** so product pages 
 | **Product pages** | All commercial investigation & transactional queries ("tool", "software", "scheduler", "pricing", "for teams/agencies") | "linkedin post scheduler", "linkedin analytics tool" |
 | **Pricing page** | Cost/purchase-intent modifiers | "linkedin scheduler pricing", "free linkedin scheduling tool" |
 | **Blog articles** | Informational queries (how/what/why/when/best-time) | "best time to post on linkedin", "linkedin engagement rate" |
-| **Category archives** | Browsable topical heads — never targeted individually | /blog/category/analytics |
+| **Category archives** | Browsable topical heads — never targeted individually, and **not in the sitemap** (see rule 5) | /blog/category/analytics |
 
 **Rules enforced across the site**
 1. A query gets exactly one primary URL (tables below). Secondary URLs may mention the topic but must not re-target the head term.
 2. Every blog article ends its commercial sections by linking the relevant product page (with the product page's target query as anchor where natural).
 3. Product pages link down to their supporting blog articles (depth + topical authority), never the reverse for the primary term.
-4. Title pattern: product pages = "{Product} — {benefit}"; articles = natural-language query phrasing.
+4. Title pattern: **every page carries its own specified title**, set with `title.absolute` so the root layout's `%s · Zybble` template does not append a brand suffix. Titles are short enough to survive Google's ~60-character truncation. Where a title already contains "Zybble" (pricing, about, contact, security, privacy, terms, blog index) it does so because the query is brand-led.
+5. **Category archives are not in the XML sitemap.** They aggregate articles that are already listed, so submitting both would ask Google to choose between two URLs for the same intent. The archives remain reachable by internal links for readers.
 
 ---
 

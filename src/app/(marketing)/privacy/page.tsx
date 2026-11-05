@@ -5,9 +5,19 @@ import { Reveal } from "@/components/motion/reveal";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy",
+  title: { absolute: "Zybble Privacy Policy" },
   description:
-    "How Zybble collects, uses and protects your data — LinkedIn tokens, analytics data and account information.",
+    "Read Zybble's privacy policy to understand how personal information, account data, LinkedIn connections and usage information are collected and handled.",
+  keywords: [
+    "Zybble privacy policy",
+    "Zybble data privacy",
+    "LinkedIn data privacy",
+    "personal information protection",
+    "SaaS privacy policy",
+    "user data management",
+    "account information privacy",
+    "data handling policy",
+  ],
   alternates: { canonical: "/privacy" },
 };
 

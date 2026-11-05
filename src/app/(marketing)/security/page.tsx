@@ -9,14 +9,24 @@ import { Reveal } from "@/components/motion/reveal";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Security at Zybble — accounts, data and the LinkedIn integration",
+  title: { absolute: "Zybble Security" },
   description:
-    "How Zybble protects your account and data: authentication, encryption of LinkedIn tokens, least-privilege database access and the official-API-only LinkedIn integration.",
+    "Learn how Zybble protects account information and handles LinkedIn integrations, authentication, application security and customer data.",
+  keywords: [
+    "Zybble security",
+    "LinkedIn account security",
+    "SaaS data protection",
+    "secure LinkedIn integration",
+    "LinkedIn OAuth security",
+    "customer data protection",
+    "SaaS application security",
+    "secure social media management",
+  ],
   alternates: { canonical: "/security" },
   openGraph: {
     type: "website",
     url: `${siteConfig.url}/security`,
-    title: "Security at Zybble — accounts, data and the LinkedIn integration",
+    title: "Zybble Security",
     description:
       "Authentication, encrypted LinkedIn tokens, least-privilege data access and an official-API-only integration — explained plainly.",
   },
