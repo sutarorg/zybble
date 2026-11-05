@@ -122,6 +122,20 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        /**
+         * /admin is the platform-owner surface. `noindex` at the header level
+         * as well as in the page metadata, because a crawler that ignores meta
+         * tags should still be told. It is also absent from sitemap.xml — that
+         * file is built from an explicit allowlist of public routes, so nothing
+         * private can appear there by omission.
+         */
+        source: "/admin(/.*)?$",
+        headers: [
+          { key: "Cache-Control", value: "no-store, must-revalidate" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
+      {
         source: "/api/:path*",
         headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
       },

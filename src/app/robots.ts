@@ -11,6 +11,9 @@ export default function robots(): MetadataRoute.Robots {
       // still never be told the paths exist.
       disallow: [
         "/api/",
+        // The admin console. Authorisation is what protects it — this entry
+        // only keeps well-behaved crawlers from indexing the surface at all.
+        "/admin",
         "/dashboard",
         "/calendar",
         "/posts",
