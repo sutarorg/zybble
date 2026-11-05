@@ -110,6 +110,25 @@ const schema = z.object({
   TOKEN_ENCRYPTION_KEY: z.string().optional(),
   TOKEN_ENCRYPTION_KEY_PREVIOUS: z.string().optional(),
   CRON_SECRET: z.string().optional(),
+
+  // Platform administration -------------------------------------------------
+  /**
+   * Comma-separated Supabase Auth user UUIDs allowed to open `/admin`.
+   *
+   * This is the *only* thing that grants platform-admin access. Deliberately
+   * not a database column, not `user_metadata` and not a workspace role:
+   *
+   *  - `user_metadata` is writable by the user it describes, so it can be
+   *    edited by anyone holding their own access token;
+   *  - a database column would let a compromised service-role key, or any
+   *    future write path, promote an account;
+   *  - a workspace role is a per-tenant concept and says nothing about who
+   *    owns the platform.
+   *
+   * Left unset, it yields an empty allowlist and `/admin` denies everyone —
+   * the fail-closed default. See `src/lib/admin/access.ts`.
+   */
+  ZYBBLE_ADMIN_USER_IDS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

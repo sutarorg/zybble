@@ -953,6 +953,15 @@ DATABASE_POOL_MAX=5
 # Optional override for links in transactional email (defaults to NEXT_PUBLIC_SITE_URL).
 APP_URL=https://zybble.com
 
+# Comma-separated Supabase Auth user UUIDs allowed to open /admin, the
+# read-only platform dashboard. Find a UUID at
+# Supabase → Authentication → Users → click the row → "User UID".
+#
+# Unset means /admin denies EVERYONE, including you — the check fails closed.
+# Admin access is deliberately not derived from user_metadata, an email domain
+# or a workspace role, since an account holder could set any of those.
+ZYBBLE_ADMIN_USER_IDS=
+
 # --- LinkedIn -------------------------------------------------------------
 LINKEDIN_CLIENT_ID=
 LINKEDIN_CLIENT_SECRET=

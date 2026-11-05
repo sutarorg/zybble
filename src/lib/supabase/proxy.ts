@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isPlatformAdmin } from "@/lib/admin/access";
+import { forbiddenResponse } from "@/lib/admin/forbidden-page";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/env";
 
 /**
@@ -29,6 +31,19 @@ const PROTECTED_PREFIXES = [
   "/onboarding",
 ];
 const AUTH_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password"];
+
+/**
+ * The platform-admin surface. Kept out of `PROTECTED_PREFIXES` because it
+ * needs a different outcome: an ordinary protected path redirects anonymous
+ * visitors to /login, but `/admin` must additionally reject *signed-in*
+ * non-admins with a real 403 rather than redirecting them somewhere they are
+ * allowed to be.
+ */
+const ADMIN_PREFIX = "/admin";
+
+function isAdminPath(pathname: string): boolean {
+  return pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`);
+}
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
@@ -73,6 +88,13 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // When Supabase is not configured, fail open on public routes and closed on
   // protected ones with a clear redirect to /login instead of a 500 loop.
   if (!isSupabaseConfigured()) {
+    if (isAdminPath(request.nextUrl.pathname)) {
+      // No auth means no verified identity, so there is nobody who could be
+      // an admin. Deny rather than redirect: a redirect here would send an
+      // unauthenticated visitor to a login page that cannot work either.
+      return forbiddenResponse();
+    }
+
     if (isProtected(request.nextUrl.pathname)) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
@@ -108,6 +130,26 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const { pathname } = request.nextUrl;
 
   if (isExempt(pathname)) {
+    return supabaseResponse;
+  }
+
+  /**
+   * Admin gate, checked before the generic protection below.
+   *
+   * This is the only place a page request can be answered with a true 403 —
+   * a Server Component that renders a "denied" panel would still return 200.
+   * `/admin`'s own layout re-checks independently, so the page tree is safe
+   * even if this rule is ever removed, but the status code lives here.
+   */
+  if (isAdminPath(pathname)) {
+    if (!user) {
+      return safeRedirect(request, "/login", { next: safeRelativePath(pathname) });
+    }
+
+    if (!isPlatformAdmin(user.id)) {
+      return forbiddenResponse();
+    }
+
     return supabaseResponse;
   }
 
