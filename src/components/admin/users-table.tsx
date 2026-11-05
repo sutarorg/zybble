@@ -1,12 +1,26 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { DataTable, EmptyRow, StatusPill, Td, Th } from "@/components/admin/primitives";
-import { Pagination, FilterSelect, SearchInput, TableToolbar } from "@/components/admin/table-controls";
+import { UserX, Users } from "lucide-react";
+import {
+  DataTable,
+  EmptyRow,
+  SkeletonRows,
+  StatusPill,
+  Td,
+  Th,
+} from "@/components/admin/primitives";
+import {
+  Pagination,
+  FilterSelect,
+  SearchInput,
+  TableToolbar,
+} from "@/components/admin/table-controls";
 import { useAdminList } from "@/components/admin/use-admin-list";
 import { formatDate } from "@/features/admin/format";
 import type { AdminUserRow } from "@/features/admin/types";
 import type { UserStatusFilter } from "@/features/admin/users";
+import { cn } from "@/lib/utils";
 
 /**
  * Platform user table.
@@ -41,6 +55,8 @@ const STATUS_LABEL = {
   deleted: "Deleted",
 } as const;
 
+const COLUMNS = 5;
+
 export function UsersTable() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<UserStatusFilter>("all");
@@ -67,6 +83,9 @@ export function UsersTable() {
     perPage: PER_PAGE,
   });
 
+  const firstLoad = data === null;
+  const filtered = search !== "" || status !== "all";
+
   return (
     <>
       <TableToolbar>
@@ -85,10 +104,15 @@ export function UsersTable() {
       </TableToolbar>
 
       {error ? (
-        <p className="px-4 py-10 text-center text-[13px] text-red-600">{error}</p>
+        <p className="px-5 py-10 text-center text-[13px] text-red-600">{error}</p>
       ) : (
         <>
-          <DataTable className={loading ? "opacity-60 transition-opacity" : undefined}>
+          <DataTable
+            className={cn(
+              "transition-opacity duration-200",
+              loading && !firstLoad && "opacity-60",
+            )}
+          >
             <thead>
               <tr>
                 <Th>Name</Th>
@@ -99,11 +123,11 @@ export function UsersTable() {
               </tr>
             </thead>
             <tbody>
-              {data === null ? (
-                <EmptyRow colSpan={5}>Loading…</EmptyRow>
+              {firstLoad ? (
+                <SkeletonRows rows={8} columns={COLUMNS} />
               ) : data.rows.length === 0 ? (
-                <EmptyRow colSpan={5}>
-                  {search || status !== "all"
+                <EmptyRow colSpan={COLUMNS} icon={filtered ? UserX : Users}>
+                  {filtered
                     ? "No users match this search."
                     : "No registered users yet."}
                 </EmptyRow>
@@ -148,6 +172,7 @@ export function UsersTable() {
             total={data?.total ?? 0}
             perPage={PER_PAGE}
             onPage={setPage}
+            loading={loading}
           />
         </>
       )}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Users } from "lucide-react";
 import { PageHeader, Panel } from "@/components/admin/primitives";
 import { UsersTable } from "@/components/admin/users-table";
 
@@ -21,7 +22,7 @@ export default function AdminUsersPage() {
         description="Every registered account, with the workspaces they belong to. Read-only — accounts cannot be modified from here."
       />
 
-      <Panel className="mt-6" padded={false}>
+      <Panel className="mt-6" icon={Users} padded={false}>
         <UsersTable />
       </Panel>
     </>

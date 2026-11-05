@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CreditCard, Layers, TrendingUp, Wallet, Zap } from "lucide-react";
 import {
   DataTable,
   EmptyRow,
@@ -47,6 +48,24 @@ function subscriptionTone(status: string): "success" | "warning" | "danger" | "n
   return "neutral";
 }
 
+/** A label/value row used by the three breakdown panels. */
+function BreakdownRow({
+  label,
+  value,
+  pill,
+}: {
+  label: string;
+  value: string;
+  pill?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      {pill ?? <dt className="text-[13px] text-slate-600">{label}</dt>}
+      <dd className="shrink-0 text-[13px] font-medium text-slate-900 tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
 export default async function AdminBillingPage() {
   const result = await safeLoad("admin.billing.failed", loadBilling);
 
@@ -54,8 +73,8 @@ export default async function AdminBillingPage() {
     return (
       <>
         <PageHeader title="Billing" description="Plans, subscriptions and recurring revenue." />
-        <Panel className="mt-6">
-          <p className="text-[13px] text-slate-600">{result.message}</p>
+        <Panel className="mt-6" icon={CreditCard}>
+          <p className="text-[13px] leading-6 text-slate-600">{result.message}</p>
         </Panel>
       </>
     );
@@ -69,30 +88,36 @@ export default async function AdminBillingPage() {
         title="Billing"
         description="Revenue is summed only from provider-verified subscription amounts. Payment card details are never loaded."
       >
-        <p className="text-[11px] text-slate-400">Generated {formatDate(billing.generatedAt)}</p>
+        <p className="text-[11px] leading-4 text-slate-400">
+          Generated {formatDate(billing.generatedAt)}
+        </p>
       </PageHeader>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="Monthly recurring revenue"
           value={formatMoney(billing.revenue.mrrCents, billing.revenue.currency)}
           hint={`${formatNumber(billing.revenue.counted)} verified subscriptions`}
+          icon={TrendingUp}
           accent
         />
         <StatTile
           label="Active subscriptions"
           value={formatNumber(billing.subscriptions.active)}
           hint={`${formatNumber(billing.seats.billable)} billable seats`}
+          icon={CreditCard}
         />
         <StatTile
           label="Pro workspaces"
           value={formatNumber(billing.plans.pro)}
           hint={`${formatNumber(billing.plans.free)} on Free`}
+          icon={Zap}
         />
         <StatTile
           label="Collected to date"
           value={formatMoney(billing.payments.collectedCents)}
           hint={`${formatNumber(billing.payments.paid)} successful payments`}
+          icon={Wallet}
         />
       </div>
 
@@ -100,6 +125,7 @@ export default async function AdminBillingPage() {
         <Panel
           title="Plan breakdown"
           description="Effective plan, derived from the subscription row."
+          icon={Layers}
         >
           <dl className="space-y-2.5">
             {[
@@ -107,12 +133,11 @@ export default async function AdminBillingPage() {
               { label: "Pro", value: billing.plans.pro },
               { label: "Total workspaces", value: billing.plans.total },
             ].map((row) => (
-              <div key={row.label} className="flex items-center justify-between">
-                <dt className="text-[13px] text-slate-600">{row.label}</dt>
-                <dd className="text-[13px] font-medium text-slate-900 tabular-nums">
-                  {formatNumber(row.value)}
-                </dd>
-              </div>
+              <BreakdownRow
+                key={row.label}
+                label={row.label}
+                value={formatNumber(row.value)}
+              />
             ))}
           </dl>
         </Panel>
@@ -120,20 +145,23 @@ export default async function AdminBillingPage() {
         <Panel
           title="Subscription status"
           description="Every status present in the table, most common first."
+          icon={CreditCard}
         >
           {billing.subscriptions.byStatus.length === 0 ? (
-            <p className="text-[13px] text-slate-500">No subscription records yet.</p>
+            <p className="text-[13px] leading-6 text-slate-500">No subscription records yet.</p>
           ) : (
             <dl className="space-y-2.5">
               {billing.subscriptions.byStatus.map((row) => (
-                <div key={row.status} className="flex items-center justify-between gap-3">
-                  <dt>
-                    <StatusPill tone={subscriptionTone(row.status)}>{row.status}</StatusPill>
-                  </dt>
-                  <dd className="text-[13px] font-medium text-slate-900 tabular-nums">
-                    {formatNumber(row.count)}
-                  </dd>
-                </div>
+                <BreakdownRow
+                  key={row.status}
+                  label={row.status}
+                  value={formatNumber(row.count)}
+                  pill={
+                    <dt>
+                      <StatusPill tone={subscriptionTone(row.status)}>{row.status}</StatusPill>
+                    </dt>
+                  }
+                />
               ))}
             </dl>
           )}
@@ -146,7 +174,7 @@ export default async function AdminBillingPage() {
           ) : null}
         </Panel>
 
-        <Panel title="Payments" description="Outcome of recorded payment events.">
+        <Panel title="Payments" description="Outcome of recorded payment events." icon={Wallet}>
           <dl className="space-y-2.5">
             {(
               [
@@ -156,21 +184,23 @@ export default async function AdminBillingPage() {
                 ["pending", billing.payments.pending],
               ] as const
             ).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between">
-                <dt>
-                  <StatusPill tone={PAYMENT_TONE[status]}>{status}</StatusPill>
-                </dt>
-                <dd className="text-[13px] font-medium text-slate-900 tabular-nums">
-                  {formatNumber(count)}
-                </dd>
-              </div>
+              <BreakdownRow
+                key={status}
+                label={status}
+                value={formatNumber(count)}
+                pill={
+                  <dt>
+                    <StatusPill tone={PAYMENT_TONE[status]}>{status}</StatusPill>
+                  </dt>
+                }
+              />
             ))}
           </dl>
         </Panel>
       </div>
 
       {billing.revenue.unpriced > 0 || billing.revenue.otherCurrency > 0 ? (
-        <Panel className="mt-4" title="Revenue notes">
+        <Panel className="mt-4" title="Revenue notes" icon={TrendingUp}>
           <ul className="space-y-1.5 text-[12px] leading-5 text-slate-600">
             {billing.revenue.unpriced > 0 ? (
               <li>
@@ -184,8 +214,9 @@ export default async function AdminBillingPage() {
               <li>
                 {formatNumber(billing.revenue.otherCurrency)} subscription
                 {billing.revenue.otherCurrency === 1 ? " is" : "s are"} billed in a currency
-                other than {billing.revenue.currency} and {billing.revenue.otherCurrency === 1 ? "is" : "are"}{" "}
-                still summed at face value — verify before quoting the figure.
+                other than {billing.revenue.currency} and{" "}
+                {billing.revenue.otherCurrency === 1 ? "is" : "are"} still summed at face value
+                — verify before quoting the figure.
               </li>
             ) : null}
           </ul>
@@ -195,6 +226,7 @@ export default async function AdminBillingPage() {
       <Panel
         title="Subscriptions"
         description="Renewal dates, seat counts and provider-reported amounts."
+        icon={CreditCard}
         className="mt-4"
         padded={false}
       >
@@ -212,7 +244,7 @@ export default async function AdminBillingPage() {
           </thead>
           <tbody>
             {billing.subscriptionsList.length === 0 ? (
-              <EmptyRow colSpan={7}>
+              <EmptyRow colSpan={7} icon={CreditCard}>
                 No subscription records yet. Subscriptions appear once the first payment
                 webhook is processed.
               </EmptyRow>

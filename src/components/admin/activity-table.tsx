@@ -1,11 +1,25 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { DataTable, EmptyRow, StatusPill, Td, Th } from "@/components/admin/primitives";
-import { Pagination, FilterSelect, SearchInput, TableToolbar } from "@/components/admin/table-controls";
+import { Activity, SearchX } from "lucide-react";
+import {
+  DataTable,
+  EmptyRow,
+  SkeletonRows,
+  StatusPill,
+  Td,
+  Th,
+} from "@/components/admin/primitives";
+import {
+  Pagination,
+  FilterSelect,
+  SearchInput,
+  TableToolbar,
+} from "@/components/admin/table-controls";
 import { useAdminList } from "@/components/admin/use-admin-list";
 import { formatDateTime, humaniseAction } from "@/features/admin/format";
 import type { AdminActivityRow } from "@/features/admin/types";
+import { cn } from "@/lib/utils";
 
 /**
  * Audit trail.
@@ -30,6 +44,8 @@ const ACTOR_TONE = {
   system: "neutral",
   webhook: "warning",
 } as const;
+
+const COLUMNS = 5;
 
 function summarise(metadata: Record<string, unknown> | null): string {
   if (!metadata) return "";
@@ -68,6 +84,9 @@ export function ActivityTable() {
     perPage: PER_PAGE,
   });
 
+  const firstLoad = data === null;
+  const filtered = search !== "" || actorType !== "all";
+
   return (
     <>
       <TableToolbar>
@@ -86,10 +105,15 @@ export function ActivityTable() {
       </TableToolbar>
 
       {error ? (
-        <p className="px-4 py-10 text-center text-[13px] text-red-600">{error}</p>
+        <p className="px-5 py-10 text-center text-[13px] text-red-600">{error}</p>
       ) : (
         <>
-          <DataTable className={loading ? "opacity-60 transition-opacity" : undefined}>
+          <DataTable
+            className={cn(
+              "transition-opacity duration-200",
+              loading && !firstLoad && "opacity-60",
+            )}
+          >
             <thead>
               <tr>
                 <Th>When</Th>
@@ -100,11 +124,11 @@ export function ActivityTable() {
               </tr>
             </thead>
             <tbody>
-              {data === null ? (
-                <EmptyRow colSpan={5}>Loading…</EmptyRow>
+              {firstLoad ? (
+                <SkeletonRows rows={8} columns={COLUMNS} />
               ) : data.rows.length === 0 ? (
-                <EmptyRow colSpan={5}>
-                  {search || actorType !== "all"
+                <EmptyRow colSpan={COLUMNS} icon={filtered ? SearchX : Activity}>
+                  {filtered
                     ? "No audit entries match this search."
                     : "No audit entries recorded yet."}
                 </EmptyRow>
@@ -141,6 +165,7 @@ export function ActivityTable() {
             total={data?.total ?? 0}
             perPage={PER_PAGE}
             onPage={setPage}
+            loading={loading}
           />
         </>
       )}

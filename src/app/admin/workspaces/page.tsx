@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Building2 } from "lucide-react";
 import { PageHeader, Panel } from "@/components/admin/primitives";
 import { WorkspacesTable } from "@/components/admin/workspaces-table";
 
@@ -21,7 +22,7 @@ export default function AdminWorkspacesPage() {
         description="Every workspace on the platform, with its owner, effective plan and connected accounts. Read-only."
       />
 
-      <Panel className="mt-6" padded={false}>
+      <Panel className="mt-6" icon={Building2} padded={false}>
         <WorkspacesTable />
       </Panel>
     </>
