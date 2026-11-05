@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { AccessDenied } from "@/components/admin/access-denied";
 import { AdminMobileNav } from "@/components/admin/admin-mobile-nav";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { gateAdminPage } from "@/features/admin/guard";
+import { adminCount } from "@/lib/admin/access";
 
 /**
  * `/admin` shell.
@@ -16,8 +18,10 @@ import { gateAdminPage } from "@/features/admin/guard";
  *  2. This layout re-checks with `gateAdminPage()`, so the pages underneath
  *     are safe even if the proxy rule is ever removed or narrowed.
  *
- * The children are server components that call the admin services directly.
- * They are only reachable once both gates have passed.
+ * The structure mirrors the workspace shell in `src/app/(app)/layout.tsx` —
+ * fixed rail, sticky topbar, `max-w-7xl` content — so the two read as one
+ * product. The children are server components that call the admin services
+ * directly; they are only reachable once both gates have passed.
  */
 
 export const metadata: Metadata = {
@@ -37,17 +41,20 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     return <AccessDenied />;
   }
 
+  const operatorEmail = gate.user.email ?? null;
+
   return (
-    <div className="min-h-screen bg-slate-50/40">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] border-r border-slate-200 bg-white lg:block">
-        <AdminSidebar />
+    <div className="min-h-screen bg-white">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] border-r border-slate-200 lg:block">
+        <AdminSidebar operatorEmail={operatorEmail} adminCount={adminCount()} />
       </aside>
 
-      <div className="lg:pl-[248px]">
-        <div className="mx-auto max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <div className="lg:pl-[264px]">
+        <AdminTopbar />
+        <div className="lg:hidden">
           <AdminMobileNav />
-          <div className="pt-5 lg:pt-0">{children}</div>
         </div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
       </div>
     </div>
   );

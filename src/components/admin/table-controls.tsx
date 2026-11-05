@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 /**
  * Controls shared by the admin tables.
@@ -17,7 +18,14 @@ import {
  * Search is debounced so each keystroke does not become a request; the page
  * resets to 1 whenever the term changes, because staying on page 4 of a
  * narrower result set usually lands on an empty page.
+ *
+ * Controls use `ring-1` rather than `border` to match the rest of the shell —
+ * a ring is drawn outside the box, so the controls cannot shift by a pixel
+ * between states.
  */
+
+const CONTROL_RING =
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600";
 
 export function SearchInput({
   defaultValue = "",
@@ -77,7 +85,7 @@ export function SearchInput({
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         placeholder={placeholder}
-        className="h-9 pl-9 text-[13px]"
+        className={cn("h-9 pl-9 text-[13px]", CONTROL_RING)}
       />
     </div>
   );
@@ -96,7 +104,10 @@ export function FilterSelect<T extends string>({
 }) {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as T)}>
-      <SelectTrigger className="h-9 w-full text-[13px] sm:w-40" aria-label={label}>
+      <SelectTrigger
+        className={cn("h-9 w-full text-[13px] sm:w-44", CONTROL_RING)}
+        aria-label={label}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -110,18 +121,23 @@ export function FilterSelect<T extends string>({
   );
 }
 
+const PAGE_BUTTON =
+  "inline-flex size-8 items-center justify-center rounded-lg bg-white text-slate-600 ring-1 ring-slate-200 shadow-xs transition-colors hover:bg-slate-50 hover:text-slate-900 hover:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white disabled:hover:ring-slate-200";
+
 export function Pagination({
   page,
   pageCount,
   total,
   perPage,
   onPage,
+  loading = false,
 }: {
   page: number;
   pageCount: number;
   total: number;
   perPage: number;
   onPage: (next: number) => void;
+  loading?: boolean;
 }) {
   if (total === 0) return null;
 
@@ -129,8 +145,13 @@ export function Pagination({
   const last = Math.min(page * perPage, total);
 
   return (
-    <div className="flex items-center justify-between gap-4 border-t border-slate-100 px-4 py-3">
-      <p className="text-[12px] text-slate-500 tabular-nums">
+    <div className="flex items-center justify-between gap-4 border-t border-slate-100 px-4 py-3 sm:px-5">
+      <p className="flex items-center gap-2 text-[12px] text-slate-500 tabular-nums">
+        {/* Spins beside the count rather than replacing it, so the row never
+            changes width while a page loads. */}
+        {loading ? (
+          <Loader2 className="size-3.5 animate-spin text-brand-600" aria-hidden />
+        ) : null}
         {first}–{last} of {total}
       </p>
       <div className="flex items-center gap-1">
@@ -138,7 +159,7 @@ export function Pagination({
           type="button"
           onClick={() => onPage(page - 1)}
           disabled={page <= 1}
-          className="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className={cn(PAGE_BUTTON, CONTROL_RING)}
           aria-label="Previous page"
         >
           <ChevronLeft className="size-4" aria-hidden />
@@ -150,7 +171,7 @@ export function Pagination({
           type="button"
           onClick={() => onPage(page + 1)}
           disabled={page >= pageCount}
-          className="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className={cn(PAGE_BUTTON, CONTROL_RING)}
           aria-label="Next page"
         >
           <ChevronRight className="size-4" aria-hidden />
@@ -162,7 +183,7 @@ export function Pagination({
 
 export function TableToolbar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 border-b border-slate-200 p-3 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-3 border-b border-slate-200/70 p-4 sm:flex-row sm:items-center sm:px-5">
       {children}
     </div>
   );

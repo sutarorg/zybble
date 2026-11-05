@@ -1,4 +1,12 @@
 import type { Metadata } from "next";
+import {
+  Activity,
+  Clock,
+  FileWarning,
+  ShieldCheck,
+  Webhook,
+  XCircle,
+} from "lucide-react";
 import { ActivityTable } from "@/components/admin/activity-table";
 import {
   DataTable,
@@ -66,8 +74,8 @@ export default async function AdminSystemPage() {
           title="System & activity"
           description="Configuration status, operational health and the audit trail."
         />
-        <Panel className="mt-6">
-          <p className="text-[13px] text-slate-600">{result.message}</p>
+        <Panel className="mt-6" icon={Activity}>
+          <p className="text-[13px] leading-6 text-slate-600">{result.message}</p>
         </Panel>
       </>
     );
@@ -81,31 +89,35 @@ export default async function AdminSystemPage() {
         title="System & activity"
         description="Configuration state only — no credentials, keys or raw provider payloads are ever loaded."
       >
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] leading-4 text-slate-400">
           Generated {formatDateTime(system.generatedAt)}
         </p>
       </PageHeader>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="Failed webhooks (24h)"
           value={formatNumber(system.webhooks.failedLast24h)}
           hint={`${formatNumber(system.webhooks.unverifiedSignature)} with unverified signature`}
+          icon={Webhook}
         />
         <StatTile
           label="Failed publish attempts (24h)"
           value={formatNumber(system.jobs.publishAttemptsFailedLast24h)}
           hint="From post_publish_attempts"
+          icon={XCircle}
         />
         <StatTile
           label="Posts in failed state"
           value={formatNumber(system.jobs.postsFailed)}
           hint="Awaiting retry or edit"
+          icon={FileWarning}
         />
         <StatTile
           label="Posts stuck publishing"
           value={formatNumber(system.jobs.postsPublishing)}
           hint="A job died without recording an outcome"
+          icon={Clock}
         />
       </div>
 
@@ -113,6 +125,7 @@ export default async function AdminSystemPage() {
         className="mt-4"
         title="Admin access"
         description="Who may open this dashboard. The allowlist is environment configuration, not a database value."
+        icon={ShieldCheck}
       >
         <dl className="space-y-2.5">
           <div className="flex items-center justify-between gap-4">
@@ -142,7 +155,9 @@ export default async function AdminSystemPage() {
           {system.access.invalidEntries.length > 0
             ? ` ${system.access.invalidEntries.length} configured ${
                 system.access.invalidEntries.length === 1 ? "entry is" : "entries are"
-              } not a valid UUID and ${system.access.invalidEntries.length === 1 ? "was" : "were"} ignored.`
+              } not a valid UUID and ${
+                system.access.invalidEntries.length === 1 ? "was" : "were"
+              } ignored.`
             : ""}
         </p>
       </Panel>
@@ -151,6 +166,7 @@ export default async function AdminSystemPage() {
         className="mt-4"
         title="Integration status"
         description="Configuration state, using the same predicates the app gates features on."
+        icon={Activity}
       >
         <ul className="divide-y divide-slate-100">
           {system.integrations.map((integration) => (
@@ -176,9 +192,12 @@ export default async function AdminSystemPage() {
         <Panel
           title="Webhooks"
           description="Counts by processing status. Payload bodies are never loaded."
+          icon={Webhook}
         >
           {system.webhooks.byStatus.length === 0 ? (
-            <p className="text-[13px] text-slate-500">No webhook events recorded yet.</p>
+            <p className="text-[13px] leading-6 text-slate-500">
+              No webhook events recorded yet.
+            </p>
           ) : (
             <dl className="space-y-2.5">
               {system.webhooks.byStatus.map((row) => (
@@ -208,6 +227,7 @@ export default async function AdminSystemPage() {
         <Panel
           title="Recent webhook events"
           description="Error text is truncated and redacted server-side."
+          icon={Webhook}
           padded={false}
         >
           <DataTable>
@@ -220,7 +240,9 @@ export default async function AdminSystemPage() {
             </thead>
             <tbody>
               {system.webhooks.recent.length === 0 ? (
-                <EmptyRow colSpan={3}>No webhook events yet.</EmptyRow>
+                <EmptyRow colSpan={3} icon={Webhook}>
+                  No webhook events yet.
+                </EmptyRow>
               ) : (
                 system.webhooks.recent.map((event) => (
                   <tr key={event.eventId}>
@@ -262,6 +284,7 @@ export default async function AdminSystemPage() {
         className="mt-4"
         title="Audit activity"
         description="Every privileged action recorded by the product, newest first."
+        icon={Activity}
         padded={false}
       >
         <ActivityTable />

@@ -1,12 +1,19 @@
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 /**
  * Shared admin presentation primitives.
  *
- * Small and deliberately few. The visual language is the one already used by
- * the product: white surfaces, `slate-200` borders, a single blue accent, and
- * tabular numerals so columns of figures line up.
+ * The surfaces here intentionally copy the product's own: `rounded-2xl
+ * bg-white ring-1 ring-slate-200 shadow-xs`. The design system prefers
+ * `ring-1` over `border` on cards because a ring is drawn outside the box and
+ * cannot shift layout, and it keeps the internal console reading as part of
+ * the same product rather than a second skin.
+ *
+ * Only one saturated blue appears per viewport — `brand-600` — used for the
+ * accent figure and the active navigation row. Everything else is slate.
  */
 
 export function PageHeader({
@@ -19,21 +26,24 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-tight text-slate-950">{title}</h1>
-        <p className="mt-1 max-w-2xl text-[13px] leading-5 text-slate-500">{description}</p>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="text-balance text-[26px] font-semibold leading-8 tracking-tight text-slate-950">
+          {title}
+        </h1>
+        <p className="mt-1.5 max-w-2xl text-[13px] leading-6 text-slate-500">{description}</p>
       </div>
       {children ? <div className="shrink-0">{children}</div> : null}
     </div>
   );
 }
 
-/** A bordered surface. No shadow by default — borders read cleaner at these sizes. */
+/** A bordered surface matching the product's section panels. */
 export function Panel({
   title,
   description,
   action,
+  icon,
   children,
   className,
   padded = true,
@@ -41,26 +51,40 @@ export function Panel({
   title?: string;
   description?: string;
   action?: ReactNode;
+  /** Optional leading icon, rendered in the product's brand-tinted chip. */
+  icon?: LucideIcon;
   children: ReactNode;
   className?: string;
   padded?: boolean;
 }) {
+  const Icon = icon;
+
   return (
     <section
-      className={cn("overflow-hidden rounded-xl border border-slate-200 bg-white", className)}
+      className={cn(
+        "overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-xs",
+        className,
+      )}
     >
       {title ? (
-        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-          <div>
-            <h2 className="text-[13px] font-semibold text-slate-900">{title}</h2>
-            {description ? (
-              <p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p>
+        <header className="flex items-start justify-between gap-4 border-b border-slate-200/70 px-5 py-4 sm:px-6">
+          <div className="flex min-w-0 items-start gap-3">
+            {Icon ? (
+              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                <Icon className="size-4" aria-hidden />
+              </span>
             ) : null}
+            <div className="min-w-0">
+              <h2 className="text-[14px] font-semibold tracking-tight text-slate-900">{title}</h2>
+              {description ? (
+                <p className="mt-0.5 text-[12px] leading-5 text-slate-500">{description}</p>
+              ) : null}
+            </div>
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
         </header>
       ) : null}
-      <div className={padded ? "p-5" : ""}>{children}</div>
+      <div className={padded ? "p-5 sm:p-6" : ""}>{children}</div>
     </section>
   );
 }
@@ -69,26 +93,37 @@ export function StatTile({
   label,
   value,
   hint,
+  icon,
   accent = false,
 }: {
   label: string;
   /** `null` renders an em-dash. We never substitute a fabricated number. */
   value: string | number | null;
   hint?: string;
+  icon?: LucideIcon;
   accent?: boolean;
 }) {
+  const Icon = icon;
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <p className="text-[12px] font-medium text-slate-500">{label}</p>
+    <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-200 shadow-xs">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[13px] font-medium leading-5 text-slate-600">{label}</p>
+        {Icon ? (
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+            <Icon className="size-4" aria-hidden />
+          </span>
+        ) : null}
+      </div>
       <p
         className={cn(
-          "mt-1.5 text-[26px] font-semibold leading-none tracking-tight tabular-nums",
+          "mt-3 text-[28px] font-semibold leading-none tracking-tight tabular-nums",
           accent ? "text-brand-600" : "text-slate-950",
         )}
       >
         {value === null ? "—" : value}
       </p>
-      {hint ? <p className="mt-2 text-[11px] leading-4 text-slate-500">{hint}</p> : null}
+      {hint ? <p className="mt-2.5 text-xs leading-4 text-slate-500">{hint}</p> : null}
     </div>
   );
 }
@@ -122,7 +157,13 @@ export function StatusPill({
   );
 }
 
-/** A compact, scrollable table with a sticky header. */
+/**
+ * A compact, scrollable table with a tinted header and row hover.
+ *
+ * The hover state lives on the row's cells rather than the `<tr>` because a
+ * background on `<tr>` is painted under the cells and can be obscured by them
+ * in some engines.
+ */
 export function DataTable({
   children,
   className,
@@ -132,7 +173,9 @@ export function DataTable({
 }) {
   return (
     <div className={cn("overflow-x-auto", className)}>
-      <table className="w-full min-w-max border-collapse text-left">{children}</table>
+      <table className="w-full min-w-max border-collapse text-left [&_tbody>tr:hover>td]:bg-slate-50/70">
+        {children}
+      </table>
     </div>
   );
 }
@@ -155,7 +198,7 @@ export function Td({ children, className }: { children?: ReactNode; className?: 
   return (
     <td
       className={cn(
-        "whitespace-nowrap border-b border-slate-100 px-4 py-2.5 text-[13px] text-slate-700",
+        "whitespace-nowrap border-b border-slate-100 px-4 py-2.5 text-[13px] text-slate-700 transition-colors",
         className,
       )}
     >
@@ -164,11 +207,62 @@ export function Td({ children, className }: { children?: ReactNode; className?: 
   );
 }
 
-export function EmptyRow({ colSpan, children }: { colSpan: number; children: ReactNode }) {
+/**
+ * Placeholder rows shown while the first page loads.
+ *
+ * These reserve the same height as real rows so the panel does not collapse
+ * and then jump when data arrives — the layout shift is the complaint, not the
+ * wait. `Skeleton` respects `prefers-reduced-motion`.
+ */
+export function SkeletonRows({ rows, columns }: { rows: number; columns: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }, (_, row) => (
+        <tr key={row}>
+          {Array.from({ length: columns }, (_, column) => (
+            <td key={column} className="border-b border-slate-100 px-4 py-2.5">
+              <Skeleton
+                className="h-4"
+                // First column carries the primary label, so it is wider.
+                style={{ width: column === 0 ? "65%" : "45%" }}
+              />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+export function EmptyRow({
+  colSpan,
+  icon,
+  children,
+}: {
+  colSpan: number;
+  icon?: LucideIcon;
+  children: ReactNode;
+}) {
+  const Icon = icon;
+
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-10 text-center text-[13px] text-slate-500">
-        {children}
+      <td colSpan={colSpan} className="px-4 py-12">
+        <div className="flex flex-col items-center justify-center text-center">
+          {Icon ? (
+            <span className="flex size-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-xs ring-1 ring-slate-200">
+              <Icon className="size-5" aria-hidden />
+            </span>
+          ) : null}
+          <p
+            className={cn(
+              "max-w-sm text-[13px] leading-6 text-slate-500",
+              Icon ? "mt-3" : undefined,
+            )}
+          >
+            {children}
+          </p>
+        </div>
       </td>
     </tr>
   );
