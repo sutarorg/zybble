@@ -10,9 +10,19 @@ import { Badge } from "@/components/ui/badge";
 import { posts, readingTimeFor } from "@/lib/blog";
 
 export const metadata: Metadata = {
-  title: "Blog — LinkedIn growth, scheduling and analytics",
+  title: { absolute: "LinkedIn Growth Blogs | Zybble" },
   description:
-    "Practical writing on LinkedIn strategy, scheduling systems and analytics that matter — for B2B founders, consultants and creators.",
+    "Explore practical LinkedIn guides covering content strategy, post scheduling, engagement analytics, personal branding and B2B audience growth.",
+  keywords: [
+    "LinkedIn growth blog",
+    "LinkedIn marketing tips",
+    "LinkedIn content strategy",
+    "LinkedIn scheduling tips",
+    "LinkedIn analytics guides",
+    "LinkedIn engagement tips",
+    "B2B LinkedIn marketing",
+    "LinkedIn personal branding",
+  ],
   alternates: { canonical: "/blog" },
 };
 

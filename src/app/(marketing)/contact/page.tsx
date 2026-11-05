@@ -9,14 +9,24 @@ import { ContactForm } from "@/components/marketing/contact-form";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Contact Zybble — support, feedback and security reports",
+  title: { absolute: "Contact Zybble" },
   description:
-    "Get in touch with the Zybble team: product support, billing questions, feedback and security reports. Messages reach the founder directly.",
+    "Contact Zybble for product questions, technical support, business enquiries and partnership opportunities related to LinkedIn scheduling and analytics.",
+  keywords: [
+    "contact Zybble",
+    "Zybble support",
+    "LinkedIn scheduler support",
+    "LinkedIn analytics support",
+    "Zybble contact details",
+    "SaaS customer support",
+    "business enquiries",
+    "LinkedIn software assistance",
+  ],
   alternates: { canonical: "/contact" },
   openGraph: {
     type: "website",
     url: `${siteConfig.url}/contact`,
-    title: "Contact Zybble — support, feedback and security reports",
+    title: "Contact Zybble",
     description: "Questions about Zybble? Messages reach the founder directly.",
   },
 };

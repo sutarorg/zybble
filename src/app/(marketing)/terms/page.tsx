@@ -5,9 +5,19 @@ import { Reveal } from "@/components/motion/reveal";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Terms of Service",
+  title: { absolute: "Zybble Terms of Service" },
   description:
-    "The terms that govern your use of Zybble: plans, acceptable use, LinkedIn's rules, cancellation and liability.",
+    "Review Zybble's terms of service covering account usage, subscriptions, LinkedIn integrations, payments, user responsibilities and platform conditions.",
+  keywords: [
+    "Zybble terms of service",
+    "Zybble terms and conditions",
+    "LinkedIn scheduler terms",
+    "SaaS subscription terms",
+    "software usage conditions",
+    "account terms",
+    "subscription conditions",
+    "platform policies",
+  ],
   alternates: { canonical: "/terms" },
 };
 

@@ -10,9 +10,19 @@ import { Reveal } from "@/components/motion/reveal";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Pricing — Free forever, Pro at $15 per seat",
+  title: { absolute: "Zybble Pricing" },
   description:
-    "Zybble pricing: a genuinely free plan with 10 scheduled posts a month, and Pro at $15 per seat per month with unlimited scheduling, 12-month analytics and team collaboration.",
+    "Explore Zybble's Free and Pro plans for LinkedIn scheduling and analytics. Start free or unlock advanced insights for just $15 per seat monthly.",
+  keywords: [
+    "LinkedIn scheduler pricing",
+    "LinkedIn analytics pricing",
+    "LinkedIn scheduling software cost",
+    "free LinkedIn scheduler",
+    "affordable LinkedIn scheduler",
+    "LinkedIn management tool pricing",
+    "LinkedIn scheduling subscription",
+    "Zybble Pro",
+  ],
   alternates: { canonical: "/pricing" },
 };
 

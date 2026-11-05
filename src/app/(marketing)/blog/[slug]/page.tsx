@@ -36,8 +36,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const post = getPost(slug);
   if (!post) return {};
   return {
-    title: post.title,
-    description: post.description,
+    /**
+     * `absolute` bypasses the root layout's `%s · Zybble` template. Each
+     * article's search title is specified individually and several already
+     * read correctly without a brand suffix, which would otherwise eat the
+     * ~60 characters Google shows before truncating.
+     */
+    title: { absolute: post.metaTitle ?? post.title },
+    description: post.metaDescription ?? post.description,
+    keywords: post.keywords,
     alternates: { canonical: `/blog/${post.slug}` },
     // Indexed, and safe to index: every article is original prose with a
     // canonical pointing at its own URL. No private or duplicate surface here.
@@ -45,6 +52,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       type: "article",
       url: `${siteConfig.url}/blog/${post.slug}`,
+      /**
+       * Social cards keep the editorial headline, not the search title.
+       * A shared link lands on a page whose H1 is `post.title`, and a card
+       * that promises a different headline than the page then delivers reads
+       * as a mismatch — the query-matching that justifies `metaTitle` in a
+       * SERP does not apply when someone is choosing whether to click a link
+       * a colleague pasted.
+       */
       title: post.title,
       description: post.description,
       publishedTime: post.publishedAt,

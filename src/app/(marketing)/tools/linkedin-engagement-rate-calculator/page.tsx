@@ -10,14 +10,24 @@ import { EngagementCalculator } from "@/components/tools/engagement-calculator";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "LinkedIn Engagement Rate Calculator — free, no signup",
+  title: { absolute: "LinkedIn Engagement Rate Calculator" },
   description:
-    "Calculate your LinkedIn engagement rate for free. Choose your denominator (impressions or reach), see the full calculation broken down, and learn how to read the result.",
+    "Calculate your LinkedIn engagement rate for free using impressions, reactions, comments and reposts. Understand your post performance with Zybble.",
+  keywords: [
+    "LinkedIn engagement rate calculator",
+    "calculate LinkedIn engagement rate",
+    "LinkedIn engagement calculator",
+    "LinkedIn post engagement",
+    "LinkedIn engagement formula",
+    "LinkedIn impressions engagement",
+    "social media engagement calculator",
+    "LinkedIn performance measurement",
+  ],
   alternates: { canonical: "/tools/linkedin-engagement-rate-calculator" },
   openGraph: {
     type: "website",
     url: `${siteConfig.url}/tools/linkedin-engagement-rate-calculator`,
-    title: "LinkedIn Engagement Rate Calculator — free, no signup",
+    title: "LinkedIn Engagement Rate Calculator",
     description:
       "Turn impressions, reactions, comments and reposts into an engagement rate — with the formula and the denominator choice shown, not hidden.",
   },

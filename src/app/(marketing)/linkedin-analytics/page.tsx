@@ -13,9 +13,19 @@ import { Reveal } from "@/components/motion/reveal";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "LinkedIn Analytics — know what actually worked",
+  title: { absolute: "LinkedIn Analytics Tool" },
   description:
-    "Zybble LinkedIn analytics: per-post impressions, reactions, comments, reposts and engagement rate, with 7-day history on Free and 12-month advanced analytics plus best-time insights on Pro.",
+    "Understand your LinkedIn performance with post analytics. Track impressions, reactions, comments and engagement to improve your content strategy.",
+  keywords: [
+    "LinkedIn analytics tool",
+    "LinkedIn post analytics",
+    "LinkedIn engagement analytics",
+    "LinkedIn impressions tracker",
+    "LinkedIn engagement rate",
+    "LinkedIn post performance",
+    "LinkedIn analytics dashboard",
+    "LinkedIn content insights",
+  ],
   alternates: { canonical: "/linkedin-analytics" },
 };
 

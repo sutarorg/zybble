@@ -10,14 +10,24 @@ import { FREE_TOOLS, type FreeTool } from "@/lib/free-tools";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Free LinkedIn Tools — engagement rate, calendar, counter & more",
+  title: { absolute: "Free LinkedIn Tools" },
   description:
-    "Four genuinely free LinkedIn tools: engagement rate calculator, content calendar template, character counter and keyword analyzer. No signup, no email gate — everything runs in your browser.",
+    "Explore free LinkedIn tools from Zybble, including an engagement calculator, content calendar template, character counter and keyword analyzer.",
+  keywords: [
+    "free LinkedIn tools",
+    "LinkedIn tools online",
+    "LinkedIn engagement calculator",
+    "LinkedIn content calendar",
+    "LinkedIn character counter",
+    "LinkedIn keyword analyzer",
+    "LinkedIn content planning tools",
+    "free LinkedIn resources",
+  ],
   alternates: { canonical: "/free-linkedin-tools" },
   openGraph: {
     type: "website",
     url: `${siteConfig.url}/free-linkedin-tools`,
-    title: "Free LinkedIn Tools — engagement rate, calendar, counter & more",
+    title: "Free LinkedIn Tools",
     description:
       "Calculate, plan, count and analyse — four working LinkedIn tools that are actually free, with no registration.",
   },

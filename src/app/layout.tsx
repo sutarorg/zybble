@@ -64,9 +64,27 @@ export const metadata: Metadata = {
    * exists (which it must, for the iOS Home Screen entry below).
    * `apple-touch-icon.png` is flattened onto white on purpose — iOS renders
    * PNG transparency as black, so the transparent master cannot be reused.
+   *
+   * Favicon sizes, and why they are listed smallest-first:
+   *
+   *  - Google Search renders a favicon next to the site name, and asks for a
+   *    square at least 8x8 that it recommends making larger than 48x48. The
+   *    sizes below are multiples of 48 (48, 96, 144) so Googlebot-Image is
+   *    offered clean, already-square rasters at the scale it downscales from,
+   *    rather than only the 256x256 master.
+   *  - `/favicon.ico` is kept at the root because that is the path Google's
+   *    own documentation uses and the one a crawler requests by convention
+   *    even when no link tag is seen. It carries 16/32/48/64 variants.
+   *  - The URLs are stable (no content hash), which Google requires: a
+   *    favicon whose URL changes on every deploy is treated as a new asset.
+   *  - None of these paths are disallowed in robots.txt, so Googlebot-Image
+   *    can fetch them.
    */
   icons: {
     icon: [
+      { url: "/favicon-48x48.png", type: "image/png", sizes: "48x48" },
+      { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
+      { url: "/favicon-144x144.png", type: "image/png", sizes: "144x144" },
       { url: "/icon.png", type: "image/png", sizes: "256x256" },
       { url: "/favicon.ico", sizes: "any" },
     ],
