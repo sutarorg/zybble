@@ -37,12 +37,18 @@ export type GoProDialogProps = {
   fallback?: { label: string; onClick: () => void };
 };
 
+/**
+ * Kept to five short lines. This dialog appears when someone has just hit a
+ * wall, so the list is there to be scanned in a couple of seconds — a benefit
+ * that needs a second clause to make sense is doing the work of copy that
+ * belongs on the pricing page. Each line still maps to a real entitlement.
+ */
 const BENEFITS = [
   "Unlimited scheduled posts",
-  "Up to 5 LinkedIn accounts per workspace",
-  "12 months of analytics history instead of 7 days",
-  "Best-time insights from your own posting history",
-  "Up to 3 workspaces, with team collaboration",
+  "Up to 5 LinkedIn accounts",
+  "12 months of analytics",
+  "Best-time insights",
+  "3 workspaces with teams",
 ];
 
 export function GoProDialog({
@@ -71,11 +77,11 @@ export function GoProDialog({
           </p>
         )}
 
-        <ul className="mt-4 space-y-2.5">
+        <ul className="mt-4 space-y-2">
           {BENEFITS.map((benefit) => (
-            <li key={benefit} className="flex items-start gap-2.5">
-              <Check className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
-              <span className="text-[14px] leading-6 text-slate-700">{benefit}</span>
+            <li key={benefit} className="flex items-center gap-2.5">
+              <Check className="size-4 shrink-0 text-brand-600" aria-hidden />
+              <span className="text-[13px] leading-5 text-slate-700">{benefit}</span>
             </li>
           ))}
         </ul>
@@ -91,8 +97,8 @@ export function GoProDialog({
           </Button>
         </DialogFooter>
 
-        <p className="mt-3 text-xs leading-5 text-slate-500">
-          $15 per seat / month. Billed per workspace, and nothing is charged until you confirm.
+        <p className="mt-4 text-xs text-slate-500">
+          $15 per seat / month. Nothing is charged until you confirm.
         </p>
       </DialogContent>
     </Dialog>

@@ -236,10 +236,6 @@ export default function AccountSettingsPage() {
                 <div>
                   <Label htmlFor="acct-email">Email</Label>
                   <Input id="acct-email" type="email" value={email} disabled autoComplete="email" />
-                  <p className="mt-1.5 text-xs text-slate-500">
-                    Email changes require re-verification, which is handled by Supabase Auth&rsquo;s
-                    own flow — it is not editable here.
-                  </p>
                 </div>
               </div>
 
@@ -456,12 +452,6 @@ export default function AccountSettingsPage() {
                     {devices.error}
                   </p>
                 )}
-
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Location is inferred from the network a device connected from, so it is
-                  approximate — and often simply unavailable. Removing a device clears it from this
-                  list; to end every session at once, change your password.
-                </p>
               </div>
             </div>
           </div>

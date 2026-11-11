@@ -150,7 +150,7 @@ export function WorkspaceSwitcher() {
             type="button"
             className="flex w-full items-center gap-2.5 rounded-xl bg-white px-3 py-2.5 text-left ring-1 ring-slate-200 shadow-xs transition hover:ring-slate-300 focus-visible:outline-2 focus-visible:outline-brand-600"
           >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-xs font-semibold text-white">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-[13px] font-semibold text-white">
               {(current.name.trim()[0] ?? "Z").toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">
@@ -158,42 +158,70 @@ export function WorkspaceSwitcher() {
                 {current.name}
               </span>
               <span className="block text-xs text-slate-500">
-                {current.plan === "pro" ? "Pro" : "Free"} plan · {workspaces.length} of{" "}
-                {workspaceLimit} {workspaceLimit === 1 ? "workspace" : "workspaces"}
+                {current.plan === "pro" ? "Pro" : "Free"} plan
               </span>
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-slate-500" aria-hidden />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-          {workspaces.map((workspace) => (
-            <DropdownMenuItem
-              key={workspace.id}
-              onSelect={() => void switchTo(workspace)}
-              disabled={pending !== null}
-            >
-              <span className="flex size-6 items-center justify-center rounded-md bg-brand-600 text-[11px] font-semibold text-white">
-                {(workspace.name.trim()[0] ?? "Z").toUpperCase()}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-              {pending === workspace.id ? (
-                <Loader2 className="ml-auto size-4 animate-spin" aria-hidden />
-              ) : (
-                workspace.id === current.id && (
-                  <Check className="ml-auto size-4 !text-brand-600" aria-hidden />
-                )
-              )}
-            </DropdownMenuItem>
-          ))}
+        {/*
+          Wider than the trigger on purpose. Matching the trigger's width left
+          every row cramped, and a second line would not fit at all. The cap
+          keeps it inside a narrow phone viewport.
+        */}
+        <DropdownMenuContent
+          align="start"
+          className="w-[17.5rem] max-w-[calc(100vw-2rem)] p-1.5"
+        >
+          <DropdownMenuLabel className="flex items-center justify-between gap-2">
+            <span>Workspaces</span>
+            {/* The count lives here rather than on the trigger: it belongs to
+                the list, and the trigger reads better without it. */}
+            <span className="text-[11px] font-normal tabular-nums text-slate-400">
+              {workspaces.length} of {workspaceLimit}
+            </span>
+          </DropdownMenuLabel>
+
+          <div className="mt-1 space-y-0.5">
+            {workspaces.map((workspace) => (
+              <DropdownMenuItem
+                key={workspace.id}
+                onSelect={() => void switchTo(workspace)}
+                disabled={pending !== null}
+                className="gap-3 px-2 py-2"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-[13px] font-semibold text-white">
+                  {(workspace.name.trim()[0] ?? "Z").toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium leading-5 text-slate-900">
+                    {workspace.name}
+                  </span>
+                  <span className="block text-[11px] leading-4 text-slate-500">
+                    {workspace.plan === "pro" ? "Pro" : "Free"} plan
+                  </span>
+                </span>
+                {pending === workspace.id ? (
+                  <Loader2 className="ml-auto size-4 animate-spin" aria-hidden />
+                ) : (
+                  workspace.id === current.id && (
+                    <Check className="ml-auto size-4 !text-brand-600" aria-hidden />
+                  )
+                )}
+              </DropdownMenuItem>
+            ))}
+          </div>
+
           <DropdownMenuSeparator />
+
           {workspacesFull && (
-            <p className="px-2 py-1.5 text-[11px] leading-4 text-slate-500">
+            <p className="px-2 pb-1.5 text-[11px] leading-4 text-slate-500">
               {workspaceLimit === 1
-                ? "The Free plan includes one workspace. Upgrade to Pro for up to three."
-                : "You have used all three workspaces included in Pro."}
+                ? "The Free plan includes one workspace. Pro allows three."
+                : "All three Pro workspaces are in use."}
             </p>
           )}
+
           <DropdownMenuItem
             disabled={workspacesFull}
             onSelect={(event) => {
@@ -203,8 +231,10 @@ export function WorkspaceSwitcher() {
               setCreateOpen(true);
             }}
           >
-            <Plus className="size-4" aria-hidden />
-            Create workspace
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+              <Plus className="size-4" aria-hidden />
+            </span>
+            <span className="text-[13px]">Create workspace</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
