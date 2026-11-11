@@ -42,29 +42,28 @@ export function ConnectLinkedInDialog({ children }: { children: ReactNode }) {
           </span>
           <DialogTitle className="pt-3">Connect LinkedIn to Zybble</DialogTitle>
           <DialogDescription>
-            Connection happens through LinkedIn&rsquo;s official OAuth 2.0 consent flow — here is
-            exactly what that means before you start.
+            You approve the connection on linkedin.com, then come straight back.
           </DialogDescription>
         </DialogHeader>
 
-        <ul className="mt-4 space-y-3.5">
+        <ul className="mt-4 space-y-3">
           {[
             {
               icon: ShieldCheck,
-              text: "You authorise on linkedin.com. Zybble never sees or stores your LinkedIn password.",
+              text: "Approved on linkedin.com — Zybble never sees your password.",
             },
             {
               icon: Zap,
-              text: `Zybble requests only the scopes this app is approved for: ${scopes.join(", ")}.`,
+              text: `Only these scopes are requested: ${scopes.join(", ")}.`,
             },
             {
               icon: Eye,
-              text: "The access token is encrypted with AES-256-GCM before it is stored, and is only ever decrypted server-side.",
+              text: "Tokens are AES-256-GCM encrypted and decrypted only server-side.",
             },
           ].map((row) => (
             <li key={row.text} className="flex gap-3">
               <row.icon className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
-              <span className="text-sm leading-6 text-slate-600">{row.text}</span>
+              <span className="text-[13px] leading-5 text-slate-600">{row.text}</span>
             </li>
           ))}
         </ul>
@@ -73,10 +72,10 @@ export function ConnectLinkedInDialog({ children }: { children: ReactNode }) {
           <div className="mt-5 rounded-xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
             <p className="flex items-start gap-2 text-[13px] leading-6 text-amber-900">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-              LinkedIn credentials are not configured on this deployment, so the connect button is
-              disabled. Add <code className="font-mono text-[12px]">LINKEDIN_CLIENT_ID</code> and{" "}
+              LinkedIn credentials are not configured, so connecting is disabled. Add{" "}
+              <code className="font-mono text-[12px]">LINKEDIN_CLIENT_ID</code> and{" "}
               <code className="font-mono text-[12px]">LINKEDIN_CLIENT_SECRET</code> to the server
-              environment to enable it.
+              environment.
             </p>
           </div>
         )}
@@ -84,11 +83,10 @@ export function ConnectLinkedInDialog({ children }: { children: ReactNode }) {
         {configured && capabilities !== null && !capabilities.analytics && (
           <div className="mt-5 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
             <p className="text-[13px] leading-6 text-slate-600">
-              <strong className="font-semibold">Analytics are not enabled.</strong> Post analytics
-              need <code className="font-mono text-[12px]">r_member_postAnalytics</code>, which
-              LinkedIn grants only to apps accepted into the Community Management API programme.
-              Until that access is approved, Zybble publishes reliably and shows analytics as
-              unavailable — it never estimates numbers.
+              <strong className="font-semibold">Analytics unavailable.</strong> Post analytics need{" "}
+              <code className="font-mono text-[12px]">r_member_postAnalytics</code>, which LinkedIn
+              grants only to approved apps. Publishing is unaffected — Zybble never estimates
+              numbers.
             </p>
           </div>
         )}
