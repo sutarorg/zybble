@@ -221,10 +221,6 @@ export default function BillingSettingsPage() {
                   Upgrade to Pro
                 </Button>
               )}
-              <p className="mt-2.5 text-center text-xs leading-5 text-slate-500">
-                One seat = one active workspace member · cancel anytime · cards handled by Dodo
-                Payments, never stored by Zybble
-              </p>
               {!canManage && state && (
                 <p className="mt-2 text-center text-xs text-slate-500">
                   Only owners and admins can change billing.
